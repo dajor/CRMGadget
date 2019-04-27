@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="440" height="470"
+	title="{i18n._('LINKTO_TITLE_LINK_EDITOR')}" 
+	creationComplete="initEntities(); updateInfo(); focusManager.setFocus(searchInput)"
+	showFlexChrome="false" transparent="true" systemChrome="none">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.BaseDAO;
+			import gadget.dao.Database;
+			import gadget.dao.LinkDAO;
+			import gadget.i18n.i18n;
+			import gadget.lists.LinkList;
+			import gadget.util.FieldUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.OOPS;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			[Bindable] public var item:Object; 
+			[Bindable] private var allItems:ArrayCollection; 
+			public var linkList:LinkList;
+			private var entities:ArrayCollection;
+			private function init():void{
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+				
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function link():Boolean {
+				var referenced:ArrayCollection = Relation.getReferenced(item.gadget_type);
+				var referencers:ArrayCollection = Relation.getReferencers(item.gadget_type);
+				var relation:Object, source:Object, dest:Object;
+				// relation based on support table (when relationship between entities is m:n)
+				for each (relation in referenced) {
+					if (relation.supportTable != null && relation.entitySrc == item.gadget_type	
+						&& resultList.selectedItem !=null && relation.entityDest == resultList.selectedItem.gadget_type) {
+						source = Database.getDao(relation.entitySrc).findByGadgetId(item.gadget_id); 
+						dest = Database.getDao(relation.entityDest).findByGadgetId(resultList.selectedItem.gadget_id);
+						linkObjectsOverSupportTable(source, dest, relation.keySrc, relation.keyDest, relation.supportTable);
+					}
+				}
+				for each (relation in referencers) {
+					if (relation.supportTable != null && relation.entityDest == item.gadget_type
+						&& resultList.selectedItem !=null && relation.entitySrc == resultList.selectedItem.gadget_type) {
+						source = Database.getDao(relation.entitySrc).findByGadgetId(resultList.selectedItem.gadget_id); 
+						dest = Database.getDao(relation.entityDest).findByGadgetId(item.gadget_id);
+						linkObjectsOverSupportTable(source, dest, relation.keySrc, relation.keyDest, relation.supportTable);
+					}
+				}
+				// 1:n relations
+				for each (relation in referenced) {
+					if (relation.supportTable == null && relation.entitySrc == item.gadget_type 
+						&& resultList.selectedItem !=null && relation.entityDest == resultList.selectedItem.gadget_type) {
+						source = Database.getDao(relation.entitySrc).findByGadgetId(item.gadget_id); 
+						dest = Database.getDao(relation.entityDest).findByGadgetId(resultList.selectedItem.gadget_id);
+						linkObjects(source, dest, relation.keySrc, relation.keyDest, relation.labelSrc, relation.labelDest);
+						return false;
+					}
+				}
+				
+				for each (relation in referencers) {
+					if (relation.supportTable == null && relation.entityDest == item.gadget_type
+						&& resultList.selectedItem !=null && relation.entitySrc == resultList.selectedItem.gadget_type) {
+						source = Database.getDao(relation.entitySrc).findByGadgetId(resultList.selectedItem.gadget_id); 
+						dest = Database.getDao(relation.entityDest).findByGadgetId(item.gadget_id);
+						linkObjects(source, dest, relation.keySrc, relation.keyDest, relation.labelSrc, relation.labelDest);
+						return false;
+					}
+				}
+				return false;
+			}
+
+			private function linkObjectsOverSupportTable(source:Object, dest:Object, keySrc:String, keyDest:String, supportTable:String):void {
+				var link:Object = new Object();
+				//VAHI We have a problem here in case of WS2.0 keySrc=="Id" or keyDest=="Id"
+				OOPS("=missing",i18n._("GLOBAL_LINKING_OF_RECORDS_CURRENTLY_DISABLED"));
+/*
+				link[keySrc] = source[keySrc];
+				link[keyDest] = dest[keyDest];
+				if (!Database.getSupportDao(supportTable)) {
+					Database.getSupportDao(supportTable).insert(link);
+					showLinkMessage(source, dest);
+				} else {
+					contentshow.visible = true;
+					var message:String = "Link already exists.";
+					lblShowMessage.measureText(message);
+					lblShowMessage.text = message;
+				}
+*/
+			}
+			
+			private function linkObjects(source:Object, dest:Object, keySrc:String, keyDest:String, labelSrc:Array, labelDest:Array):void {
+				source[keySrc] = dest[keyDest];
+				for (var i:int = 0; i < labelSrc.length; i++) {
+					source[labelSrc[i]] = dest[labelDest[i]];
+				}
+				source.local_update = new Date().getTime();
+				Database.getDao(source.gadget_type).update(source);
+				
+				showLinkMessage(source, dest);
+			}
+			
+			private function showLinkMessage(source:Object, dest:Object):void {
+				var message:String = Utils.getName(source) + "'s " + dest.gadget_type + " " + i18n._('LINKTO_TEXT_SET_TO') + " " + Utils.getName(dest) + ".";
+				contentshow.visible = true;
+				lblShowMessage.measureText(message);
+				lblShowMessage.text = message;
+				linkList.listLinks();
+				if (linkList.list.entity == source.gadget_type) {
+					linkList.list.selectItem(source);
+				}
+			}
+			
+			private function initEntities():void {
+				entities = FieldUtils.linkableEntities(item.gadget_type);
+			}
+			
+			private function doSearch():void {
+				if (searchInput.text.length >= 2) {
+					allItems = Database.linkDao.allItems(entities, searchInput.text.toUpperCase());
+				} else {
+					allItems = null;
+				}
+				updateInfo();
+			}
+
+			private function updateInfo():void {
+				if (allItems != null && allItems.length == 1000) {
+					//CRO 05.01.2011
+					info.text = i18n._('GLOBAL_ONLY_THE_FIRST_1000_MATCHING_ITEMS_ARE_SHOWN');
+				}  else if (allItems != null) {
+					//CRO 05.01.2011
+					info.text = allItems.length + " " + i18n._('GLOBAL_ITEMS_FOUND');
+				} else {
+					//CRO 05.01.2011
+					info.text = i18n._('GLOBAL_PLEASE_ENTER_AT_LEAST_TWO_CHARACTERS_FOR_SEARCH');
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="440" height="470" right="0" bottom="0"> <!--CRO 05.01.2011-->
+		<control:TitleBar icon="@Embed(source='/assets/link.png')" title="{i18n._('GLOBAL_LINK')} {Utils.getName(item)} {i18n._('LINKTO_TITLEBAR_TO')} :"/>
+		<mx:VBox top="32" left="16" right="16">
+			<mx:Form width="100%" paddingBottom="8">
+				<mx:Label id="info" left="0"/><!--CRO 05.01.2011-->
+				<mx:FormItem label="{i18n._('GLOBAL_SEARCH')}">
+					<mx:TextInput id="searchInput" change="doSearch()"/>
+				</mx:FormItem><!--CRO 05.01.2011-->
+				<mx:FormItem label="{i18n._('GLOBAL_RESULTS')}" width="100%">
+					<mx:List id="resultList" doubleClickEnabled="true" doubleClick="link()" width="100%" dataProvider="{allItems}" rowHeight="27" rowCount="10">
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox width="100%" horizontalScrollPolicy="off">
+									<mx:Script>
+										<![CDATA[
+											import gadget.util.ImageUtils;
+										]]>
+									</mx:Script>
+									<mx:Image source="{ImageUtils.getImage(data.gadget_type)}"/>
+									<mx:Label width="100%" text="{data.name}"/>
+								</mx:HBox>
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:List>
+				</mx:FormItem>
+			</mx:Form>
+			<mx:VBox height="100%">
+				<mx:HBox id="contentshow" visible="false">
+					<mx:Image source="{ImageUtils.acceptIcon}" />
+					<mx:Text id="lblShowMessage" width="375" height="30" />
+				</mx:HBox>
+				<mx:HBox horizontalAlign="right" width="100%">
+					<control:DetailButtonBar closeLabel="GLOBAL_CLOSE" buttonLabel="GLOBAL_LINK" action="link"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:VBox>	
+
+	</mx:Canvas>
+	
+</mx:Window>

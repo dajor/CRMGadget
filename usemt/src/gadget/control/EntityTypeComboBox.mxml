@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:ComboBox xmlns:mx="http://www.adobe.com/2006/mxml" labelField="label">
+	<mx:itemRenderer>
+		<mx:Component>
+			<mx:HBox horizontalScrollPolicy="off" horizontalAlign="left" horizontalGap="0">
+				<mx:Script>
+					<![CDATA[
+			    		[Embed(source='/assets/green_circle.png')] [Bindable] public var ProspectImg:Class;
+			    		[Embed(source='/assets/yellow_circle.png')] [Bindable] public var CustomerImg:Class;
+				        [Embed(source='/assets/blue_circle.png')] [Bindable] public var PartnerImg:Class;
+				        [Embed(source='/assets/red_circle.png')] [Bindable] public var CompetitorImg:Class;
+				        [Embed(source='/assets/blank_circle.png')] [Bindable] public var Img:Class;
+					
+					    private function getImage(str:String):Class{
+					        return this[str + "Img"];
+					    }  
+					]]>
+				</mx:Script>
+				<mx:Image id="albumImage" source="{getImage(data.data)}"/>
+				<mx:Label text="{data.label}"/>
+			</mx:HBox>
+		</mx:Component>
+	</mx:itemRenderer>
+</mx:ComboBox>

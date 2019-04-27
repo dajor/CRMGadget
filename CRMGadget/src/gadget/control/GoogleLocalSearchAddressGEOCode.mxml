@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas width="100%"
+		   xmlns:mx="http://www.adobe.com/2006/mxml" 
+		   xmlns:control="gadget.control.*" 
+		   xmlns:s="library://ns.adobe.com/flex/spark"
+		   creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSON;
+			
+			import gadget.dao.Database;
+			import gadget.util.CountryUtils;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.TextInput;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.http.HTTPService;
+			[Bindable] public var addressText:String;
+			[Bindable] public var provider:ArrayCollection;
+			[Bindable] public var clickFunc:Function;
+			[Bindable] public var item:Object;
+			[Bindable] public var fields:Object;
+			[Bindable] public var fieldName:String;
+			private var city:String =  '';
+			private function init():void {
+				toogleSpinner(false);
+			}
+			
+			private function getGeocodeCountry():void {
+				toogleSpinner(true);
+				var curUser:Object = Database.allUsersDao.ownerUser();
+				if(curUser == null||!curUser.hasOwnProperty("Id")){ //In case, there is no user, the current user country is in USA
+					curUser = {PersonalCountry:"United States", Local:"English - United States"};
+				}
+				var component:DisplayObject;
+				if(fields != null){
+					for (var i:int = 0; i < fields.length; i++) {
+						if(fields[i].column_name == "PrimaryBillToCity"){
+							component = fields[i].component;
+							break;
+						}
+					}
+				}
+				
+				if(component != null){
+					if(component is TextInput){
+						city =  (component as TextInput).text;
+					}
+				}
+				
+				var country:String = curUser.PersonalCountry;
+				if(country == "" || country == null){
+					var local:Array = (curUser.Locale as String).split(" - ");
+					country = local[1]; //get the country
+				}
+				
+				var accCounty:String ="";
+				if(item['PrimaryBillToCountry'] != null && item['PrimaryBillToCountry'] != ''){
+					// country of account for searching lacation
+					country = item['PrimaryBillToCountry'];
+				}
+				if(country == "United Kingdom") country = "England";
+
+				var add:String = '';
+				if(!StringUtils.isEmpty(city)){
+					add = city + ',' + country ;
+				}else{
+					add = country ;
+				}
+				
+				// https://maps.googleapis.com/maps/api/place/textsearch/xml?query=restaurants+in+Sydney&sensor=true&key=AIzaSyA1etgU9U1EAccXgrKIit68jBkyQT239LY
+				var url:String = "http://maps.googleapis.com/maps/api/geocode/json?address=" + encodeURI(add) + "&sensor=false";
+				doRequest(url, onGetGeometryComplete);
+				
+				
+				trace("url request center point:" + url);
+				// doRequest(url, onGetGeometryComplete);
+			}
+			
+			private function onGetGeometryComplete(event:ResultEvent):void {
+				try {
+					var json:Object = JSON.decode(event.result as String);
+					trace("url request center point status:" + json.status);
+					trace(json.toString());
+					if(json.status == "OK"){
+						var geometry:Object = json.results[0].geometry;
+						var location:Object = geometry.location;
+						var sw:Object = geometry.bounds.southwest;
+						var ne:Object = geometry.bounds.northeast;
+//						var region:String = json.results[0].address_components[0].short_name;
+						getAddress(new Point(location.lat,location.lng), new Point(sw.lat,sw.lng), new Point(ne.lat,ne.lng));
+					}
+				} catch(ignored:Error) {
+					trace(ignored);
+					toogleSpinner(false);
+				}
+			}			
+			
+			private function getAddress(location:Point, sw:Point, ne:Point):void {
+				toogleSpinner(true);
+				if(StringUtils.isEmpty(address.text)){
+					address.text = "";
+				}
+				var url:String = "http://ajax.googleapis.com/ajax/services/search/local?v=1.0";
+				url += "&q=" + encodeURI(address.text);
+				//url += "&key=ABQIAAAADLVFWzMFYMu28dkOxNfgART-y38ddP0OAp0wGY0-KVK-F9BaeBTlJb_TNeDzXn7pdnOV1YkAG5Qthw";
+				url += "&rsz=8";
+				if( location != null )
+					url += "&sll=" + location.x + "," + location.y;
+				if( sw != null && ne != null )
+					url += "&sspn=" + sw.x + "," + sw.y + "|" + ne.x + "," + ne.y;
+				trace("url get address:" + url);
+				doRequest(url,function(event:ResultEvent):void {
+					try {
+						var res:Object = JSON.decode(event.result as String);
+						trace(res.toString());
+						trace("url request address status:" + res.responseStatus);
+						if(res.responseStatus == "200"){
+							//If the address is not found in center point of the current user, try to search again for world wide.
+							if(res.responseData.results.length == 0 && location != null){ getAddress(null,null,null); return };
+							var _dp:ArrayCollection = new ArrayCollection();
+							for each(var r:Object in res.responseData.results) {
+								var phoneNumbers:Array = r.hasOwnProperty("phoneNumbers") ? r.phoneNumbers : [];
+								if(StringUtils.isEmpty(city)){
+									if("PrimaryShipToStreetAddress" == fieldName){
+										_dp.addItem({
+											data: r.titleNoFormatting,
+											label: r.titleNoFormatting + ", " + r.city,
+											PrimaryShipToStreetAddress: r.streetAddress,
+											PrimaryShipToCity: r.city,
+											PrimaryShipToPostalCode: r.hasOwnProperty("postalCode")?r.postalCode:"",
+											PrimaryShipToCountry: CountryUtils.getCountryByCode(r.country),
+											fieldName : fieldName
+										});
+									}else if("Company"==fieldName){
+										_dp.addItem({
+											data: r.titleNoFormatting,
+											label: r.titleNoFormatting,
+											fieldName : fieldName
+										});
+									}else{
+										_dp.addItem({
+											data: r.titleNoFormatting,
+											label: r.titleNoFormatting + ", " + r.city,
+											PrimaryBillToStreetAddress: r.streetAddress,
+											PrimaryBillToCity: r.city,
+											PrimaryBillToPostalCode: r.hasOwnProperty("postalCode")?r.postalCode:"",
+											PrimaryBillToCountry: CountryUtils.getCountryByCode(r.country),
+											MainPhone: getPhoneNumber(phoneNumbers),
+											MainFax: getPhoneNumber(phoneNumbers, "Fax"),
+											WebSite:"",
+											fieldName : fieldName
+										});
+									}
+									
+								}else if(r.city != null && (r.city as String).toLocaleLowerCase() == city.toLocaleLowerCase()){
+									if("PrimaryShipToStreetAddress" == fieldName){
+										_dp.addItem({
+											data: r.titleNoFormatting,
+											label: r.titleNoFormatting + ", " + r.city,
+											PrimaryShipToStreetAddress: r.streetAddress,
+											PrimaryShipToCity: r.city,
+											PrimaryShipToPostalCode: r.hasOwnProperty("postalCode")?r.postalCode:"",
+											PrimaryShipToCountry: CountryUtils.getCountryByCode(r.country),
+											fieldName : fieldName
+										});
+									}else if("Company"==fieldName){
+										_dp.addItem({
+											data: r.titleNoFormatting,
+											label: r.titleNoFormatting,
+											fieldName : fieldName
+										});
+									}else{
+										_dp.addItem({
+											data: r.titleNoFormatting,
+											label: r.titleNoFormatting + ", " + r.city,
+											PrimaryBillToStreetAddress: r.streetAddress,
+											PrimaryBillToCity: r.city,
+											PrimaryBillToPostalCode: r.hasOwnProperty("postalCode")?r.postalCode:"",
+											PrimaryBillToCountry: CountryUtils.getCountryByCode(r.country),
+											MainPhone: getPhoneNumber(phoneNumbers),
+											MainFax: getPhoneNumber(phoneNumbers, "Fax"),
+											WebSite:"",
+											fieldName : fieldName
+										});
+									}
+									
+								}
+								
+							}
+							
+							if(_dp.length == 0){
+								if("PrimaryShipToStreetAddress" == fieldName){
+									_dp.addItem({
+										data: address.text, 
+										label:"No Data Found", 
+										PrimaryShipToStreetAddress:"", 
+										PrimaryShipToCity:"", 
+										PrimaryShipToPostalCode:"", 
+										PrimaryShipToCountry:"",
+										fieldName : fieldName
+									});
+								
+								}else{
+									_dp.addItem({
+										data: address.text, 
+										label:"No Data Found", 
+										PrimaryBillToStreetAddress:"", 
+										PrimaryBillToCity:"", 
+										PrimaryBillToPostalCode:"", 
+										PrimaryBillToCountry:"",
+										MainPhone: "",
+										MainFax: "",
+										WebSite:"",
+										fieldName : fieldName
+									});
+								}
+								
+							}						
+							address.forceOpen = _dp.length == 0 ? false : true;
+							provider = _dp;
+							toogleSpinner(false);
+						}
+					} catch(ignored:Error) {
+						trace(ignored);
+						toogleSpinner(false);
+					}
+				});
+			}
+			
+			private function getPhoneNumber(phoneNumbers:Array, type:String=""):String {
+				var phoneNum:String="";
+				for each(var o:Object in phoneNumbers) {
+					if(o.type == type) {
+						phoneNum = o.number;
+						break;
+					}
+				}
+				return phoneNum;
+			}
+			
+			private function doRequest(url:String, onCompleteHandler:Function):void {
+				var service:HTTPService = new HTTPService();
+				service.url = url;
+				service.addEventListener(ResultEvent.RESULT, onCompleteHandler);
+				service.send();
+			}
+			
+			private function toogleSpinner(toogle:Boolean):void {
+				if(toogle) {
+					spinner.play();
+					setIncludeLayoutSpinner(true);
+				}else {
+					spinner.stop();
+					setIncludeLayoutSpinner(false);
+				}
+			}
+			
+			private function setIncludeLayoutSpinner(includeLayout:Boolean):void {
+				spinner.includeInLayout = includeLayout;
+				spinner.visible = includeLayout;
+				button.includeInLayout = !includeLayout;
+				button.visible = !includeLayout;
+			}
+			
+			private function labelFunction(item:Object):String {
+				return StringUtils.reduceTextLength(item.label,30);
+			}
+			
+			private function addressKeyHandler(event:KeyboardEvent):void {
+				addressText = address.text;
+				if(event.keyCode == Keyboard.ENTER)
+					getGeocodeCountry();
+			}
+			
+			private function addressChangeHandler(event:Event):void {
+				addressText = address.text;
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:HBox width="100%" verticalAlign="middle">
+		<control:AutoCompleteAddress change="addressChangeHandler(event)" keyDown="addressKeyHandler(event)" id="address" dataProvider="{provider}" text="{addressText}" labelFunction="labelFunction" select="if(clickFunc != null)clickFunc(event)" width="100%" />
+		<control:Spinner id="spinner" tickColor="#66aaff" />
+		<mx:LinkButton id="button" icon="@Embed('/assets/search.png')" click="getGeocodeCountry()" width="24" height="24" />
+	</mx:HBox>
+	
+</mx:Canvas>

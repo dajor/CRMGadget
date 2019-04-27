@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   showFlexChrome="false" systemChrome="none"
+		   title="TCS Kitchen Report"
+		   creationComplete="init()"
+		   width="280" height="180" xmlns:control="gadget.control.*">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.ListEvent;
+			[Bindable] public var item:Object;
+			[Bindable] private var _dataProviderKitenReport:ArrayCollection;
+			private var report:Object;			
+			private var nativeProcessStarupInfo:NativeProcessStartupInfo;
+			private var nativeProcess:NativeProcess;
+			
+			private function init():void {
+				report = Database.reportAdminDao.first();
+				if(report != null && StringUtils.isEmpty(report.report_path)) {
+					Alert.show("Please, install 360 mobileAUDITOR\n for Windows and restart the application", "", Alert.OK, this);	
+				}
+				_dataProviderKitenReport = new ArrayCollection();				
+				_dataProviderKitenReport.addItem({report_name: '', report_code: ''});
+				_dataProviderKitenReport.addAll(new ArrayCollection(Database.reportAdminChildDao.fetch()));
+				//cboKitchenReport.dispatchEvent(new ListEvent(ListEvent.CHANGE));
+			}
+			
+			private function changeHandler(event:Event):void {
+				var data:Object = (event.currentTarget as ComboBox).selectedItem;
+				if(report != null && data != null && !StringUtils.isEmpty(report.report_path) && !StringUtils.isEmpty(report.type) && !StringUtils.isEmpty(data.report_code)) {
+					//var user:Object = Database.allUsersDao.ownerUser();
+					var file:File = File.applicationDirectory.resolvePath(report.report_path);		
+					var auditor:String = report.auditor;
+					if(StringUtils.isEmpty(auditor)){
+						var userDir:String = File.userDirectory.nativePath;
+						auditor = userDir.substr(userDir.lastIndexOf(File.separator) + 1);
+					}
+					var params:String = 'auditor=' + auditor + ' account=' + (item.CustomText42?item.CustomText42:"") + ' form=' + data.report_code + ' type=' + report.type ;
+					//var params:String = 'auditor=Test account=001 form=' + data.report_code + ' type=' + report.type;
+					startupAndLaunchKitchenReport(file, params);
+				}
+			}
+			
+			private function startupAndLaunchKitchenReport(file:File, params:String):void {
+				try {
+					nativeProcessStarupInfo = new NativeProcessStartupInfo();
+					nativeProcess = new NativeProcess();
+					var args:Vector.<String> = new Vector.<String>;
+					var pa:Array = params.split(/\s/gi);
+					for(var i:int = 0; i < pa.length; i++) {
+						args.push(pa[i]);
+					}
+					nativeProcessStarupInfo.executable = file;
+					nativeProcessStarupInfo.arguments = args;
+					nativeProcess = new NativeProcess();
+					nativeProcess.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onStandardOutputData);
+					nativeProcess.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onStandardErrorData);
+					nativeProcess.start(nativeProcessStarupInfo);
+				} catch(e:Error) {
+					//Alert.show("Trace " + e.getStackTrace() + " \nMessage : " + e.message , "", Alert.OK, this);
+					trace(e.getStackTrace());
+				} finally {					
+					nativeProcess.closeInput();
+				}
+			}
+			
+			private function onStandardErrorData(e:ProgressEvent):void{
+				// improve your code here
+				trace(e.toString());
+			}
+			
+			private function onStandardOutputData(e:ProgressEvent):void{
+				// improve your code here
+				var message:String = nativeProcess.standardOutput.readUTFBytes(nativeProcess.standardOutput.bytesAvailable);
+				trace(message);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Style source="styles.css"/>
+	<mx:Canvas width="280" height="180" horizontalScrollPolicy="off" styleName="main" left="0" top="0"  right="0" bottom="0">
+		<control:TitleBar id="titlebar" title="TCS Kitchen Report" y="2" x="25"/>
+		<mx:VBox width="100%" height="100%" paddingTop="35" paddingLeft="10" paddingRight="10">
+			<mx:HBox width="100%" height="120">
+				<mx:Label text="Report" />
+				<mx:ComboBox id="cboKitchenReport" width="180" labelField="report_name" dataProvider="{_dataProviderKitenReport}" change="changeHandler(event);" selectedIndex="0" />
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

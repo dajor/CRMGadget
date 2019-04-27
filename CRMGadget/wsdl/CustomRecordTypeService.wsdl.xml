@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions targetNamespace="urn:crmondemand/ws/odesabs/customrecordtype/" xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:tns="urn:crmondemand/ws/odesabs/customrecordtype/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:apData="urn:/crmondemand/xml/customrecordtype/data" xmlns:apQuery="urn:/crmondemand/xml/customrecordtype/query">
+    <types>
+        <xsd:schema elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="urn:crmondemand/ws/odesabs/customrecordtype/" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+            <xsd:import namespace="urn:/crmondemand/xml/customrecordtype/query"/>
+            <xsd:import namespace="urn:/crmondemand/xml/customrecordtype/data"/>
+            <xsd:element name="CustomRecordTypeReadAll_Input">
+                <xsd:complexType/>
+            </xsd:element>
+            <xsd:element name="CustomRecordTypeReadAll_Output">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element ref="apData:ListOfCustomRecordType"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="CustomRecordTypeRead_Input">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element ref="apQuery:CustomRecordType"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="CustomRecordTypeRead_Output">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element ref="apData:ListOfCustomRecordType"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="CustomRecordTypeUpsert_Input">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element ref="apData:CustomRecordType"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="CustomRecordTypeUpsert_Output">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="Status" type="xsd:string"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:schema>
+        <xsd:schema elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="urn:/crmondemand/xml/customrecordtype/query" xmlns:apQuery="urn:/crmondemand/xml/customrecordtype/query" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+            <xsd:element name="CustomRecordType" type="apQuery:CustomRecordTypeQuery"/>
+            <xsd:complexType name="CustomRecordTypeQuery">
+                <xsd:all>
+                    <xsd:element name="Name" type="xsd:string" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="SingularName" type="xsd:string" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="PluralName" type="xsd:string" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="ShortName" type="xsd:string" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="IconName" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="ListOfCustomRecordTypeTranslations" type="apQuery:ListOfCustomRecordTypeTranslationsQuery" maxOccurs="1" minOccurs="0"/>
+                </xsd:all>
+            </xsd:complexType>
+            <xsd:complexType name="ListOfCustomRecordTypeTranslationsQuery">
+                <xsd:sequence>
+                    <xsd:element name="CustomRecordTypeTranslation" type="apQuery:CustomRecordTypeTranslationQuery" maxOccurs="unbounded" minOccurs="1"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="CustomRecordTypeTranslationQuery">
+                <xsd:all>
+                    <xsd:element name="LanguageCode" type="apQuery:Empty" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="SingularName" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="PluralName" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="ShortName" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+                </xsd:all>
+            </xsd:complexType>
+            <xsd:complexType name="Empty"/>
+        </xsd:schema>
+        <xsd:schema elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="urn:/crmondemand/xml/customrecordtype/data" xmlns:apData="urn:/crmondemand/xml/customrecordtype/data" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+            <xsd:element name="ListOfCustomRecordType" type="apData:ListOfCustomRecordTypeData"/>
+            <xsd:complexType name="ListOfCustomRecordTypeData">
+                <xsd:sequence>
+                    <xsd:element ref="apData:CustomRecordType" maxOccurs="unbounded" minOccurs="1"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:element name="CustomRecordType" type="apData:CustomRecordTypeData"/>
+            <xsd:complexType name="CustomRecordTypeData">
+                <xsd:all>
+                    <xsd:element name="Name" type="xsd:string" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="SingularName" type="xsd:string" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="PluralName" type="xsd:string" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="ShortName" type="xsd:string" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="IconName" type="xsd:string" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="ListOfCustomRecordTypeTranslations" type="apData:ListOfCustomRecordTypeTranslationsData" maxOccurs="1" minOccurs="1"/>
+                </xsd:all>
+            </xsd:complexType>
+            <xsd:complexType name="ListOfCustomRecordTypeTranslationsData">
+                <xsd:sequence>
+                    <xsd:element name="CustomRecordTypeTranslation" type="apData:CustomRecordTypeTranslationData" maxOccurs="unbounded" minOccurs="1"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="CustomRecordTypeTranslationData">
+                <xsd:all>
+                    <xsd:element name="LanguageCode" type="xsd:string" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="SingularName" type="xsd:string" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="PluralName" type="xsd:string" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="ShortName" type="xsd:string" maxOccurs="1" minOccurs="1"/>
+                </xsd:all>
+            </xsd:complexType>
+        </xsd:schema>
+    </types>
+    <message name="CustomRecordTypeReadAll_Input">
+        <part name="CustomRecordTypeReadAll_Input" element="tns:CustomRecordTypeReadAll_Input"/>
+    </message>
+    <message name="CustomRecordTypeReadAll_Output">
+        <part name="CustomRecordTypeReadAll_Output" element="tns:CustomRecordTypeReadAll_Output"/>
+    </message>
+    <message name="CustomRecordTypeRead_Input">
+        <part name="CustomRecordTypeRead_Input" element="tns:CustomRecordTypeRead_Input"/>
+    </message>
+    <message name="CustomRecordTypeRead_Output">
+        <part name="CustomRecordTypeRead_Output" element="tns:CustomRecordTypeRead_Output"/>
+    </message>
+    <message name="CustomRecordTypeUpsert_Input">
+        <part name="CustomRecordTypeUpsert_Input" element="tns:CustomRecordTypeUpsert_Input"/>
+    </message>
+    <message name="CustomRecordTypeUpsert_Output">
+        <part name="CustomRecordTypeUpsert_Output" element="tns:CustomRecordTypeUpsert_Output"/>
+    </message>
+    <portType name="CustomRecordTypeService">
+        <operation name="CustomRecordTypeReadAll">
+            <input message="tns:CustomRecordTypeReadAll_Input"/>
+            <output message="tns:CustomRecordTypeReadAll_Output"/>
+        </operation>
+        <operation name="CustomRecordTypeRead">
+            <input message="tns:CustomRecordTypeRead_Input"/>
+            <output message="tns:CustomRecordTypeRead_Output"/>
+        </operation>
+        <operation name="CustomRecordTypeUpsert">
+            <input message="tns:CustomRecordTypeUpsert_Input"/>
+            <output message="tns:CustomRecordTypeUpsert_Output"/>
+        </operation>
+    </portType>
+    <binding name="CustomRecordTypeService" type="tns:CustomRecordTypeService">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <operation name="CustomRecordTypeReadAll">
+            <soap:operation soapAction="document/urn:crmondemand/ws/odesabs/CustomRecordType/:CustomRecordTypeReadAll"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+        <operation name="CustomRecordTypeRead">
+            <soap:operation soapAction="document/urn:crmondemand/ws/odesabs/CustomRecordType/:CustomRecordTypeRead"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+        <operation name="CustomRecordTypeUpsert">
+            <soap:operation soapAction="document/urn:crmondemand/ws/odesabs/CustomRecordType/:CustomRecordTypeUpsert"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+    </binding>
+    <service name="CustomRecordTypeService">
+        <port name="CustomRecordTypeService" binding="tns:CustomRecordTypeService">
+            <soap:address location="https://secure-ausomxapa.crmondemand.com/Services/cte/CustomRecordTypeService"/>
+        </port>
+    </service>
+</definitions>

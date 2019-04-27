@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false" height="235"
+	width="500" 
+	title="About Record"
+	showFlexChrome="false" systemChrome="none" xmlns:form="gadget.form.*"
+	creationComplete="init()" xmlns:s="library://ns.adobe.com/flex/spark" xmlns:local="*"
+	
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			private var createdOn:String;
+			private var createdBy:String;
+			private var updatedOn:String;
+			private var updatedBy:String;
+			private var lastUpdatedSource:String;
+			private var lastUpdatedOn:String;
+			private var entityId:String;
+			public function doAbout(item:Object,gadget_id:String):void{
+				var obj:Object = item;
+				if(obj.CreatedBy != null){
+					var created:Array = obj.CreatedBy.split(",");
+					createdOn = created[1];
+					createdBy = created[0];
+				}
+				if(obj.ModifiedBy != null){
+					var modified:Array = obj.ModifiedBy.split(",");
+					updatedOn = modified[1];
+					updatedBy = modified[0];
+					lastUpdatedOn = modified[1];
+					lastUpdatedSource = modified[0];
+				}
+				
+				entityId = gadget_id;
+					
+			}
+			private function init():void{
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function doClose():void{
+				close();
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas width="500" height="235" horizontalScrollPolicy="off" styleName="main" left="0" top="0"  right="0" bottom="0">
+		<control:TitleBar id="titlebar" title="{i18n._('GLOBAL_ABOUT_RECORD')}" y="2" x="25"/>
+		<mx:VBox width="100%" paddingTop="35" paddingLeft="20" paddingRight="10" paddingBottom="10" height="230" >
+			<s:Label text=""/>
+			<mx:HBox width="100%" >
+				<mx:HBox width="100%" >
+					<s:Label text="Created On: " height="20" fontWeight="bold" /><s:Label text="{createdOn}" height="20" paddingLeft="2"/>
+				</mx:HBox> 
+				<mx:HBox/>
+				<mx:HBox width="100%" paddingLeft="80">
+					<s:Label text="Row#: " height="20" fontWeight="bold"/><s:Label text="{entityId}" height="20"/>
+				</mx:HBox>
+			</mx:HBox>
+			<mx:HBox width="100%" ><s:Label text="Created By:" height="20" fontWeight="bold"/><s:Label text="{createdBy}" height="20" paddingLeft="10"/></mx:HBox>
+			<mx:HBox width="100%" ><s:Label text="Updated On:" height="20" fontWeight="bold" /><s:Label text="{updatedOn}" height="20" /></mx:HBox>
+			<mx:HBox width="100%" ><s:Label text="Updated By:" height="20" fontWeight="bold" /><s:Label text="{updatedBy}" height="20" paddingLeft="8"/></mx:HBox>
+			<s:Label text=""/>
+		
+			
+			<mx:HBox width="100%" paddingLeft="200" >
+				<s:Button label="OK" click="doClose()"/>
+			</mx:HBox>
+		</mx:VBox>
+		
+		
+	</mx:Canvas>
+
+	
+</mx:Window>

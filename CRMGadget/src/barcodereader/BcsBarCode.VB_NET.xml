@@ -1,0 +1,267 @@
+﻿<?xml version="1.0"?>
+<doc>
+<assembly>
+<name>
+BcsBarCode.VB-NET
+</name>
+</assembly>
+<members>
+<member name="F:BcsBarCode.VB_NET.BcsBarcodeSampleApp.m_bcsApi">
+	<summary>
+ Represents an instance of the wrapper of Bcs.dll.
+ </summary>
+</member><member name="F:BcsBarCode.VB_NET.BcsBarcodeSampleApp.mDownload">
+	<summary>
+ Represents an instance of download mode.
+ </summary>
+</member><member name="F:BcsBarCode.VB_NET.BcsBarcodeSampleApp.LEN_DEVICE_ID">
+	<summary>
+ Represents maximum number of characters in the scanner UserID field.
+ </summary>
+</member><member name="F:BcsBarCode.VB_NET.BcsBarcodeSampleApp.MSG_TITLE">
+	<summary>
+ Represents the title of messages to be shown to user.
+ </summary>
+</member><member name="T:BcsBarCode.VB_NET.BcsBarcodeSampleApp.DOWNLOAD">
+	<summary>
+ These are the possible states of the download mode of scanner data.
+ </summary>
+</member><member name="T:BcsBarCode.VB_NET.BcsBarcodeSampleApp.DISPLAY_STATE">
+	<summary>
+ These are the possible states of the application. These values are used by the
+ UpdateControls function to set the state of the controls on the main dialog.
+ </summary>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnFind_Click(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method to be called to find new bluetooth scanners.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.RefreshConnectionList(BcsBarCode.VB_NET.BcsBarcodeSampleApp.DISPLAY_STATE,System.Boolean)">
+	<summary>
+ Represents tyhe method to refreshes the connection list with new connections discovered.
+ </summary>
+	<param name="displayState">Represents display state.</param>
+	<param name="discoverDevicesDialog"></param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.MyConnectionCallback(System.IntPtr,Microvision.BarCodeScanner.Scanner.ConnectionInfo@)">
+----------------------------------------------------------------------------------------
+ <summary>
+ This is the enumeration callback function. When the Add function is called then this
+ function is called for each port (serial port or USB VCOMM port). It only recognizes
+ VCOMM ports when the USB cable is connected. The COM ports detected may or may not
+ have a scanner attached. This callback populates the connection list box and a member
+ connection array. Activate uses the connection structure stored in the connection list
+ to open a connection to a specific scanner.
+ </summary>
+	<param name="param">[in/out] Generic parameter used to communicate with the function.
+ This is not used and a member array is used to save the connection information.</param>
+	<param name="connectionInfo">[in] Is loaded with connection details when this
+ function is called.</param>
+	<returns>
+ A value &gt;= 0 if enumeration is to continue; less than 0 if enumeration should stop.
+ </returns>
+----------------------------------------------------------------------------------------
+
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.UpdateControls(BcsBarCode.VB_NET.BcsBarcodeSampleApp.DISPLAY_STATE)">
+ -----------------------------------------------------------------------------------------
+ <summary>
+ This function enables and disables the controls that are appropriate for the current state of
+ the application. Handling the controls is critical because many of functions do not contain error
+ checking to insure that the control was activated at an appropriate time. The application assumes
+ that controls that should be selected are not enabled.
+ </summary>
+	<param name="displayState">Set controls as appropriate for this operating state.</param>
+-----------------------------------------------------------------------------------------
+
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnActivate_Click(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method to be called to activate or deactivate bluetooth connection.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.ReadBarCodeData">
+-----------------------------------------------------------------------------------------
+ <summary>
+ When using auto-download the scanner could contain bar codes and the user may have connected
+ the scanner before the application was active. This function starts a download to handle
+ this initial case. If a download starts then the event handler generates a data event that 
+ will trigger the application to read the bar codes.
+ NOTE: The connection to the scanner MUST be open before calling this function.
+ </summary>
+	<returns>
+ true = scanner downloaded data, false = no scanner connected or not data in the scanner.
+ </returns>
+-----------------------------------------------------------------------------------------
+
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.OpenConnection(System.Boolean)">
+-----------------------------------------------------------------------------------------
+ <summary>
+ This function creates a connection to the scanner. The scanner must be connected
+ to the host or be in range with the Bluetooth radio on. Normally you enumerate a list
+ of possible scanners and then select the desired scanner from the list. You can also
+ connect to the first scanner found or use some other algorithm of your choosing to
+ connect to a scanner.
+ After connecting you can either monitor system events (bar code events) or you can manually
+ request a data download.
+ </summary>
+	<param name="connectPrompt">TRUE prompts the user to plug in the scanner, FALSE displays nothing.</param>
+	<returns>
+ TRUE if the scanner was found and the connection has been opened.
+ </returns>
+-----------------------------------------------------------------------------------------
+
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.MyEventCallback(System.IntPtr,Microvision.BarCodeScanner.Scanner.EventType,System.IntPtr)">
+-----------------------------------------------------------------------------------------
+ <summary>
+ Callback function that handles scanner connection events.
+ </summary>
+	<param name="pvParam"></param>
+	<param name="eventType"></param>
+	<param name="pEvent"></param>
+	<returns></returns>
+-----------------------------------------------------------------------------------------
+
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.DataEventReceived(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method to be called to get bar code data.
+ </summary>
+	<param name="s">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.MyBarCodeCallback(System.IntPtr,System.String,System.String,System.String,System.String,System.Int32,System.Int32)">
+	<summary>
+ Represents the method to be called to add the obtained bar code data to a list box.
+ </summary>
+	<param name="pvParam">Parameter passed into BcsGetBarCodesA as the pvParam</param>
+	<param name="symbology">Symbol Identifier (This value is dependent on the setting of the SymIdType property)</param>
+	<param name="timeStamp">Timestamp (This pointer value is only valid if Timestamp = True, otherwise the the pointer value is NULL)</param>
+	<param name="timeType">Time Type (This pointer value is only valid if Timestamp = True, otherwise the the pointer value is NULL).
+ Possible Values: "ok" = Actual Time, or e1, e2, ..., eN = Estimated time after N battery events)</param>
+	<param name="barCode">Bar code data</param>
+	<param name="downloadInfo">Length of the bar code data in characters</param>
+	<returns></returns>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.FormatOutputLine(System.String,System.String)">
+	<summary>
+ Format the bar code, date stamp, and time stamp (if selected). Use the settings in the
+ combo boxes for the date/time format.
+ </summary>
+	<param name="aBarcode">Bar code data read from the scanner.</param>
+	<returns>
+ The formatted string with bar code, date, and time.
+ </returns>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnUserId_Click(System.Object,System.EventArgs)">
+	<summary>
+ The User ID button should only be enabled if there is data in the User ID field. When
+ the user presses this button then write the User ID text to the scanner.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnSave_Click(System.Object,System.EventArgs)">
+	<summary>
+ This function saves the downloaded scanner data in the output list box to the specified file. The
+ SAVE button should not be enabled unless there is data in the filename edit box. After writing
+ the data to the file clear the output list box.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnRemove_Click(System.Object,System.EventArgs)">
+	<summary>
+ This function removes a Bluetooth connection from the connection list.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnDownload_Click(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method to be called when download button is clicked to get bar code data from the scanner.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnClear_Click(System.Object,System.EventArgs)">
+	<summary>
+ This function sends a command instructing the scanner to clear any bar codes buffered in the
+ memory of the scanner. This command is normally not used in a live application since most
+ applications read the data in blocks and delete each block after it is received and verified.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnGetCount_Click(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method to be called when Get Bar Code Count button is 
+ clicked to get count of bar codes in scanner.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnClearList_Click(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method to be called when clear list button is 
+ clicked to clear the list box containing bar codes in scanner.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnInitScanner_Click(System.Object,System.EventArgs)">
+	<summary>
+ Your application should always have a way to initialize a scanner. If the user receives a new
+ scanner from the factory it must be configured once. This function calls scannerConnectionConfigure
+ to open the port and force a scanner initialization. The scanner MUST be connected in order for
+ this to work.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.radManual_CheckedChanged(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method called when manual radio button check state changes.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.radAuto_CheckedChanged(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method called when auto radio button check state changes.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.lstConnection_SelectedIndexChanged(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method to be called when list box selection changes.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.btnGetInfo_Click(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method to be called when Get Info button is clicked.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.BcsBarcodeSampleApp_Load(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method to be called when the screen get loaded.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.editFilename_TextChanged(System.Object,System.EventArgs)">
+	<summary>
+ Represents the method to be called when a file name has been entered into the file name text box.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="M:BcsBarCode.VB_NET.BcsBarcodeSampleApp.editUserId_TextChanged(System.Object,System.EventArgs)">
+	<summary>
+ If the user enters data in the User ID field then enable the SET button. If the field
+ is cleared then disable the button.
+ </summary>
+	<param name="sender">Represents instance raising the event.</param>
+	<param name="e">Represents instance containing event data.</param>
+</member><member name="P:BcsBarCode.VB_NET.My.Resources.Resources.ResourceManager">
+	<summary>
+  Returns the cached ResourceManager instance used by this class.
+</summary>
+</member><member name="P:BcsBarCode.VB_NET.My.Resources.Resources.Culture">
+	<summary>
+  Overrides the current thread's CurrentUICulture property for all
+  resource lookups using this strongly typed resource class.
+</summary>
+</member><member name="T:BcsBarCode.VB_NET.My.Resources.Resources">
+	<summary>
+  A strongly-typed resource class, for looking up localized strings, etc.
+</summary>
+</member>
+</members>
+</doc>

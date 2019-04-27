@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="800" height="400"
+	title="{i18n._(MainWindow.MAINWINDOW_SUBMENU_FIELDMANAGMENT)}"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init()" xmlns:s="library://ns.adobe.com/flex/spark"
+	creationComplete="window1_creationCompleteHandler(event)"
+	
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.crmgadget.eval.Evaluator;
+			
+			import flash.sampler.getSetterInvocationCount;
+			
+			import gadget.control.CalculatedField;
+			import gadget.control.FellowImageRenderer;
+			import gadget.dao.CustomFieldDAO;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.LocaleService;
+			import gadget.service.PicklistService;
+			import gadget.util.CacheUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.ReadCSVFile;
+			import gadget.util.ReadExcelFile;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			import mx.controls.TextArea;
+			import mx.controls.dataGridClasses.DataGridItemRenderer;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.utils.StringUtil;
+			import mx.validators.StringValidator;
+			import mx.validators.Validator;
+			
+				
+			
+			[Bindable] public static var languageCodes:ArrayCollection = new ArrayCollection(
+				[ // {data:"", label:""},
+				{data:"CHS", label:"Chinese (Simplified)"},
+				{data:"DAN", label:"Danish"},
+				{data:"NLD", label:"Dutch"},
+				{data:"ENU", label:"English-American"},
+				{data:"ENG", label:"English-British"},
+				{data:"FIN", label:"Finnish"},
+				{data:"FRA", label:"French"},
+				{data:"DEU", label:"German"},
+				{data:"ITA", label:"Italian"},
+				{data:"JPN", label:"Japanese"},
+				{data:"PTG", label:"Portuguese"},
+				{data:"ESN", label:"Spanish"},
+				{data:"SVE", label:"Swedish"}
+			]);	
+			[Bindable] public static var entityNameList:ArrayCollection = new ArrayCollection(
+				[ {data:"", label:""},
+					{data:"Account", entity:"Account" ,label:"Account"},
+					//{data:"Account.Partner", entity:"Account.Partner", label:"Account Partner"},
+					//{data:"Account.Competitor", entity:"Account.Competitor", label:"Account Competitor"},
+					{data:"Activity", entity:"Activity", label:"Activity"},
+					//{data:"Activity.Product", entity:"Activity.Product", label:"Activity Product"},
+					{data:"BusinessPlan", entity:"BusinessPlan" ,label:"Business Plan"},
+					{data:"Contact", entity:"Contact", label:"Contact"},
+					//{data:"Contact.Related", entity:"Contact.Related", label:"Contact Relationships"},
+					{data:"Opportunity", entity:"Opportunity", label:"Opportunity"},
+					//{data:"Opportunity.Partner", entity:"Opportunity.Partner", label:"Opportunity Partner"},
+					{data:"Opportunity.Product", entity:"Opportunity.Product", label:"Opportunity ProductRevenue"},
+					{data:"Product", entity:"Product", label:"Product"},
+					{data:"Service", entity:"Service Request", label:"Service Request"},
+					{data:"Campaign", entity:"Campaign", label:"Campaign"},					
+					{data:"Asset", entity:"Asset", label:"Asset"},
+					{data:"Lead", entity:"Lead", label:"Lead"},
+					{data:"CustomObject1", entity:"Custom Object 1", label:"Custom Object 1"},
+					{data:"Custom_Object_2", entity:"Custom Object 2", label:"Custom Object 2"},
+					{data:"Custom_Object_3", entity:"Custom Object 3", label:"Custom Object 3"},
+					{data:"CustomObject7", entity:"CustomObject7", label:"Custom Object 7"},
+					{data:"Custom_Object_14", entity:"CustomObject14", label:"Custom Object 14"},
+					{data:"CustomObject6",entity:"CustomObject6", label:"Custom Object 6"},
+					{data:"CustomObject8",entity:"CustomObject8", label:"Custom Object 8"},
+					{data:"CustomObject9",entity:"CustomObject9", label:"Custom Object 9"},
+					{data:"CustomObject10",entity:"CustomObject10", label:"Custom Object 10"},
+					{data:"CustomObject11",entity:"CustomObject11", label:"Custom Object 11"},
+					{data:"CustomObject12",entity:"CustomObject12", label:"Custom Object 12"},
+					{data:"CustomObject13",entity:"CustomObject13", label:"Custom Object 13"},
+					{data:"CustomObject15",entity:"CustomObject15", label:"Custom Object 15"},
+					{data:"CustomObject4", entity:"CustomObject4", label:"Custom Object 4"},
+					{data:"CustomObject5", entity:"CustomObject5", label:"Custom Object 5"}
+
+				]);
+				
+			[Bindable] public static var entityList:ArrayCollection = new ArrayCollection(
+				[ {data:"", label:""},
+					{data:"Account", label:"Account"},
+					{data:"Account.Partner", label:"Account Partner"},
+					{data:"Account.Competitor", label:"Account Competitor"},
+					{data:"Activity", label:"Activity"},
+					{data:"Activity.Product", label:"Activity Product"},
+					{data:"BusinessPlan", label:"Business Plan"},
+					{data:"Contact", label:"Contact"},
+					{data:"Contact.Related", label:"Contact Relationships"},
+					{data:"Opportunity", label:"Opportunity"},
+					{data:"Opportunity.Partner", label:"Opportunity Partner"},
+					{data:"Opportunity.Product", label:"Opportunity ProductRevenue"},
+					{data:"Product", label:"Product"},
+					{data:"Service Request", label:"Service Request"},
+					{data:"Campaign", label:"Campaign"},					
+					{data:"Asset", label:"Asset"},
+					{data:"Lead", label:"Lead"},
+					{data:"Custom Object 1", label:"Custom Object 1"},
+					{data:"Custom Object 2", label:"Custom Object 2"},
+					{data:"Custom Object 3", label:"Custom Object 3"},
+					{data:"CustomObject7", label:"Custom Object 7"},
+					{data:"CustomObject14", label:"Custom Object 14"},
+					{data:"CustomObject6", label:"Custom Object 6"},
+					{data:"CustomObject8", label:"Custom Object 8"},
+					{data:"CustomObject9", label:"Custom Object 9"},
+					{data:"CustomObject10", label:"Custom Object 10"},
+					{data:"CustomObject11", label:"Custom Object 11"},
+					{data:"CustomObject12", label:"Custom Object 12"},
+					{data:"CustomObject13", label:"Custom Object 13"},
+					{data:"CustomObject15", label:"Custom Object 15"},
+					{data:"CustomObject4", label:"Custom Object 4"},
+					{data:"CustomObject5", label:"Custom Object 5"}
+				]);
+			
+			private static var _cache_cascading_crm:CacheUtils = new CacheUtils("cascading_crm");
+			private static var _cache_customField:CacheUtils = new CacheUtils("customField");
+			
+			
+			public static function getEntityDisplayName(item:Object):String{
+				
+				return Database.customLayoutDao.getDisplayName(item.data);				
+				
+			}
+			
+			private function init():void {	
+				// fieldsGrid.dataProvider = Database.customFieldDao.selectAll();
+				fieldsGrid.addEventListener(MouseEvent.DOUBLE_CLICK, function(e:MouseEvent):void{
+					if(e.target is DataGridItemRenderer && !(e.target.data is DataGridColumn)){
+						var cusField:Object = e.target.data;
+						if(cusField.fieldType == "Tree" && cusField.hasOwnProperty("value")) {
+							delete cusField.value;
+						}
+						openWindow_clickHanler(e, cusField);
+					}
+				});
+				cbolanguageCodes.selectedIndex = CalculatedField.getComboSelectedIndex(cbolanguageCodes,CustomFieldDAO.DEFAULT_LANGUAGE_CODE);
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+				
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			public static function getListSelectedData(grid:DataGrid):ArrayCollection{
+				var data:ArrayCollection = grid.dataProvider as ArrayCollection;
+				var selectedList:ArrayCollection = new ArrayCollection();
+				if(data != null){
+					for(var i:int=0;i<data.length;i++){
+						var entity:Object = data[i];
+						if(entity.batchUpdate == true){	
+							selectedList.addItem(entity);
+						}
+					}	
+				}	
+				
+				return selectedList;
+			}
+			
+			private function changeLanguageCode():void{
+				var languageCode:String = CalculatedField.getComboDataField(cbolanguageCodes);
+				if(languageCode!=CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+					btnNewField.enabled = false;
+					btndeleteField.enabled = false;
+				}else{
+					btnNewField.enabled = true;
+					btndeleteField.enabled = true;
+				}
+				// fieldsGrid.dataProvider = Database.customFieldDao.selectAll(CalculatedField.getComboDataField(cboEntitys),languageCode);
+				refreshListDataGrid();
+			}
+			
+			private function refreshListDataGrid():void{
+				btnImportExcel.enabled = (CalculatedField.getComboDataField(cboEntitys)=="Service Request");
+				var listAll:ArrayCollection = Database.customFieldDao.selectAll(CalculatedField.getComboDataField(cboEntitys),CalculatedField.getComboDataField(cbolanguageCodes));
+				var listCustomFields:ArrayCollection = new ArrayCollection();
+				for each(var tmp:Object in listAll){
+					if(tmp.fieldType!='HeaderText'){
+						listCustomFields.addItem(tmp);
+					}
+					tmp["display_value"] = StringUtils.reduceTextLength(tmp.value, 30);	
+				}
+				fieldsGrid.dataProvider = listCustomFields;
+			}
+			
+			private function checkUsingField(list:ArrayCollection):Boolean{
+				var customfields:ArrayCollection = Database.layoutDao.selectCustomFields(list[0].entity);
+				for each (var cusField:Object in customfields) {
+					for each(var objDeleteF:Object in list){
+						if(cusField.element_name==objDeleteF.fieldName){
+							Alert.show(i18n._("FIELDMANAGMENTWINDOW_CAN_NOT_DELETE_THIS_FIELD") + "<" + objDeleteF.displayName + ">." + i18n._("FIELDMANAGMENTWINDOW_IT_IS_USING_IN_THE_PROJECT"),titlebar.title, Alert.OK, this);
+							return true;
+						}
+					}
+				}
+				return false;
+			}
+			
+			private function btnDelete_clickHanler(event:MouseEvent):void {
+				var selectedList:ArrayCollection = getListSelectedData(fieldsGrid);
+				if(selectedList.length>0){
+					if(checkUsingField(selectedList)) return;
+					Alert.show(i18n._('GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE'),titlebar.title, Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+						if (event.detail==Alert.YES){
+							for each(var obj:Object in selectedList){
+								Database.customFieldTranslatorDao.deleteFieldByColumnName(obj.entity,obj.column_name);
+								Database.customFieldDao.deleteCustomField(obj);
+								Database.territoryTreeDAO._delete(obj);
+								Database.depthStructureTreeDAO._delete(obj);
+								if((obj.column_name as String).indexOf(CustomLayout.BINDPICKLIST_CODE)>-1){
+									PicklistService.getPicklist(obj.entity,obj.fieldName,true,true,true);
+									PicklistService.getBindPicklist(obj.entity,obj.fieldName,true,true);
+								}
+							}
+							var entity:String = CalculatedField.getComboDataField(cboEntitys);
+							_cache_cascading_crm.del(entity);
+							_cache_customField.del(entity);
+							refreshListDataGrid();
+						}    	 
+					});
+				}else{
+					Alert.show(i18n._('GLOBAL_PLEASE_SELECT_A_RECORD'), "", Alert.OK, this);
+				}	
+				
+			}
+			private function openWindow_clickHanler(event:MouseEvent,objectField:Object=null):void {
+				if(!StringUtils.isEmpty(cboEntitys.text)){
+					var calculatedField:CalculatedField = new CalculatedField();
+					calculatedField.dataField = new Object();
+					calculatedField.isCustomField = true;
+					calculatedField.isCreate = objectField==null?true:false;
+					calculatedField.dataField["entity"] = CalculatedField.getComboDataField(cboEntitys);
+					calculatedField.dataField["languageCode"] = CalculatedField.getComboDataField(cbolanguageCodes);
+					calculatedField.dataField.customField = objectField;
+					calculatedField.refreshGridEntity = refreshListDataGrid;
+					WindowManager.openModal(calculatedField);
+				}else{
+					Alert.show(i18n._('FIELDMANAGMENTWINDOW_PLEASE_SELECT_ENTITY_FRIST'),this.title, Alert.OK, this);
+				}
+				
+			}
+			
+			
+			
+			private function browseAndUpload():void {
+				var readCSVFile:ReadCSVFile = new ReadCSVFile();
+				readCSVFile.browseFile(this,createImportCustomField,refreshListDataGrid);
+				
+				//var readExcelFile:ReadExcelFile = new ReadExcelFile();
+				//readExcelFile..browseAndUpload(this,createImportCustomField,refreshListDataGrid);
+			}
+			
+			private function createImportCustomField(customFieldList:ArrayCollection):void {
+				for each(var objImport:Object in customFieldList){
+					var customField:Object = Database.customFieldDao.getObjectValue(objImport);
+					customField["fieldType"] = "Related Picklist";
+					customField["defaultValue"] = 0;
+					var objcusField:Object = Database.customFieldDao.selectCustomFieldByFieldName(customField.entity,customField.fieldName);
+					if(!objcusField){ // create new
+						var colName:String = CustomLayout.BINDPICKLIST_CODE;
+						var count:int = Database.customFieldDao.countColumnName(colName);
+						customField["column_name"] = "{" + colName + count + "}";
+						customField["subtype"] = 10;
+						if(objImport.languageCode==CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+							Database.customFieldDao.insert(customField);
+						}
+					}else{
+						customField["column_name"] = objcusField.column_name;
+						customField["subtype"] = objcusField.subtype;
+						if(objImport.languageCode==CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+							Database.customFieldDao.updateField(customField);
+						}
+					}
+					customField["languageCode"] =  objImport.languageCode;
+					Database.customFieldTranslatorDao.updateField(customField);
+					PicklistService.getPicklist(customField.entity,customField.fieldName,true,true,true);
+					PicklistService.getBindPicklist(customField.entity,customField.fieldName,true,true);
+					
+					// var cache:CacheUtils = new CacheUtils("cascading_crm");
+					_cache_cascading_crm.del(customField.entity);
+					_cache_customField.del(customField.entity);
+				}
+			}
+			
+						
+
+			protected function window1_creationCompleteHandler(event:FlexEvent):void
+			{
+				cboEntitys.setFocus();
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="800" height="400" right="0" bottom="0">
+		<control:TitleBar title="{i18n._('FIELDMANAGMENTWINDOW_FIELD_MANAGMENT')}" icon="@Embed(source='/assets/customize.png')" id="titlebar" y="2" x="25"/>
+		<!--mx:VBox top="40" left="0" right="0" bottom="0"-->
+			<!-- mx:Canvas width="100%" -->
+				<mx:VBox top="40" left="0" right="0" bottom="0">
+					<mx:Form paddingTop="5" paddingLeft="0" width="100%">	
+						<mx:FormItem>
+							<mx:HBox>
+								<mx:Label text="{i18n._('GLOBAL_ENTITY')}" textAlign="right" width="100" fontWeight="bold" />
+								<mx:ComboBox id="cboEntitys" dataProvider="{entityList}" labelFunction="{FieldManagmentWindow.getEntityDisplayName}" change="refreshListDataGrid()" width="160" />
+								<mx:Label text="{i18n._('GLOBAL_LANGUAGE')}" textAlign="right" width="150" fontWeight="bold" />
+								<mx:ComboBox id="cbolanguageCodes" dataProvider="{languageCodes}" change="changeLanguageCode()" width="160" />
+							</mx:HBox>
+						</mx:FormItem>
+						<mx:FormItem paddingTop="10">
+							<mx:VBox>							
+								<mx:HBox paddingLeft="10">
+									<mx:DataGrid id="fieldsGrid" width="760"  doubleClickEnabled="true" height="230">
+										<mx:columns>
+											<mx:DataGridColumn sortable="false" width="30" dataField="batchUpdate" headerText="{i18n._('check Delete')}" itemRenderer="CheckBoxRenderer" headerRenderer="CheckBoxRenderer" rendererIsEditor="true" />
+											<mx:DataGridColumn dataField="fieldName" headerText="{i18n._('GLOBAL_FIELD_NAME')}"/>
+											<mx:DataGridColumn dataField="displayName" headerText="{i18n._('GLOBAL_DISPLAY_NAME')}"/>
+											<mx:DataGridColumn dataField="fieldType" headerText="{i18n._('GLOBAL_FIELD_TYPE')}"/>
+											<mx:DataGridColumn dataField="value" headerText="{i18n._('GLOBAL_VALUE')}">
+												<mx:itemRenderer>
+													<mx:Component>
+														<mx:HBox verticalAlign="middle" horizontalScrollPolicy="off">
+															<s:Label textAlign="left" text="{data.display_value} "/>
+														</mx:HBox>
+													</mx:Component>
+												</mx:itemRenderer>
+											</mx:DataGridColumn>
+										</mx:columns>
+									</mx:DataGrid>
+								</mx:HBox>
+								<mx:HBox paddingLeft="20">
+									<mx:Button id="btnNewField" label="{i18n._('GLOBAL_CREATE')}" click="openWindow_clickHanler(event)" right="0"/>
+									<mx:Button id="btndeleteField" label="{i18n._('GLOBAL_DELETE')}" click="btnDelete_clickHanler(event)" right="0"/>
+									<mx:Button id="btnImportExcel" label="{i18n._('GLOBAL_IMPORT_CSV')}" click="browseAndUpload()" enabled="false"/>
+								</mx:HBox>
+							</mx:VBox>						
+						</mx:FormItem>				
+					</mx:Form>
+					<mx:HBox width="95%" horizontalAlign="right">
+						<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" right="0" icon="{ImageUtils.cancelIcon}"/>
+						<!-- mx:Button id="createBtn" label="{i18n._('GLOBAL_SAVE')}" click="update_clickHanler(event)" right="0" icon="{ImageUtils.acceptIcon}"/ -->
+					</mx:HBox>
+				</mx:VBox>	
+			<!--/mx:Canvas -->
+		<!--/mx:VBox -->
+	</mx:Canvas>
+	
+</mx:Window>

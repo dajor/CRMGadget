@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="800" height="500" title="{i18n._('GLOBAL_CHARTS')}" 
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*" initialize="init()"
+	creationComplete="entityCombo.setFocus()">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.BaseDAO;
+			import gadget.dao.DAO;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.StringUtils;
+			
+			import ilog.charts3d.BarChart3D;
+			import ilog.charts3d.ColumnChart3D;
+			import ilog.charts3d.PieChart3D;
+			import ilog.charts3d.charts3dClasses.Series3D;
+			import ilog.charts3d.series.BarSeries3D;
+			import ilog.charts3d.series.ColumnSeries3D;
+			import ilog.charts3d.series.PieSeries3D;
+			
+			import mx.charts.BarChart;
+			import mx.charts.CategoryAxis;
+			import mx.charts.ChartItem;
+			import mx.charts.ColumnChart;
+			import mx.charts.LegendItem;
+			import mx.charts.PieChart;
+			import mx.charts.chartClasses.ChartBase;
+			import mx.charts.chartClasses.LegendData;
+			import mx.charts.chartClasses.Series;
+			import mx.charts.series.BarSeries;
+			import mx.charts.series.ColumnSeries;
+			import mx.charts.series.PieSeries;
+			import mx.charts.series.items.PieSeriesItem;
+			import mx.collections.ArrayCollection;
+			import mx.controls.List;
+			import mx.core.FlexGlobals;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.formatters.DateFormatter;
+			import mx.graphics.IFill;
+			import mx.graphics.SolidColor;
+
+		
+            private static const PIE_CHART:String = i18n._("CHARTS_PIE");
+            private static const COLUMN_CHART:String = i18n._("CHARTS_COLUMN");
+            private static const BAR_CHART:String = i18n._("CHARTS_BAR");
+            private static const CURRENT_MONTH:int = 0;
+            private static const LAST_6_MONTHS:int = 1;
+            private static const OTHER:int = 2;  //CRO 14.01.2011
+			private static const MODIFIED_LAST_WEEK:String = i18n._("GLOBAL_MODIFIED_LAST_WEEK");
+			private static const MODIFIED_LAST_MONTH:String = i18n._("GLOBAL_MODIFIED_LAST_MONTH");
+			private static const MODIFIED_LAST_3_MONTH:String = i18n._("GLOBAL_MODIFIED_LAST_3_MONTHS");
+			private static const MODIFIED_LAST_6_MONTH:String = i18n._("GLOBAL_MODIFIED_LAST_6_MONTHS");
+			private static const MODIFIED_LAST_YEAR:String = i18n._("GLOBAL_MODIFIED_LAST_YEAR");
+			private static const MODIFIED_LAST_2_YEARS:String = i18n._("GLOBAL_MODIFIED_LAST_2_YEARS");
+			private static const MODIFIED_LAST_3_YEARS:String = i18n._("GLOBAL_MODIFIED_LAST_3_YEARS");
+			private static const MODIFIED_OTHER:String = i18n._("GLOBAL_OTHER");
+			private static const MODIFIED_NOW:String =  i18n._("GLOBAL_NOW");
+            private static const MILLIS_PER_DAY:int = 1000*60*60*24;
+
+            
+			private static const chartStyle:ArrayCollection = new ArrayCollection(
+			                [ {label:PIE_CHART , data:1}, 
+			                  {label:COLUMN_CHART, data:2}, 
+			                  {label:BAR_CHART, data:3} ]);
+			[Bindable]public  var entityValue:ArrayCollection = new ArrayCollection();
+			
+			private static const ENTITIES:Array = new Array("Account", "Contact", "Activity");
+			
+			private static const range1:Array = new Array(
+				MODIFIED_LAST_WEEK,
+				MODIFIED_LAST_MONTH,
+				MODIFIED_LAST_3_MONTH,
+				MODIFIED_LAST_6_MONTH,
+				MODIFIED_LAST_YEAR,
+				MODIFIED_LAST_2_YEARS);
+			private static const range2:Array =  new Array(
+				MODIFIED_LAST_MONTH,
+				MODIFIED_LAST_3_MONTH,
+				MODIFIED_LAST_6_MONTH,
+				MODIFIED_LAST_YEAR,
+				MODIFIED_LAST_2_YEARS,
+				MODIFIED_LAST_3_YEARS);
+			            															/* green                       orange                          red */ 				
+            private static const CAT_COLOR:Array = new Array(new SolidColor(0x008000, .65),new SolidColor(0xFFA500, .65),new SolidColor(0xFF0000, .65));
+			
+			private var downX:int;
+			private var downY:int;
+			private var downElevation:Number;
+			private var downRotation:Number;
+			private var currentChart:Object;
+			private var elevationAngle:Number = 0;
+			private var rotationAngle:Number = 0;
+            /**
+             * Create and return a simple ArrayCollection to
+             * use as a data provider for pie chart.
+             */
+            private function getPieDataProvider(entity:String) : ArrayCollection {
+                var arr:ArrayCollection = new ArrayCollection();
+                arr.addItem({label:cboRange1.selectedItem as String, data:entityCount(entity, cboRange1.selectedItem as String, MODIFIED_NOW)});
+                arr.addItem({label:cboRange2.selectedItem as String, data:entityCount(entity, cboRange2.selectedItem as String, cboRange1.selectedItem as String)});
+                arr.addItem({label:MODIFIED_OTHER, data:entityCount(entity, MODIFIED_OTHER, cboRange2.selectedItem as String)});
+                return arr;
+            }
+            
+            private function getChartDataProvider(entity:String):ArrayCollection {            	
+	            var arr:ArrayCollection = new ArrayCollection( [
+	            { label: Database.customLayoutDao.getPlural(entity), 
+	            	data0: entityCount(entity, cboRange1.selectedItem as String, MODIFIED_NOW), 
+	            	data1: entityCount(entity, cboRange2.selectedItem as String, cboRange1.selectedItem as String), 
+	            	data2: entityCount(entity, MODIFIED_OTHER, cboRange2.selectedItem as String)}]);
+	            return arr;
+            }
+            
+            private function init():void {
+            	for(var i:int=0; i<ENTITIES.length; i++){
+            		var object:Object = new Object();
+            		//object.label = Database.transactionDao.getDisplayName(ENTITIES[i]);
+					object.label = Database.customLayoutDao.getDisplayName(ENTITIES[i]);
+            		object.data = ENTITIES[i];
+            		entityValue.addItem(object);
+            	}
+            	createChart(null);
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+            }
+			
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function getStartTime(mode:String):Date {
+				var today:Date = new Date();
+				switch(mode){
+					case MODIFIED_NOW:
+						return today;
+					case MODIFIED_LAST_WEEK:
+						return new Date(today.getTime() - MILLIS_PER_DAY * 7);
+					case  MODIFIED_LAST_MONTH:
+						return new Date(today.getTime() - MILLIS_PER_DAY * 30);						
+					case  MODIFIED_LAST_3_MONTH:
+						return new Date(today.getTime() - MILLIS_PER_DAY * 30 * 3);
+					case  MODIFIED_LAST_6_MONTH:
+						return new Date(today.getTime() - MILLIS_PER_DAY * 30 * 6);
+					case  MODIFIED_LAST_YEAR:
+						return new Date(today.getTime() - MILLIS_PER_DAY * 365);
+					case  MODIFIED_LAST_2_YEARS:
+						return new Date(today.getTime() - MILLIS_PER_DAY * 730);
+					case  MODIFIED_LAST_3_YEARS:
+						return new Date(today.getTime() - MILLIS_PER_DAY * 1095);
+					default:
+						return new Date(0);
+					
+				}
+			}
+			
+			private function getFilterMode(start:String, end:String):String{
+				
+				var dateFormatter:DateFormatter = new DateFormatter();
+				//10/22/2009 12:39:59
+				dateFormatter.formatString = "YYYYMMDD";  
+				
+
+				var dateExpr:String = "substr(ModifiedDate, 1, 4) || substr(ModifiedDate, 6, 2) || substr(ModifiedDate, 9, 2) ";
+				
+				var startDate:Date = getStartTime(start);
+				var endDate:Date = getStartTime(end);
+
+
+				return dateExpr + ">= '" + dateFormatter.format(startDate) + "' AND " + dateExpr + "< '" + dateFormatter.format(endDate) + "'";
+			}
+			
+			private function entityCount(entity:String, begin:String, end:String):int {
+				var dao:DAO = Database.getDao(entity);
+              	var resultList:ArrayCollection;
+              	var columns:ArrayCollection = new ArrayCollection([{element_name:"ModifiedDate"}]);
+				var filter:String = getFilterMode(begin, end);
+				return dao.findAll(columns, filter).length;			   
+            } 
+
+            
+            private function createPieChart(entity:String):PieChart3D {
+
+                /* Define pie series. */
+                var series:PieSeries3D = new PieSeries3D();
+                series.nameField = "label";
+                series.field = "data";
+                
+				/* set label position */						
+				series.setStyle("labelPosition","callout");        
+				series.labelFunction = function displayLabel(data:Object, field:String, index:Number, percentValue:Number):String {
+					var temp:String= (" " + percentValue).substr(0,6);
+					return data.label + ": " + '\n' + "Total: " + data.data + '\n' + temp + "%";
+				}
+				// green orange red
+				series.setStyle("fills", CAT_COLOR);
+				
+				series.filters =[];
+                /* Define pie chart. */
+                var chart:PieChart3D = new PieChart3D(); 
+                chart.showDataTips = true;
+                chart.dataProvider = getPieDataProvider(entity);
+                chart.series = [series];
+              
+				return chart;
+            }
+
+
+			private function buildSeries(horiz:Boolean):Array {
+				var ret:Array = [];
+				for (var i:int = 0; i < 3; i++) {
+					var series:Series3D = horiz ? new BarSeries3D() : new ColumnSeries3D();
+					var val:String = "Other";
+					if(i==0){
+						val = cboRange1.selectedItem as String;	
+					}else if(i==1){
+						val = cboRange2.selectedItem as String;
+					}
+					series.displayName = val;
+					
+					series["xField"] = horiz ? ("data" + i) : "label";
+					series["yField"] = horiz ? "label" : ("data" + i);
+					series.setStyle("fill", CAT_COLOR[i])
+					series.filters=[];
+					
+					ret.push(series);
+				}
+				return ret;
+			}
+			
+
+            
+            private function createColumnChart(entity:String):ColumnChart3D {                   	
+                
+                /* Define column chart. */
+                var chart:ColumnChart3D = new ColumnChart3D();  
+                chart.showDataTips = true;
+                chart.dataProvider = getChartDataProvider(entity);
+                chart.series = buildSeries(false);
+               
+                var cat:CategoryAxis = new CategoryAxis();
+                cat.categoryField = "label";
+				chart.horizontalAxis = cat;
+                
+                return chart;
+            }
+            
+            private function createBarChart(entity:String):BarChart3D {                             	
+            
+                /* Define bar chart. */                
+                var chart:BarChart3D = new BarChart3D();            
+
+                chart.showDataTips = true;
+                chart.dataProvider = getChartDataProvider(entity);
+                chart.series = buildSeries(true);
+                var cat:CategoryAxis = new CategoryAxis();
+                cat.categoryField = "label";
+				chart.verticalAxis = cat;
+
+				return chart;
+            }
+           
+
+			  
+			private function createChart(event:Event):void{
+				var chartMode:String = chartCombo.selectedLabel;
+				var entity:String = entityCombo.selectedItem.data;
+				var chart:UIComponent = null;
+				elevationAngle = 15;
+				rotationAngle = 25;
+				
+				switch (chartMode) {
+					case PIE_CHART:
+                		chart = createPieChart(entity);
+						elevationAngle = 35;
+						rotationAngle = 10;
+                		break;
+                	case COLUMN_CHART:
+	                	chart = createColumnChart(entity);
+	                	break;
+                	case BAR_CHART:
+                		chart = createBarChart(entity);						
+                		break;
+                }
+                chart.percentWidth = 100;
+                chart.percentHeight = 100;
+				
+				currentChart = chart;
+				currentChart.rotationAngle = rotationAngle;
+				currentChart.elevationAngle = elevationAngle;
+				currentChart.addEventListener(MouseEvent.MOUSE_DOWN, downListener);
+				currentChart.doubleClickEnabled=true;
+
+ 				/* Add chart to the display list. */
+                canvasChart.removeAllChildren();
+                canvasChart.addChild(chart);
+                legendChart.dataProvider = chart;
+            }
+			
+
+			
+			private function downListener(e:MouseEvent):void
+			{
+				currentChart.removeEventListener(MouseEvent.MOUSE_DOWN, downListener);
+				currentChart.addEventListener(MouseEvent.MOUSE_UP, upListener);			
+				currentChart.addEventListener(MouseEvent.MOUSE_MOVE, moveListener);
+				downX=e.stageX;
+				downY=e.stageY;
+				downElevation=elevationAngle;
+				downRotation=rotationAngle;
+			}
+			
+			
+			
+			private function moveListener(e:MouseEvent):void
+			{
+				var dx:Number=e.stageX - downX;
+				var dy:Number=e.stageY - downY;				
+				currentChart.elevationAngle = downElevation + dy / 5 ;
+				currentChart.rotationAngle = downRotation - dx / 5;
+				elevationAngle= currentChart.elevationAngle;
+				rotationAngle= currentChart.rotationAngle;
+			}
+			
+			
+			private function upListener(e:MouseEvent):void
+			{
+				currentChart.addEventListener(MouseEvent.MOUSE_DOWN, downListener);
+				currentChart.removeEventListener(MouseEvent.MOUSE_UP, upListener);
+				currentChart.removeEventListener(MouseEvent.MOUSE_MOVE, moveListener);
+			}
+			
+		
+			private function onChangRange1(event:Event):void{
+				
+				var combo:ComboBox = event.target as ComboBox;
+				var dataProvider :Array = new Array();
+				if(combo == null){
+					return;
+				}
+				var value:String = combo.selectedItem as String;
+				var ind:int = range1.indexOf(value);
+				
+				var selectedVal:String = cboRange2.selectedItem as String;
+				var selectedInd:int = range2.indexOf(selectedVal); 		
+				for(var i:int=ind;i<range2.length;i++){
+					dataProvider.push(range2[i]);
+				}
+				
+				if(ind > selectedInd){
+					selectedVal = range2[ind];
+				}				
+				cboRange2.dataProvider = dataProvider;
+				cboRange2.selectedItem = selectedVal;
+				
+				
+			}
+			
+			private function onChangRange2(event:Event):void{
+				
+				var combo:ComboBox = event.target as ComboBox;
+				var dataProvider :Array = new Array();
+				if(combo == null){
+					return;
+				}
+				var value:String = combo.selectedItem as String;
+				var ind:int = range2.indexOf(value)								
+				var selectedInd:int = cboRange1.selectedIndex;
+				
+				for(var j:int=0;j<ind+1;j++){
+					dataProvider.push(range1[j]);
+				}
+				
+				cboRange1.dataProvider = dataProvider;
+				cboRange1.selectedIndex = selectedInd;
+			}
+		]]>
+	</mx:Script>
+	
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0"><!--CRO 05.01.2011-->
+	    <control:TitleBar icon="@Embed(source='/assets/chart_bar.png')" title="{i18n._('GLOBAL_CHARTS')}"/>
+	    <mx:VBox width="100%" height="100%" verticalGap="8" top="40" left="8" right="8" bottom="8">
+		    <mx:HDividedBox width="100%" height="100%">
+		    	<mx:VBox minWidth="300" width="300" height="100%" verticalGap="8">
+					<mx:Panel width="100%" title="{i18n._('CHARTS_CHART_TYPE')}">
+						<mx:VBox width="100%" height="100%" paddingLeft="8" paddingRight="8" paddingTop="8" paddingBottom="8" horizontalGap="8">
+							<mx:ComboBox left="8" id="entityCombo" width="100%" dataProvider="{entityValue}" close="createChart(event);"/>
+							<mx:ComboBox id="chartCombo" width="100%" dataProvider="{chartStyle}" close="createChart(event);" />												
+						</mx:VBox> 		
+					</mx:Panel>
+					<mx:Panel width="100%" title="{i18n._('CHARTS_SELECT_RANGE')}">
+						<mx:VBox width="100%" height="100%" paddingLeft="8" paddingRight="8" paddingTop="8" paddingBottom="8" horizontalGap="8">
+							<mx:HBox width="100%">
+								<mx:Label text="{i18n._('CHARTS_RANGE1')}" fontWeight="bold" />								
+								<mx:ComboBox left="8" id="cboRange1" width="100%" dataProvider="{range1}" change="onChangRange1(event)" close="createChart(event);"/>
+							</mx:HBox>
+							<mx:HBox width="100%">
+								<mx:Label text="{i18n._('CHARTS_RANGE2')}" fontWeight="bold" />
+								<mx:ComboBox id="cboRange2" width="100%" dataProvider="{range2}" change="onChangRange2(event)" close="createChart(event);" />
+							</mx:HBox>		
+							
+						</mx:VBox> 		
+					</mx:Panel>
+		    	</mx:VBox>
+				<mx:Panel width="100%" height="100%">
+					<mx:Canvas id="canvasChart" width="100%" height="100%"/>
+					<mx:Legend id="legendChart" width="100%"/>
+				</mx:Panel>
+		    </mx:HDividedBox>
+		    <mx:Canvas width="100%">
+		    	<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="this.close()" right="0"/>
+		    </mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

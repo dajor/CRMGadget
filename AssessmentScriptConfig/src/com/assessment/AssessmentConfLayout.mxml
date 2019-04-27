@@ -1,0 +1,2332 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"		 
+		   creationComplete="init()" xmlns:s="library://ns.adobe.com/flex/spark" xmlns:components="com.shinynet.shinylib.components.*" xmlns:control="gadget.control.*" xmlns:assessment="com.assessment.*">
+	<mx:Style>
+		.myStyleBottom {
+			borderSides: "bottom";
+		}
+	</mx:Style>
+	<mx:Script>
+		<![CDATA[
+			import com.shinynet.shinylib.skins.FieldSetSkin;
+			
+			import flash.filesystem.File;
+			import flash.filesystem.FileMode;
+			import flash.filesystem.FileStream;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+			import mx.controls.Alert;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.utils.ObjectUtil;
+			
+			[Bindable]  
+			public var iAseesment:IAssessment;
+			
+			
+			[Bindable]  
+			private var _availablePageItems:ArrayCollection;
+			
+			[Bindable] 
+			private var _selectedPageItems:ArrayCollection;  
+			[Bindable]  
+			private var _availableItems:ArrayCollection;
+			
+			[Bindable] 
+			private var _selectedItems:ArrayCollection;
+			
+			[Bindable]
+			private var _availableSplitterItems:ArrayCollection;
+			[Bindable]
+			private var _selectedSplitterItems:ArrayCollection;
+			
+			private var currentConfig:DtoConfiguration = null;
+			[Bindable] 
+			private var currentPageConfig:DtoPage = null;
+			
+			//CH
+			private var currentSplitter:DtoAssessmentSplitter = null;
+			
+			private static var PAGE:String="PAGE_CONF";
+			private static var MODEL:String="MODEL_CONF";
+			private static var FIELD:String = "FIELD_CONF";
+			
+			
+			[Bindable] 
+			private var dataPageItems:ArrayCollection;
+			[Bindable] 
+			private var dataModelItems:ArrayCollection;
+			[Bindable] private var lstPDFHeaderField:ArrayCollection;
+			[Bindable] private var dtoCurrentPDFHeader:DtoAssessmentPDFHeader = null;
+			[Bindable] private var dtoCustomTextPDFHeader:DtoAssessmentPDFHeader = null;
+			[Bindable] private var lstEntity:ArrayCollection = new ArrayCollection(["Account","Activity","Contact"]);
+			
+			public static var LIGHT_BLUE:String = "Light Blue";
+			public static var DARK_BLUE:String = "Dark Blue";
+			public static var YELLOW:String = "Yellow";	
+			public static var BLACK:String = "Black";
+			public static var LIGHT_GREEN:String = "Light Green";
+			public static var RED:String = "Red";
+			public static var WHITE:String = "White";
+			private var lstPDFColor:ArrayCollection;
+			public static var IMG_BG_PDF_COLORS:Array = ["IMG_BG_PDF_COLOR_DATA_HEADER", "IMG_BG_PDF_HEADER_COLOR_GRID","IMG_BG_PDF_COLOR_PAGE"];
+
+			
+			[Bindable] public static var imagesBGPDFHeaderColorGrid:ArrayCollection = new ArrayCollection(
+				[   {icon:ImageUtils.black,label:" ",data:BLACK},
+					{icon:ImageUtils.darkBlue,label:" ",data:DARK_BLUE},
+					{icon:ImageUtils.lightBlue,label:" ",data:LIGHT_BLUE},
+					{icon:ImageUtils.yellow,label:" ",data:YELLOW}
+				]);
+			
+			[Bindable] public static var imagesBGPDFDataHeader:ArrayCollection = new ArrayCollection(
+				[   {icon:ImageUtils.lightGreen,label:" ",data:LIGHT_GREEN},
+					{icon:ImageUtils.yellow,label:" ",data:YELLOW},
+					{icon:ImageUtils.red,label:" ",data:RED}
+					
+				]);
+			
+			[Bindable] public static var imagesBGPDFPageColor:ArrayCollection = new ArrayCollection(
+				[   {icon:ImageUtils.lightGreen,label:" ",data:LIGHT_GREEN},
+					{icon:ImageUtils.yellow,label:" ",data:YELLOW},
+					{icon:ImageUtils.white,label:" ",data:WHITE},
+					
+				]);
+			
+			private const GLOBAL_INVALID_FORM:String = "GLOBAL_INVALID_FORM@Invalid from ...";
+			
+			private function init():void{
+				
+				dataPageItems = iAseesment.getAllPages();
+				datagridPage.dataProvider = dataPageItems;
+				datagridPage.validateNow();
+				datagridPage.dataProvider = dataPageItems;
+				dataModelItems = iAseesment.getAllConfiguration();
+			
+				reset(PAGE);
+				enableDetailPage(false);
+				
+			}
+			
+			
+			
+			
+			private function getPageComboDataProvider():ArrayCollection{
+				_availablePageItems = new ArrayCollection();
+				_selectedPageItems = new ArrayCollection();
+				return iAseesment.getAllAssessmentType();
+			}
+			private function getComboData():ArrayCollection{
+				_availableItems = new ArrayCollection();
+				_selectedItems = new ArrayCollection();
+				
+				return iAseesment.getAllAssessmentType();
+			}
+			private function reloadComboModel():void{
+				var list:ArrayCollection = getAllModel();
+				
+				cboMappingModel.dataProvider = list;
+				if(list != null && list.length>0){
+				//	cboMapAssTotal.selectedIndex =0;//selected first model
+					btnEditColumn.enabled = true;
+				}else{
+					btnEditColumn.enabled = false;
+				}
+				changeMappingAssessmentModel();
+			}
+			private function getAllModel():ArrayCollection{
+				return iAseesment.getAllConfiguration();
+
+			}
+			
+			protected function importConfiguration():void{
+				var file:File = new File();
+				file.browseForOpen(iAseesment.translate('IMPORT_ASSESSMENT_CONFIG@Import configuration'), [new FileFilter("*.XML", "*.xml")]);				
+				buttonsconfigure.enabled = false;				
+				file.addEventListener(Event.SELECT,uploadFile);
+				file.addEventListener(Event.CANCEL, cancelledFile);
+				
+			}
+			
+			protected function uploadFile(event:Event):void{
+				var that:AssessmentConfLayout = this;
+				var selectedFile:File = event.target as File;				
+				var stream:FileStream = new FileStream();			
+				stream.open(selectedFile, FileMode.READ);
+				var fileData:String = stream.readUTFBytes(stream.bytesAvailable);				
+				try{
+					var xml:XML = new XML(fileData);
+					iAseesment.importConfiguration(xml);
+					refreshData();//refresh data on selected page
+					Alert.show(iAseesment.translate("GLOBAL_IMPORT_SUCCESSFULLY@Import Successfully") + " " + selectedFile.name + "" , iAseesment.translate('IMPORT_ASSESSMENT_CONFIG@Import configuration'), Alert.OK, that);
+				}catch(e:Error){
+					Alert.show(e.message, iAseesment.translate(GLOBAL_INVALID_FORM), Alert.OK, this);
+				}
+				buttonsconfigure.enabled = true;
+			}
+			
+			
+			private function cancelledFile(event:Event):void{				
+				buttonsconfigure.enabled = true;				
+			}
+			
+			protected function exportConfiguration():void{
+				try{
+					var that:AssessmentConfLayout = this;
+					var configXml:XML = iAseesment.exportConfiguration();
+					var f:File = new File();					
+					buttonsconfigure.enabled = false;
+					f.addEventListener(Event.SELECT, function (event:Event):void{
+						var file:File = event.currentTarget as File;
+						if(!file.extension || file.extension.toLowerCase()!="xml") file = File.applicationStorageDirectory.resolvePath(file.nativePath + ".xml"); // Bug #543
+						
+						if(file!=null){
+							var fileStream:FileStream = new FileStream();
+							fileStream.open(file, FileMode.WRITE);
+							var byteData : ByteArray = new ByteArray();
+							byteData.writeUTFBytes(configXml.toXMLString());
+							fileStream.writeBytes(byteData, 0, byteData.length);
+							fileStream.close();
+						}						
+						buttonsconfigure.enabled = true;	
+						Alert.show(iAseesment.translate("EXPORT_ASS_SUCCESSFULLY@Export successfully"), iAseesment.translate('EXPORT_ASSESSMENT_CONFIG@Export configuration'), Alert.OK, that);
+					});
+					f.addEventListener(Event.CANCEL, cancelledFile);
+					f.browseForSave(iAseesment.translate('GLOBAL_SAVE@save'));
+				}catch(e:Error){
+					Alert.show(e.message, iAseesment.translate(GLOBAL_INVALID_FORM), Alert.OK, this);
+				}
+			} 
+			
+			private function changePageAssessment(event:Event):void {
+				var entity:String = event.currentTarget.selectedItem;
+				//chkCreateSumPerPage.enabled = !StringUtils.isEmpty(entity);				
+				//cboMapPageTotal.dataProvider = iAseesment.getFields(entity);
+				//cboMapPageTotal.selectedIndex =-1;
+				_availablePageItems = iAseesment.getAssessmentByType(entity);				
+				selectedPageItems = new ArrayCollection();
+				
+				
+			}
+			private function changeAssessment(event:Event):void {
+				var entity:String = event.currentTarget.selectedItem;
+				_availableItems = iAseesment.getPageByType(entity);
+				//chkCreateSumPerModel.enabled = !StringUtils.isEmpty(entity);
+				//cboMapModelTotal.dataProvider = iAseesment.getFields(entity);
+				//cboMapModelTotal.selectedIndex =-1;
+				selectedItems = new ArrayCollection();
+				
+				
+			}
+			
+			private function getModelName(item:Object,col:DataGridColumn):String{
+				var modelId:String = item[col.dataField];
+				if(!StringUtils.isEmpty(modelId)){
+					
+					var model:DtoConfiguration = iAseesment.getConfigurationById(modelId);
+					
+					if(model!=null){
+						return model.assessmentModel;
+					}
+				}
+				
+				return "";
+				
+			}
+			
+			private function changeMappingAssessmentModel():void {
+				
+				var dtoConfig:DtoConfiguration = cboMappingModel.selectedItem as DtoConfiguration;
+				var data:ArrayCollection = new ArrayCollection();
+				var fields:ArrayCollection = new ArrayCollection();
+				if(dtoConfig != null){
+					data = iAseesment.getAssessmentByModel(dtoConfig.recordId);
+					fields = iAseesment.getFields(dtoConfig.assessmentType);
+				}
+				initMappingTableColumn();
+				datagridMapping.dataProvider = data;
+				datagridQuestion.dataProvider = new ArrayCollection();
+				//datagridTotalField.dataProvider = new ArrayCollection();
+				reloadGridSumField();
+				//cboMapAssTotal.selectedIndex=-1;
+				//cboMapAssTotal.visible = false;
+				//cboMapAssTotal.dataProvider = fields;
+				//chkCreateSumPerAss.selected = false;
+				//chkCreateSumPerAss.enabled = false;
+//				btnUseDefaultMapping.enabled = true;
+			}
+			
+			private function cancelMapping():void{
+				datagridQuestion.dataProvider = new ArrayCollection();
+				datagridMapping.selectedIndex=-1;
+				btnsameMapping.enabled = false;
+				//cboMapAssTotal.visible = false;
+				//chkCreateSumPerAss.enabled = false;
+				//chkCreateSumPerAss.selected = false;
+				//cboMapAssTotal.dataProvider = new ArrayCollection();
+				//cboMapAssTotal.selectedIndex=-1;
+//				btnUseDefaultMapping.enabled = false;
+			}
+			
+			private function allRightBtn_clickHandler(event:MouseEvent,name:String):void
+			{
+				if(name==PAGE){
+					addAll(_selectedPageItems, _availablePageItems);
+					//	sortSelectedItems();
+					_availablePageItems.removeAll();
+				}else if(name==MODEL){
+					addAll(_selectedItems, _availableItems);
+					//	sortSelectedItems();
+					_availableItems.removeAll();
+				}else if(name == FIELD){
+					// CH
+					addAll(_selectedSplitterItems, _availableSplitterItems);
+					_availableSplitterItems.removeAll();
+				}
+				
+			}
+			
+			private function oneRightBtn_clickHandler(event:MouseEvent,name:String):void
+			{
+				if(name==PAGE){
+					addAll(_selectedPageItems, new ArrayCollection(listPageAssessment.selectedItems)); 
+					//	sortSelectedItems();
+					removeAvailableItems(listPageAssessment.selectedItems,name);
+				}else if(name==MODEL){
+					addAll(_selectedItems, new ArrayCollection(listAssessment.selectedItems)); 
+					//	sortSelectedItems();
+					removeAvailableItems(listAssessment.selectedItems,name);
+				}else if(name == FIELD){
+					// CH
+					addAll(_selectedSplitterItems, new ArrayCollection(listSplitterField.selectedItems));
+					removeAvailableItems(listSplitterField.selectedItems, name);
+				}
+				
+			}
+			
+			private function getSumTypeProvider():ArrayCollection{
+				
+				return new ArrayCollection([{'data':'','label':iAseesment.translate('GLOBLE_NUMBERS@Numbers')},
+					{'data':'%','label':iAseesment.translate('GLOBLE_PERCENT@Percent')}]);
+			}
+			
+			private function getModelTypeProvider():ArrayCollection{
+				
+				return new ArrayCollection([{'data':'','label':''},{'data':DtoConfiguration.MILJO,'label':iAseesment.translate('GLOBLE_MILJO@Miljo')},
+					{'data':DtoConfiguration.TRYGGMAT,'label':iAseesment.translate('GLOBLE_TRYGGMAT@Tryggmat')},
+						{'data':DtoConfiguration.BUTIKS,'label':iAseesment.translate('GLOBLE_BUTIKS@Butiks')}]);
+			}
+			
+			private function modelLabel(data:Object,col:DataGridColumn=null):String{
+				if(data!=null){
+					var type:String = data.type;
+					for each(var t:Object in getModelTypeProvider()){
+						if(t.data==type){
+							return t.label;
+						}
+					}
+					
+				}
+				
+				return '';
+			}
+			
+			private function sumTypeLabel(data:Object,col:DataGridColumn=null):String{
+				if(data!=null){
+					var type:String = data[col.dataField];
+					if(type==null){
+						type ='';//number is default;
+					}
+					for each(var t:Object in getSumTypeProvider()){
+						if(t.data==type){
+							return t.label;
+						}
+					}
+					
+				}
+				
+				return '';
+			}
+			
+//			private function setDefaultMapping():void{
+//				var dto:DtoConfiguration = cboMappingModel.selectedItem as DtoConfiguration;
+//				if(dto != null){
+//					iAseesment.setDefaultMapping(dto.recordId);
+//					changeMappingAssessmentModel();
+//				}
+//				/*
+//				if(datagridMapping.selectedItem!=null){
+//					var dto:DtoConfiguration = cboMappingModel.selectedItem as DtoConfiguration;allLeftBtn;
+//					var assType:String =dto==null?"": dto.assessmentType;
+//					var assName:String = datagridMapping.selectedItem as String;
+//					iAseesment.setDefaultMapping(assName,assType);
+//				}
+//				*/
+//			}
+			
+			
+			
+			private function oneLeftBtn_clickHandler(event:MouseEvent,name:String):void
+			{
+				if(name==PAGE){
+					addAll(_availablePageItems, new ArrayCollection(listPageAssessmentSelected.selectedItems)); 
+					//	sortAvailableItems();
+					removeSelectedItems(listPageAssessmentSelected.selectedItems,name);
+				}else if(name==MODEL){
+					addAll(_availableItems, new ArrayCollection(listAssessmentSelected.selectedItems)); 
+					//	sortAvailableItems();
+					removeSelectedItems(listAssessmentSelected.selectedItems,name);
+				}else if(name == FIELD){
+					// CH
+					addAll(_availableSplitterItems, new ArrayCollection(listSplitterSelected.selectedItems));
+					removeSelectedItems(listSplitterSelected.selectedItems, name);
+				}
+				
+			}
+			private function allLeftBtn_clickHandler(event:MouseEvent,name:String):void
+			{
+				if(name==PAGE){
+					addAll(_availablePageItems, _selectedPageItems); 
+					//	sortAvailableItems();
+					_selectedPageItems.removeAll();
+				}else if(name==MODEL){
+					addAll(_availableItems, _selectedItems); 
+					//	sortAvailableItems();
+					_selectedItems.removeAll();
+				}else if(name == FIELD){
+					// CH
+					addAll(_availableSplitterItems, _selectedSplitterItems);
+					_selectedSplitterItems.removeAll();
+				}
+				
+			}
+			
+			
+			private function switchBtn_clickHandler(event:MouseEvent,name:String):void
+			{
+				var t:ArrayCollection = new ArrayCollection();
+				if(name==PAGE){
+					
+					t = _selectedPageItems;
+					_selectedPageItems = _availablePageItems;
+					_availablePageItems = t; 
+				}else if(name==MODEL){
+					
+					t = _selectedItems;
+					_selectedItems = _availableItems;
+					_availableItems = t; 
+				}else if(name == FIELD){
+					// CH
+					t = _selectedSplitterItems;
+					_selectedSplitterItems = _availableSplitterItems;
+					_availableSplitterItems = t;
+				}
+				
+			}
+			//all hadlers 
+			protected function aList_doubleClickHandler(event:MouseEvent,name:String):void
+			{ 
+				if(name==PAGE){
+					addAll(_selectedPageItems, new ArrayCollection(listPageAssessment.selectedItems)); 
+					//sortSelectedItems();
+					removeAvailableItems(listPageAssessment.selectedItems,name);
+				}else if(name==MODEL){
+					addAll(_selectedItems, new ArrayCollection(listAssessment.selectedItems)); 
+					//sortSelectedItems();
+					removeAvailableItems(listAssessment.selectedItems,name);
+				}else if(name == FIELD){
+					// CH
+					addAll(_selectedSplitterItems, new ArrayCollection(listSplitterField.selectedItems));
+					removeAvailableItems(listSplitterField.selectedItems, name);
+				}
+				
+			}
+			protected function sList_doubleClickHandler(event:MouseEvent,name:String):void
+			{
+				if(name==PAGE){
+					addAll(_availablePageItems, new ArrayCollection(listPageAssessmentSelected.selectedItems)); 
+					//sortAvailableItems();
+					removeSelectedItems(listPageAssessmentSelected.selectedItems,name);
+				}else if(name==MODEL){
+					addAll(_availableItems, new ArrayCollection(listAssessmentSelected.selectedItems)); 
+					//sortAvailableItems();
+					removeSelectedItems(listAssessmentSelected.selectedItems,name);
+				}else if(name == FIELD){
+					// CH
+					addAll(_availableSplitterItems, new ArrayCollection(listSplitterSelected.selectedItems));
+					removeSelectedItems(listSplitterSelected.selectedItems, name);
+				}
+			}
+			
+			private function addAll(arr:ArrayCollection, src:ArrayCollection):void
+			{
+				for each(var o:Object in src)
+				{
+					arr.addItem(o);
+				}
+			}
+			
+			//sort selected items list
+			private function sortSelectedItems():void
+			{
+				var s:Sort = new Sort();
+				s.fields=[new SortField("label")];
+				_selectedItems.sort = s;
+				_selectedItems.refresh();
+			}
+			//sort available items list
+			private function sortAvailableItems():void
+			{
+				var s:Sort = new Sort();
+				s.fields=[new SortField("label")];
+				_availableItems.sort = s;
+				_availableItems.refresh();
+			}
+			//remove given items from selected list
+			private function removeSelectedItems(items:Array,name:String):void
+			{
+				for each(var o:Object in items)
+				{
+					if(name==PAGE){
+						_selectedPageItems.removeItemAt(_selectedPageItems.getItemIndex(o));
+					}else if(name==MODEL){
+						_selectedItems.removeItemAt(_selectedItems.getItemIndex(o));
+					}else if(name == FIELD){
+						_selectedSplitterItems.removeItemAt(_selectedSplitterItems.getItemIndex(o));
+					}
+					
+				}
+			}
+			private function removeAvailableItems(items:Array,name:String):void
+			{
+				for each(var o:Object in items)
+				{
+					if(name==PAGE){
+						if ( _availablePageItems.getItemIndex(o) > -1 )
+							_availablePageItems.removeItemAt(_availablePageItems.getItemIndex(o));
+					}else if(name==MODEL){
+						if ( _availableItems.getItemIndex(o) > -1 )
+							_availableItems.removeItemAt(_availableItems.getItemIndex(o));
+					}else if(name == FIELD){
+						// CH
+						if (_availableSplitterItems.getItemIndex(o) > -1){
+							_availableSplitterItems.removeItemAt(_availableSplitterItems.getItemIndex(o));
+						}
+					}
+					
+				}
+			}
+			public function set selectedItems(v:ArrayCollection):void
+			{ 
+				_selectedItems = v;			
+				updateLists(MODEL);
+			} 
+			public function set selectedPageItems(v:ArrayCollection):void
+			{ 
+				_selectedPageItems = v;			
+				updateLists(PAGE);
+			} 
+			//set all available items, those will be display on the left list from teh component		
+			public function set availablePageItems(v:ArrayCollection):void
+			{ 
+				_availablePageItems = v;
+				updateLists(PAGE);
+			}
+			//set all available items, those will be display on the left list from teh component		
+			public function set availableItems(v:ArrayCollection):void
+			{ 
+				_availableItems = v;
+				updateLists(MODEL);
+			}
+			//update available and selected list
+			private function updateLists(name:String):void
+			{
+				var listSelected:ArrayCollection = null;
+				var listAvailable:ArrayCollection = null;
+				if(name == MODEL){
+					listSelected = _selectedItems;
+					listAvailable = _availablePageItems;
+				}else if(name == PAGE){
+					listSelected = _selectedPageItems;
+					listAvailable = _availableItems;
+				}else if(name == FIELD){
+					listSelected = _selectedSplitterItems;
+					listAvailable = _availableSplitterItems;
+				}
+				if(listSelected) {
+					if (listSelected.length>0 && listAvailable.length>0  )
+					{
+						var arr:ArrayCollection = new ArrayCollection();
+						
+						for each(var s:Object in listSelected)
+						{
+							for each(var v:Object in listAvailable)
+							{
+								if ( v == s )
+									arr.addItem(v);
+							} 
+						}
+						
+						removeAvailableItems(arr.toArray(),name);
+					}
+				}
+			}
+			private function saveSumField():void{
+				var data:ArrayCollection = datagridTotalField.dataProvider as ArrayCollection;
+				//delete temp field
+				for each(var obj:Object in data){
+					delete obj.listfields001;
+					delete obj.Title;
+				}
+				iAseesment.saveSumField(data);
+				reloadGridSumField();
+				btnSaveSumField.enabled = false;
+			}
+			private function cancelSumField():void{
+				reloadGridSumField();
+				btnSaveSumField.enabled = false;
+			}
+			private function saveMapping(copytomodel:Boolean=false):void{
+				var listSave:ArrayCollection = null;
+				var listSaveAss:ArrayCollection = new ArrayCollection();
+				var modelId:String = cboMappingModel.selectedItem.recordId;
+				if(copytomodel){
+					listSave = new ArrayCollection();
+					var listAss:ArrayCollection = datagridMapping.dataProvider as ArrayCollection;
+					var sampleList:ArrayCollection = datagridQuestion.dataProvider as ArrayCollection;
+					for each(var ass:DtoAssessment in listAss){
+						var listTemp:ArrayCollection = iAseesment.getQuestionsByAssessment(ass.assessementName,modelId);
+						for(var i:int=0;i<listTemp.length;i++){
+							if(i<sampleList.length){
+								//do copy 
+								var sampleObject:Object = sampleList.getItemAt(i);
+								var objClone:Object = ObjectUtil.clone(sampleObject);
+								objClone["QuestionId"]=listTemp.getItemAt(i)["QuestionId"];
+								objClone['AssessmentId'] = ass.assessmentId;
+								// HSC Ticket 6493
+								// The copy mapping button should not effect the background button
+								if(sampleObject["QuestionId"] != objClone["QuestionId"]){
+									objClone["backgroundColor"] = listTemp.getItemAt(i)["backgroundColor"];
+								}
+								listSave.addItem(objClone);
+								
+							}
+						}
+						//ass.isCreateSum = chkCreateSumPerAss.selected;
+					//	if(ass.isCreateSum){
+						//	ass.totalStoreToField = cboMapAssTotal.selectedItem as String;
+					//	}else{
+						//	ass.totalStoreToField = '';
+					//	}
+					//	listSaveAss.addItem(ass);
+												
+					}
+					
+				}else{
+					//var selectedAss:DtoAssessment = datagridMapping.selectedItem as DtoAssessment;
+					//selectedAss.isCreateSum = chkCreateSumPerAss.selected;
+					//if(selectedAss.isCreateSum){
+//						selectedAss.totalStoreToField = cboMapAssTotal.selectedItem as String;
+					//}else{
+					//	selectedAss.totalStoreToField = '';
+					//}
+					//listSaveAss.addItem(selectedAss);
+					listSave = datagridQuestion.dataProvider as ArrayCollection;
+				}
+			
+				
+				try{
+					iAseesment.saveQuestionMapping(listSave,listSaveAss,modelId);
+				}catch(error:SQLError){
+					if(error.errorID==3131){
+						Alert.show(iAseesment.translate("GLOBAL_DUPLICATE_MAPPING_FIELD@Mapping field cannot duplicate."),iAseesment.translate(GLOBAL_INVALID_FORM), Alert.OK, this);
+					}else{
+						throw error;
+					}
+				}
+				onGridMappingClick();
+				
+			}
+			private function checkExistAssessmentPage():Boolean{
+				var data:ArrayCollection = datagridPage.dataProvider as ArrayCollection;
+				if(data != null && data.length >0){
+					for each(var o:DtoPage in data){
+						if(txtAssessmentPage.text == o.pageName){
+							return true && o!=currentPageConfig;
+						}
+					}
+				}
+				return false;
+			}
+			
+			private function checkExistSpliter():Boolean{
+				
+				var data:ArrayCollection = datagridSplitter.dataProvider as ArrayCollection;
+				if(data != null && data.length >0){
+					for each(var o:DtoAssessmentSplitter in data){
+						var model:DtoConfiguration = cboSpliterModel.selectedItem as DtoConfiguration;
+						if(model.recordId == o.modelId){
+							return true && currentSplitter!=o;
+						}
+					}
+				}
+				return false;
+			}
+			
+			private function checkExistModelName():Boolean{
+				var data:ArrayCollection = datagridModel.dataProvider as ArrayCollection;
+				if(data != null && data.length >0){
+					for each(var o:DtoConfiguration in data){
+						if(txtAssessmentModel.text == o.assessmentModel){
+							return true && currentConfig!=o;
+						}
+					}
+				}
+				return false;
+			}
+			
+			
+			
+			private function savePage():void{
+				var errors:Array = new Array();
+				if(cboPageType.text=='' || cboPageType.selectedIndex==-1){
+					errors.push(iAseesment.translate("ASSESSMENT_TYPE_IS_MANDATORY@Assessment Type is mandatory"));
+				}
+				
+				if(txtAssessmentPage.text=='' || txtAssessmentPage.text==null){
+					errors.push(iAseesment.translate("ASSESSMENT_PAGE_IS_MANDATORY@Assessment Page is mandatory"));
+				}
+				
+				if(_selectedPageItems==null || _selectedPageItems.length<1){
+					errors.push(iAseesment.translate("PLEASE_SELECT_AT_LEAST_ONE_ASSESSMENT@Please select at least one assessment."));
+				}
+				
+				
+				if(currentPageConfig==null && checkExistAssessmentPage()){
+					errors.push(iAseesment.translate("ASSESSMENT_PAGE_IS_ALREADY_EXISTED@Assessment Page is already existed"));
+				}
+				
+				
+				if(errors.length>0){
+					
+					Alert.show(errors.join("\n"), iAseesment.translate(GLOBAL_INVALID_FORM), Alert.OK, this);
+					
+				}else{
+					var data:ArrayCollection = datagridPage.dataProvider as ArrayCollection;
+					if(data == null){
+						data = new ArrayCollection();
+					}
+					
+					var isUpdate:Boolean = currentPageConfig!=null;
+					if(currentPageConfig==null){
+						currentPageConfig = new DtoPage(String(cboPageType.selectedItem),txtAssessmentPage.text,new ArrayCollection(_selectedPageItems.source));
+					}
+					currentPageConfig.pageName = txtAssessmentPage.text;
+					currentPageConfig.assessmentType = String(cboPageType.selectedItem);
+					//currentPageConfig.isCreateSum = chkCreateSumPerPage.selected;
+					//if(chkCreateSumPerPage.selected){
+					//	currentPageConfig.totalStoreToField = cboMapPageTotal.selectedItem as String;
+					//}else{
+					//	currentPageConfig.totalStoreToField = "";
+					//}
+					var selectedIds:ArrayCollection = new ArrayCollection();
+					for each(var ass:DtoAssessment in _selectedPageItems){
+						selectedIds.addItem(ass.assessmentId);
+					}
+					
+					currentPageConfig.assessmentSelectedIds = selectedIds;
+					
+					
+					iAseesment.savePage(currentPageConfig,isUpdate);
+					if(!isUpdate){
+						
+						data.addItem(currentPageConfig);
+					}
+					datagridPage.dataProvider = data;
+					datagridPage.selectedItem = currentPageConfig;
+					datagridPage.validateNow();
+				}
+			}
+			private function saveModel():void{
+				var errors:Array = new Array();
+				if(cboType.text=='' || cboType.selectedIndex==-1){
+					errors.push(iAseesment.translate("ASSESSMENT_TYPE_IS_MANDATORY@Assessment Type is mandatory"));
+				}
+				
+				if(txtAssessmentModel.text=='' || txtAssessmentModel.text==null){
+					errors.push(iAseesment.translate("ASSESSMENT_MODEL_IS_MANDATORY@Assessment Model is mandatory"));
+				}
+				
+				if(cboModelType.text=='' || cboModelType.selectedIndex==-1){
+					errors.push(iAseesment.translate("ASSESSMENT_MODEL_TYPE_IS_MANDATORY@Type is mandatory"));
+				}
+				
+				if(_selectedItems==null || _selectedItems.length<1){
+					errors.push(iAseesment.translate("PLEASE_SELECT_AT_LEAST_ONE_Page@Please select at least one Page."));
+				}
+				
+				if(cboSumType.selectedItem==null || cboSumType.selectedIndex==-1){
+					errors.push(iAseesment.translate("SUM_TYPE_IS_MANDATORY@Sum Type is mandatory"));
+				}
+				
+				
+				if(checkExistModelName()){
+					errors.push(iAseesment.translate("MODELNAME_IS_ALREADY_EXISTED@Model name is already existed"));
+				}
+				
+				if(errors.length>0){
+					
+					Alert.show(errors.join("\n"), iAseesment.translate(GLOBAL_INVALID_FORM), Alert.OK, this);
+					
+				}else{
+					
+					var data:ArrayCollection = datagridModel.dataProvider as ArrayCollection;
+					if(data == null){
+						data = new ArrayCollection();
+					}
+					
+					var isUpdate:Boolean = currentConfig!=null;
+					if(currentConfig==null){
+						currentConfig = new DtoConfiguration(String(cboType.selectedItem),txtAssessmentModel.text,cboModelType.selectedItem.data,new ArrayCollection(_selectedItems.source));
+					}
+					
+					currentConfig.assessmentModel = txtAssessmentModel.text;
+					currentConfig.assessmentType = String(cboType.selectedItem);
+					var selectedIds:ArrayCollection = new ArrayCollection();
+					for each(var page:DtoPage in _selectedItems){
+						selectedIds.addItem(page.recordId);
+					}
+					currentConfig.pageSelectedIds = selectedIds;
+					//currentConfig.isCreateSum = chkCreateSumPerModel.selected;
+					//if(chkCreateSumPerModel.selected){
+					//	currentConfig.totalStoreToField = cboMapModelTotal.selectedItem as String;
+					//}else{
+					//	currentConfig.totalStoreToField = "";
+					//}
+					currentConfig.sumType = cboSumType.selectedItem.data;
+					iAseesment.saveAssessmentConf(currentConfig,isUpdate);
+					if(!isUpdate){
+						
+						data.addItem(currentConfig);
+					}
+					datagridModel.dataProvider = data;
+					datagridModel.selectedItem = currentConfig;
+					datagridModel.validateNow();
+					
+					
+				}
+				
+			}
+			
+			public function set asseesment(c:IAssessment):void
+			{ 
+				iAseesment = c;			
+				
+			} 
+			private function getObjectSumField(listColumnSumFields:ArrayCollection,col:DtoColumn):Object{
+				var dtoSumField:Object = null;
+				for each(var obj:Object in listColumnSumFields){
+					if(col.recordId==obj.ColId){
+						return obj;
+					}
+				}
+				if(dtoSumField == null){
+					dtoSumField = new Object();
+					dtoSumField['ColId'] = col.recordId;
+					dtoSumField['SectionTotal'] = "";
+					dtoSumField['ModelTotal'] = "";
+				}
+				return dtoSumField;
+			}
+			
+			private function reloadHeaderElementField(dtoHeader:DtoAssessmentPDFHeader):void{
+				var entity:String = cboEntity.selectedItem as String;
+				var assModel:DtoConfiguration = cboAssPdfModel.selectedItem as DtoConfiguration;
+				if(!StringUtils.isEmpty(entity) && assModel != null){
+					cboElementName.dataProvider = iAseesment.getFields(entity);
+					
+					if(dtoHeader!=null){
+						cboElementName.selectedItem = dtoHeader.elementName;
+						txtDisplayName.text = dtoHeader.display_name;
+					}else{
+						cboElementName.selectedIndex =-1;
+					}
+					btnSavePDFHeader.enabled = true;
+				}else{
+					btnSavePDFHeader.enabled = false;
+				}
+				
+			}
+			
+			
+			public function reloadGridSumField():void{
+				
+				var modelSelected:DtoConfiguration = cboMappingModel.selectedItem as DtoConfiguration;
+				var dataSumField:ArrayCollection = new ArrayCollection();
+				if(modelSelected==null){
+					datagridTotalField.dataProvider = dataSumField;
+					return ;
+				}
+				var listFields:ArrayCollection = iAseesment.getFields(modelSelected.assessmentType);
+				
+				var listColumnSumFields:ArrayCollection = iAseesment.getMappingTableSetting(modelSelected.recordId);
+				var listAllSumFields:ArrayCollection = iAseesment.getAllSumFieldByModelId(modelSelected.recordId);
+				for each(var col:DtoColumn in listColumnSumFields){
+					if(col.isHasSumField){
+						var dtoSumField:Object =getObjectSumField(listAllSumFields,col);
+						dtoSumField['ModelId'] = modelSelected.recordId;
+						dtoSumField['Title'] = col.title;
+						dtoSumField["listfields001"] = listFields;
+						dataSumField.addItem(dtoSumField);
+					}
+					
+				}
+				datagridTotalField.dataProvider = dataSumField;
+			}
+			private function onPageGridClick():void{
+				var obj:DtoPage = datagridPage.selectedItem as DtoPage;
+				if(obj == null){
+					return;
+				}
+				currentPageConfig = obj;
+				enableDetailPage(true);
+				cboPageType.selectedItem = obj.assessmentType;
+				txtAssessmentPage.text = obj.pageName;
+				var allAvaiableItems:ArrayCollection = iAseesment.getAssessmentByType(String(cboPageType.selectedItem));
+				var notSelectedItems:ArrayCollection = new ArrayCollection();
+				var tempselectedItems:Object = new Object();
+				for each(var assessment:DtoAssessment in allAvaiableItems){
+					if(obj.assessmentSelectedIds.contains(assessment.assessmentId)){						
+						tempselectedItems[assessment.assessmentId]=assessment;
+					}else{
+						notSelectedItems.addItem(assessment);
+					}
+				}
+				var orderSelected:ArrayCollection = new ArrayCollection();
+				for each(var assId:String in obj.assessmentSelectedIds){
+					if(tempselectedItems.hasOwnProperty(assId)){
+						orderSelected.addItem(tempselectedItems[assId]);
+					}
+				}
+				
+				//chkCreateSumPerPage.selected = currentPageConfig.isCreateSum;
+				//chkCreateSumPerPage.enabled = true;
+				//cboMapPageTotal.dataProvider = iAseesment.getFields(currentPageConfig.assessmentType);
+				//cboMapPageTotal.selectedItem = currentPageConfig.totalStoreToField;
+				//cboMapPageTotal.visible = currentPageConfig.isCreateSum;
+				
+				_availablePageItems = notSelectedItems;
+				_selectedPageItems = orderSelected;
+				
+				
+			}
+			
+			
+			private function onGridClick():void{
+				var obj:DtoConfiguration = datagridModel.selectedItem as DtoConfiguration;
+				if(obj == null){
+					return;
+				}
+				currentConfig = obj;
+				enableDetail(true);
+				cboType.selectedItem = obj.assessmentType;
+				txtAssessmentModel.text = obj.assessmentModel;
+				var allAvaiableItems:ArrayCollection = iAseesment.getPageByType(String(cboType.selectedItem));
+				var notSelectedItems:ArrayCollection = new ArrayCollection();
+				var tempselectedItems:Object = new Object();
+				for each(var page:DtoPage in allAvaiableItems){
+					if(obj.pageSelectedIds.contains(page.recordId)){
+						tempselectedItems[page.recordId]=page;
+					}else{
+						notSelectedItems.addItem(page);
+					}
+				}
+				var orderSelectedItem:ArrayCollection = new ArrayCollection();
+				for each(var pageId:String in obj.pageSelectedIds){
+					if(tempselectedItems[pageId] != null && tempselectedItems[pageId] != ""){
+						orderSelectedItem.addItem(tempselectedItems[pageId]);
+					}
+					
+				}
+				//cboMapModelTotal.dataProvider = iAseesment.getFields(currentConfig.assessmentType);
+				//chkCreateSumPerModel.enabled = true;
+				//chkCreateSumPerModel.selected = currentConfig.isCreateSum;
+				//cboMapModelTotal.selectedItem = currentConfig.totalStoreToField;
+				//cboMapModelTotal.visible = currentConfig.isCreateSum;
+				cboSumType.selectedIndex=0;//clear selecged
+				for each(var sumType:Object in cboSumType.dataProvider){
+					if(sumType.data==currentConfig.sumType){
+						cboSumType.selectedItem = sumType;
+						break;
+					}
+				}
+				
+				cboModelType.selectedIndex =0;
+				for each(var mType:Object in cboModelType.dataProvider){
+					if(mType.data==currentConfig.type){
+						cboModelType.selectedItem = mType;
+						break;
+					}
+				}
+				
+				_availableItems = notSelectedItems;
+				_selectedItems = orderSelectedItem;
+			}
+			private function onGridMappingClick():void{
+				var obj:Object = datagridMapping.selectedItem;
+				if(obj == null){
+					return;
+				}
+				btnsameMapping.enabled=true;
+				
+				var assess:DtoAssessment = obj as DtoAssessment;
+				var dto:DtoConfiguration = cboMappingModel.selectedItem as DtoConfiguration;allLeftBtn;
+				var listFields:ArrayCollection = iAseesment.getFields(dto==null?"":dto.assessmentType);
+				var data:ArrayCollection = iAseesment.getQuestionsByAssessment(assess.assessementName,cboMappingModel.selectedItem.recordId);
+				for each(var quest:Object in data){
+					quest["listfields001"] = listFields;
+				}
+				//var fields:ArrayCollection = iAseesment.getFields(dto.assessmentType);
+				//cboMapAssTotal.dataProvider = fields;
+				//chkCreateSumPerAss.enabled = true;
+				//chkCreateSumPerAss.selected = assess.isCreateSum;
+				//cboMapAssTotal.visible = assess.isCreateSum;
+				//cboMapAssTotal.selectedItem = assess.totalStoreToField;
+				
+				//reloadGridSumField(listFields);
+				datagridQuestion.dataProvider = data;
+			}
+			
+			private function up_clickHandler(event:MouseEvent,name:String):void{
+				var i:int = 0;
+				var o:Object = null;
+				var arr:ArrayCollection = null;
+				if(name==PAGE){
+					arr = new ArrayCollection(listPageAssessmentSelected.selectedItems);
+					i = listPageAssessmentSelected.selectedIndex;
+					if(arr==null || arr.length < 1 || i<1){
+						return;
+					}
+					
+					_selectedPageItems.removeItemAt(i);
+					for each(o in arr){
+						_selectedPageItems.addItemAt(o,i-1);
+						listPageAssessmentSelected.selectedIndex = i;
+					}
+				}else if(name==MODEL){
+					arr = new ArrayCollection(listAssessmentSelected.selectedItems);
+					i = listAssessmentSelected.selectedIndex;
+					if(arr==null || arr.length < 1 || i<1){
+						return;
+					}
+					
+					_selectedItems.removeItemAt(i);
+					for each(o in arr){
+						_selectedItems.addItemAt(o,i-1);
+						listAssessmentSelected.selectedIndex = i;
+					}
+				}else if(name == FIELD){
+					// CH
+					arr = new ArrayCollection(listSplitterSelected.selectedItems);
+					i = listSplitterSelected.selectedIndex;
+					if(arr==null || arr.length < 1 || i<1){
+						return;
+					}
+					
+					_selectedSplitterItems.removeItemAt(i);
+					for each(o in arr){
+						_selectedSplitterItems.addItemAt(o,i-1);
+						listSplitterSelected.selectedIndex = i;
+					}
+				}
+				
+			}
+			
+			private function initMappingTab():void{	
+				if(cboMappingModel.selectedItem == null){
+					btnEditColumn.enabled = false;
+				}else{
+					btnEditColumn.enabled = true;
+				}
+				cancelMapping();
+				changeMappingAssessmentModel();
+				initMappingTableColumn();
+			}
+			
+			private function down_clickHandler(event:MouseEvent,name:String):void{
+				var i:int = 0;
+				var o:Object = null;
+				var arr:ArrayCollection = null;
+				if(name==PAGE){
+					arr = new ArrayCollection(listPageAssessmentSelected.selectedItems);
+					i = listPageAssessmentSelected.selectedIndex;
+					if(arr==null || arr.length < 1 || i == _selectedPageItems.length - 1){
+						return;
+					}
+					
+					_selectedPageItems.removeItemAt(i);
+					for each(o in arr){
+						_selectedPageItems.addItemAt(o,i+1);
+						listPageAssessmentSelected.selectedIndex = i;
+					}
+				}else if(name==MODEL){
+					arr = new ArrayCollection(listAssessmentSelected.selectedItems);
+					i = listAssessmentSelected.selectedIndex;
+					if(arr==null || arr.length < 1 || i == _selectedItems.length - 1){
+						return;
+					}
+					
+					_selectedItems.removeItemAt(i);
+					for each(o in arr){
+						_selectedItems.addItemAt(o,i+1);
+						listAssessmentSelected.selectedIndex = i;
+					}
+				}else if(name == FIELD){
+					arr = new ArrayCollection(listSplitterSelected.selectedItems);
+					i = listSplitterSelected.selectedIndex;
+					if(arr==null || arr.length < 1 || i == _selectedSplitterItems.length - 1){
+						return;
+					}
+					
+					_selectedSplitterItems.removeItemAt(i);
+					for each(o in arr){
+						_selectedSplitterItems.addItemAt(o,i+1);
+						listSplitterSelected.selectedIndex = i;
+					}
+				}
+				
+				
+			}
+			private function newPageClick():void{
+				reset(PAGE);
+				enableDetailPage(true);
+			}
+			private function newClick():void{
+				reset(MODEL);
+				enableDetail(true);
+			}
+			
+			private function reset(name:String):void{
+				if(name == PAGE){
+					datagridPage.selectedIndex=-1;
+					cboPageType.text="";
+					cboPageType.selectedIndex=-1;
+					_availablePageItems = new ArrayCollection();
+					txtAssessmentPage.text = "";
+					_selectedPageItems = new ArrayCollection();
+					//chkCreateSumPerPage.selected=false;
+					//cboMapPageTotal.dataProvider = new ArrayCollection();
+					//cboMapPageTotal.selectedIndex=-1;
+					//cboMapPageTotal.visible = false;
+					//chkCreateSumPerPage.enabled = false;
+					currentPageConfig = null;
+				}else if(name == MODEL){
+					datagridModel.selectedIndex=-1;
+					cboType.text="";
+					cboType.selectedIndex=-1;
+					_availableItems = new ArrayCollection();
+					txtAssessmentModel.text = "";
+					_selectedItems = new ArrayCollection();
+					currentConfig = null;
+					//chkCreateSumPerModel.selected=false;
+					//chkCreateSumPerModel.enabled=false;
+					//cboMapModelTotal.dataProvider = new ArrayCollection();
+					//cboMapModelTotal.selectedIndex=-1;
+					//cboMapModelTotal.visible=false;
+					cboSumType.selectedIndex=-1;
+				}else if(name == FIELD){
+					datagridSplitter.selectedIndex = -1;
+					_availableSplitterItems = new ArrayCollection();
+					cboSpliterModel.text = "";
+					_selectedSplitterItems = new ArrayCollection();
+					cboSpliterModel.selectedIndex = -1;
+					cboSpliterModel.dataProvider = iAseesment.getAllConfiguration();
+					txtDelimiter.text = "";
+					currentSplitter = null;					
+					
+					
+				}
+				
+			}
+			
+			
+			
+			
+			
+			private function getFieldDisplayName(item:Object,col:AdvancedDataGridColumn =null):String{
+				var dto:DtoConfiguration = cboMappingModel.selectedItem as DtoConfiguration;
+				var assType:String = null;
+				if(col!=null){
+					item = item[col.dataField];
+				}
+				if(dto!=null){
+					assType = dto.assessmentType;
+				}
+				return getFieldDisplay(item,assType);
+			}
+			
+			private function getHeaderDisplayName(item:Object,col:AdvancedDataGridColumn):String{
+				var header:DtoAssessmentPDFHeader = item as DtoAssessmentPDFHeader;
+				return iAseesment.getFieldDisplayName(header.entity,header.elementName);
+			}
+			
+			private function getEntityDisplayName(item:Object,col:AdvancedDataGridColumn):String{
+				
+					var entity:String = item[col.dataField];
+				
+				return iAseesment.getDisplayNameEntity(entity);
+				
+			}
+			
+			private function cancelConfig(event:Event):void{
+				reset(MODEL);
+				enableDetail(false);
+			}
+			private function cancelPageConfig(event:Event):void{
+				reset(PAGE);
+				enableDetailPage(false);
+			}
+			private function  enableDetail(edit:Boolean):void{
+				cboType.enabled = edit;
+				txtAssessmentModel.enabled = edit;
+				listAssessment.enabled = edit;
+				listAssessmentSelected.enabled = edit;
+				boxModelMove.enabled = edit;
+				boxModelUpDown.enabled = edit;
+				//				allRightBtn.enabled = edit;
+				//				oneRightBtn.enabled = edit;
+				//				switchBtn.enabled = edit;
+				//				allLeftBtn.enabled = edit;
+				//				oneLeftBtn.enabled = edit;
+				//				btnmovedown.enabled = edit;
+				//				btnmoveup.enabled = edit;
+				buttonSave.enabled=edit;
+				
+				
+			}
+			private function  enableDetailPage(edit:Boolean):void{
+				cboPageType.enabled = edit;
+				txtAssessmentPage.enabled = edit;
+				listPageAssessment.enabled = edit;
+				listPageAssessmentSelected.enabled = edit;
+				boxPagelMove.enabled = edit;
+				boxPageUpDown.enabled = edit;
+				
+				//				allPageRightBtn.enabled = edit;
+				//				onePageRightBtn.enabled = edit;
+				//				switchPageBtn.enabled = edit;
+				//				allPageLeftBtn.enabled = edit;
+				//				onePageLeftBtn.enabled = edit;
+				//				btnPagemovedown.enabled = edit;
+				//				btnPagemoveup.enabled = edit;
+				buttonPageSave.enabled=edit;
+				
+			}
+			public final function deletePDFHeader(data:Object):void{
+				Alert.show(iAseesment.translate("GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE@Are you sure you want to delete?"), iAseesment.translate('GLOBAL_DELETE@Delete'), Alert.YES | Alert.NO, this, alertListener, null, Alert.NO);
+				var that:Canvas = this;
+				function alertListener(eventObj:CloseEvent):void {
+					// Check to see if the OK button was pressed.
+					if (eventObj.detail==Alert.YES) {
+						
+						
+						iAseesment.deletePDFHeader(data.gadget_id);
+						lstPDFHeaderField.removeItemAt(lstPDFHeaderField.getItemIndex(data));	
+						reindexHeaderAfterDelete();
+						changeAssessmentPDFHeader(); //reload grid 
+						
+					
+						
+					}
+				}
+
+			}
+			
+			protected function reindexHeaderAfterDelete():void{
+				var i:int = 1;
+				for each(var header:DtoAssessmentPDFHeader in lstPDFHeaderField){
+					header.ordering = i;
+					iAseesment.upsertAssPDFHeader(header);
+					i++;
+				}
+			}
+			
+			
+			public final function deleteAssModel():void{
+				Alert.show(iAseesment.translate("GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE@Are you sure you want to delete?"), iAseesment.translate('GLOBAL_DELETE@Delete'), Alert.YES | Alert.NO, this, alertListener, null, Alert.NO);
+				var that:Canvas = this;
+				function alertListener(eventObj:CloseEvent):void {
+					// Check to see if the OK button was pressed.
+					if (eventObj.detail==Alert.YES) {						
+						
+						var canDelete:Boolean = true;
+						var cols:ArrayCollection = iAseesment.getMappingTableSetting(currentConfig.recordId);
+						if(cols!=null){
+							for each(var col:DtoColumn in cols){
+								if(!col.isDefault){
+									canDelete = false;
+								}
+							}						
+						}						
+						if(canDelete){
+							//try to check with spliter
+							var spliters:ArrayCollection = iAseesment.getAllAssessmentSplitter();
+							if(spliters!=null){
+								for each(var spliter:DtoAssessmentSplitter in spliters){
+									if(spliter.modelId==currentConfig.recordId){
+										canDelete = false;
+									}
+								}
+							}
+						}
+						if(canDelete){
+							iAseesment.deleteAssessmentModel(currentConfig);
+							dataModelItems.removeItemAt(dataModelItems.getItemIndex(currentConfig));
+							datagridModel.validateNow();
+							cancelConfig(null);
+						}else{
+							Alert.show(iAseesment.translate("MODEL_CANNOT_DELETE@This Model is in use."), iAseesment.translate(GLOBAL_INVALID_FORM), Alert.OK, that);
+						}
+						
+						
+						
+						
+						//reloadComboModel();
+						//dataPageItems.removeItemAt(datagridPage.selectedIndex);
+						//dataPageItems.refresh();
+					}
+				}
+			}
+			
+			public function initTableColumnSumField():void{
+				var col:AdvancedDataGridColumn = null;
+				var columns:Array = new Array();
+				col = new AdvancedDataGridColumn();
+				col.editable = false;
+				col.dataField = "Title";
+				col.headerText = iAseesment.translate('GLOBAL_Column_FIELDS@Column Field');
+				columns.push(col);
+				
+				col = new AdvancedDataGridColumn();
+				col.itemEditor = new ClassFactory(ComboboxColRender);
+				col.editable = true;				
+				col.editorDataField = "selectedItem";
+				col.labelFunction = getFieldDisplayName;				
+				col.dataField = "SectionTotal";
+				col.headerText = iAseesment.translate('GLOBAL_ASSESSNENT_TOTAL@Assessment Total');
+				columns.push(col);
+				
+				col = new AdvancedDataGridColumn();
+				col.editable = true;
+				col.dataField = "PageTotal";
+				col.editorDataField = "selectedItem";
+				col.labelFunction = getFieldDisplayName;
+				col.itemEditor = new ClassFactory(ComboboxColRender);
+				col.headerText = iAseesment.translate('Page_Total@Page Total');
+				columns.push(col);
+				
+				
+				col = new AdvancedDataGridColumn();
+				col.editable = true;
+				col.dataField = "ModelTotal";
+				col.editorDataField = "selectedItem";
+				col.labelFunction = getFieldDisplayName;
+				col.itemEditor = new ClassFactory(ComboboxColRender);
+				col.headerText = iAseesment.translate('Model_Total@Model Total');
+				columns.push(col);
+				
+				
+				datagridTotalField.groupedColumns = columns;
+				datagridTotalField.validateNow();
+			}
+			public function initMappingTableColumn():void{
+				var comboSelected:DtoConfiguration = cboMappingModel.selectedItem as DtoConfiguration;
+			 	var cols:ArrayCollection  = iAseesment.getMappingTableSetting(comboSelected==null?"":comboSelected.recordId);
+				var columns:Array = new Array();
+				for each(var dtoCol:DtoColumn in cols){
+					var col:AdvancedDataGridColumn = null;
+					if(dtoCol.colProperty=='Question'){
+					 col =	createColumn(dtoCol,null,false);
+					}else{
+					 col =	createColumn(dtoCol,getFieldDisplayName,true,ComboboxColRender);
+					}			
+					columns.push(col);
+				}
+				
+				var cl:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+				cl.dataField = "backgroundColor";
+				cl.itemRenderer = new ClassFactory(CheckBoxQuestionPDFBackgroundRender);
+				cl.headerText = iAseesment.translate("ASSESSMENT_FIELD_BACKGROUND@Background");
+				cl.editable = false;
+				columns.push(cl);
+				
+				cl = new AdvancedDataGridColumn();
+				cl.dataField = "isHeader";
+				cl.itemRenderer = new ClassFactory(CheckBoxQuestionPDFBackgroundRender);
+				cl.headerText = iAseesment.translate("ASSESSMENT_FIELD_IS_HEADER@Is Header");
+				cl.editable = false;
+				columns.push(cl);
+				datagridQuestion.groupedColumns = columns;
+				datagridQuestion.validateNow();
+				
+				
+			}
+			
+			
+			protected function createColumn(col:DtoColumn,lblFunction:Function = null,editable:Boolean = false,renderer:Class =null,editorDataField:String="selectedItem"):AdvancedDataGridColumn{
+				var child:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+				child.editable = editable;
+				if(renderer!=null){
+					child.itemEditor = new ClassFactory(renderer);
+					child.editorDataField = editorDataField;
+					child.labelFunction = lblFunction;
+				}				
+				child.dataField = col.colProperty;
+				child.headerText = col.title;
+				return child;
+			}
+			
+			
+			
+			
+			
+			protected function openEditablePopup():void{
+				
+				var editTable:EditTableWindow = new EditTableWindow();
+				editTable.iAseesment = iAseesment;
+				editTable.assessementLayout = this;
+				iAseesment.openWindow(editTable);
+			}
+			
+			
+			
+			public final  function deleteAssPage():void{
+				Alert.show(iAseesment.translate("GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE@Are you sure you want to delete?"), iAseesment.translate('GLOBAL_DELETE@Delete'), Alert.YES | Alert.NO, this, alertListener, null, Alert.NO);
+				var that:Canvas = this;
+				function alertListener(eventObj:CloseEvent):void {
+					// Check to see if the OK button was pressed.
+					if (eventObj.detail==Alert.YES) {
+						var canDelete:Boolean = true;
+						var models:ArrayCollection = iAseesment.getAllConfiguration();
+						for each(var model:DtoConfiguration in models){
+							if(model.pageSelectedIds.contains(currentPageConfig.recordId)){
+								canDelete = false;
+							}
+						}
+						if(canDelete){
+							iAseesment.deleteAssessmentPage(currentPageConfig);
+							dataPageItems.removeItemAt(dataPageItems.getItemIndex(currentPageConfig));
+							datagridPage.validateNow();
+							cancelPageConfig(null);
+						}else{
+							Alert.show(iAseesment.translate("PAGE_CANNOT_DELETE@This page is in use."), iAseesment.translate(GLOBAL_INVALID_FORM), Alert.OK, that);
+						}
+					}
+				}
+			}
+			private function onChangeTab(e:Event):void{
+				if(tabstrip.selectedChild==tabModel){
+					cancelConfig(e);
+				}else if(tabstrip.selectedChild==tabPage){
+					cancelPageConfig(e);
+				}else if(tabstrip.selectedChild==tabSplitter){					
+					cancelSplitter(e);
+					initializedSplitter();
+				}else if(tabstrip.selectedChild == tabPDFHeader){
+					cboAssPdfModel.dataProvider = getAllModel();
+					getCustomTextPDFHeader();
+					changeAssessmentPDFHeader();
+					clearPDFHeader();
+				}
+//				else if(tabstrip.selectedChild == tabPDFColorTheme){
+//					setSelectedAllColorCombo();
+//				}
+				else{
+					// reload combobox model in tab mapping after save model					
+					cancelMapping();
+					reloadComboModel();
+					btnSaveSumField.enabled = false;				
+					
+				}
+			}
+			
+			// CH : I need to refresh in Mobile Configurator. Thanks
+			public function refreshData():void{
+				init();
+			//	reset(MODEL);
+				onChangeTab(null);//refresh selected tab
+			}
+			
+			private function saveSplitter():void{
+				var errors:Array = new Array();
+				if(cboSpliterModel.text=='' || cboSpliterModel.selectedIndex==-1){
+					errors.push(iAseesment.translate("ASSESSMENT_MODEL_IS_MANDATORY@Assessment Model is mandatory"));
+				}
+				
+				if(txtDelimiter.text=='' || txtDelimiter.text==null){
+					errors.push(iAseesment.translate("ASSESSMENT_DELIMITER@Delimiter is mandatory"));
+				}
+				
+				if(_selectedSplitterItems.length == 0){
+					errors.push(iAseesment.translate("ASSESSMENT_FIELD@Please select one field."));
+				}
+				
+				if(errors.length>0){
+					Alert.show(errors.join("\n"), iAseesment.translate(GLOBAL_INVALID_FORM), Alert.OK, this);
+				}else{
+					
+					var data:ArrayCollection = datagridSplitter.dataProvider as ArrayCollection;
+					if(data == null){
+						data = new ArrayCollection();
+					}					
+					var isUpdate:Boolean = currentSplitter != null;					
+				
+					
+					
+					if(currentSplitter == null){						
+						currentSplitter = new DtoAssessmentSplitter();
+					}
+					
+					var model:DtoConfiguration = cboSpliterModel.selectedItem as DtoConfiguration;
+					
+					currentSplitter.modelId = model.recordId;
+					currentSplitter.delimiter = txtDelimiter.text;					
+					currentSplitter.selectedFields = _selectedSplitterItems;
+					
+					if(checkExistSpliter()){
+						Alert.show(iAseesment.translate('ASS_SPLITER_FOR_MODEL_EXIST@The model already created. Please change the model.'), iAseesment.translate(GLOBAL_INVALID_FORM), Alert.OK, this);
+					}else{
+						iAseesment.saveSplitter(currentSplitter, isUpdate);
+						if(!isUpdate){
+							data.addItem(currentSplitter);
+						}
+						datagridSplitter.dataProvider = data;
+						datagridSplitter.selectedItem = currentSplitter;
+						datagridSplitter.validateNow();
+					}
+					
+					
+				}
+			}
+			
+			private function changeSplitterAssessment(e:ListEvent):void {
+				var assModel:DtoConfiguration = (e.currentTarget as ComboBox).selectedItem as DtoConfiguration;
+				_availableSplitterItems =  iAseesment.getFields(assModel.assessmentType);
+				_availableSplitterItems.removeItemAt(0);//remove empty field
+				txtDelimiter.text = "";
+				selectedSplitterItems = new ArrayCollection();
+//				currentSplitter = getDtoSpliter(assModel);
+//				if(currentConfig!=null){
+//					datagridSplitter.selectedItem= currentConfig;
+//					bindSpliterToForm(currentSplitter);
+//				}
+				
+			}
+			private function changeEntity(event:Event):void{				
+				reloadHeaderElementField(null);
+			}
+			private function changeAssessmentPDFHeader():void{
+				var assModel:DtoConfiguration = cboAssPdfModel.selectedItem as DtoConfiguration;
+				if(assModel != null){ //Bug #6514
+					lstPDFHeaderField = iAseesment.getAssPDFHeaderByAssName(assModel.recordId);				
+					clearPDFHeader();
+					getCustomTextPDFHeader();
+					btnSavePDFHeader.enabled = false;
+					enableMoveUpDownButton(null);
+					btnNewPDFHeader.enabled = true;
+					btnSaveCustomText.enabled = true;
+				}else{
+					btnNewPDFHeader.enabled = false;
+					btnSaveCustomText.enabled = false;
+				}
+			}
+			private function getCustomTextPDFHeader():void{
+				var assModel:DtoConfiguration = cboAssPdfModel.selectedItem as DtoConfiguration;
+				if(assModel != null){
+					dtoCustomTextPDFHeader = iAseesment.getCustomTextPDFHeader(assModel.recordId);
+					if(dtoCustomTextPDFHeader != null){						
+						txtHeader.text = dtoCustomTextPDFHeader.customText;
+					}else{						
+						txtHeader.text = "";
+					}
+				}
+				
+			}
+			private function getDtoSpliter(assModel:DtoConfiguration):DtoAssessmentSplitter{
+				// Search in dataGrid
+				var providers:ArrayCollection = datagridSplitter.dataProvider as ArrayCollection;
+				for each(var dto:DtoAssessmentSplitter in providers){
+					if(dto.modelId == assModel.recordId){						
+						return  dto;
+					}
+				}
+				return null;
+			}
+			
+			private function newSplitterClick():void{
+				reset(FIELD);
+				enableDetailSplitter(true);
+			}
+			
+			private function cancelSplitter(e:Event):void{
+				reset(FIELD);
+				enableDetailSplitter(false);
+			}
+			
+			private function enableDetailSplitter(edit:Boolean):void{
+				cboSpliterModel.enabled = edit;
+				txtDelimiter.enabled = edit;
+				listSplitterField.enabled = edit;
+				listSplitterSelected.enabled = edit;
+				boxSplitterMove.enabled = edit;
+				boxSplitterUpDown.enabled = edit;
+				buttonSplitterSave.enabled = edit;
+			}
+			
+			public final function deleteAssSplitter():void{
+				Alert.show(iAseesment.translate("GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE@Are you sure you want to delete?"), iAseesment.translate('GLOBAL_DELETE@Delete'), Alert.YES | Alert.NO, this, alertListener, null, Alert.NO);
+				function alertListener(eventObj:CloseEvent):void {
+					// Check to see if the OK button was pressed.
+					if (eventObj.detail==Alert.YES) {
+						iAseesment.deleteAssessmentSplitter(currentSplitter);
+						var providers:ArrayCollection = (datagridSplitter.dataProvider as ArrayCollection);
+						providers.removeItemAt(providers.getItemIndex(currentSplitter));
+						datagridSplitter.validateNow();
+						cancelSplitter(null);
+					}
+				}
+			}
+			
+			private function getSplitterComboDataProvider():ArrayCollection{
+				_availableSplitterItems = new ArrayCollection();
+				_selectedSplitterItems = new ArrayCollection();
+				return iAseesment.getAllConfiguration();
+			}
+			
+			private function initializedSplitter():void{
+				// CH 
+				datagridSplitter.dataProvider = iAseesment.getAllAssessmentSplitter();
+			}
+			
+			private function getFieldDisplayNameSplitter(item:Object):String{
+				
+				var model:DtoConfiguration = cboSpliterModel.selectedItem as DtoConfiguration;
+				if(model==null){
+					return "";
+				}
+				
+				return getFieldDisplay(item,model.assessmentType);
+			}
+			
+			private function getTotalPageFieldDisplayName(item:Object):String{
+				
+				var assessmentType:String = cboPageType.selectedItem as String;
+				
+				return getFieldDisplay(item,assessmentType);
+			}
+			
+			private function getTotalModelFieldDisplayName(item:Object):String{
+				
+				var assessmentType:String = cboType.selectedItem as String;
+				
+				return getFieldDisplay(item,assessmentType);
+			}
+			
+			
+			private function getFieldDisplay(item:Object,assTyep:String):String{
+				var elementname:String = "";
+				if(item!=null){
+					elementname = String(item);
+				}
+				if(iAseesment != null && !StringUtils.isEmpty(elementname)){					
+					return iAseesment.getFieldDisplayName(assTyep, elementname);
+				}
+				return elementname;
+			}
+			
+			private function bindSpliterToForm(obj:DtoAssessmentSplitter):void{
+				enableDetailSplitter(true);
+				var selectedModel:DtoConfiguration = null;
+				for each(var assModel:DtoConfiguration in cboSpliterModel.dataProvider){
+					if(assModel.recordId == obj.modelId){
+						cboSpliterModel.selectedItem = assModel;
+						selectedModel = assModel;
+						break;
+					}
+				}
+				txtDelimiter.text = obj.delimiter;
+				
+				var allAvaiableItems:ArrayCollection = new ArrayCollection();
+				if(selectedModel!=null){
+					allAvaiableItems = iAseesment.getFields(selectedModel.assessmentType);
+					allAvaiableItems.removeItemAt(0);//remove empty
+				}
+				
+				for each(var s:String in obj.selectedFields){
+					if(allAvaiableItems.contains(s))
+						allAvaiableItems.removeItemAt(allAvaiableItems.getItemIndex(s));
+				}
+				
+				_availableSplitterItems = allAvaiableItems;
+				_selectedSplitterItems = obj.selectedFields;
+			}
+			
+			private function onGridSplitterClick():void{
+				var obj:DtoAssessmentSplitter = datagridSplitter.selectedItem as DtoAssessmentSplitter;
+				if(obj == null){
+					return;
+				}
+				currentSplitter = obj;
+				bindSpliterToForm(currentSplitter);
+			}
+			
+			public function set selectedSplitterItems(v:ArrayCollection):void{ 
+				_selectedSplitterItems = v;			
+				updateLists(FIELD);
+			}
+			
+			public function set availableSplitterItems(v:ArrayCollection):void{ 
+				_availableSplitterItems = v;			
+				updateLists(FIELD);
+			}
+			
+//			public function upsertPDFColor():void{
+//				var color:Array = new Array();
+//				color[0] = cboBGColorHeaderData.selectedItem.data;
+//				color[1] = cboBGColorHeaderGrid.selectedItem.data;
+//				color[2] = cboBGColorPage.selectedItem.data;
+//				for(var i:int=0;i<color.length;i++){
+//					var dtoColor:DtoPDFColorTheme = new DtoPDFColorTheme();
+//					dtoColor.color = color[i];
+//					dtoColor.colorType = IMG_BG_PDF_COLORS[i];
+//					dtoColor.ordering = i+"" ;
+//					if(lstPDFColor != null && lstPDFColor.length>0 ){
+//						var dto:DtoPDFColorTheme = lstPDFColor[i] as DtoPDFColorTheme;
+//						if(IMG_BG_PDF_COLORS[i] == dto.colorType){
+//							dtoColor.gadget_id = dto.gadget_id;
+//						}
+//					}
+//					iAseesment.upsertAssPDFColorTheme(dtoColor);
+//					
+//				}
+//				
+//				lstPDFColor = iAseesment.getAllAssPDFColorTheme();
+//				
+//			}
+			
+			
+			public function clearPDFHeader():void{				
+				cboEntity.selectedIndex = -1;
+				cboElementName.selectedIndex=-1;
+				dtoCurrentPDFHeader = null;
+				datagridPDFHeader.selectedIndex = -1;
+				txtDisplayName.text = "";
+			}
+			public function upsertPDFHeader():void{
+				 if(cboEntity.selectedItem == null || StringUtils.isEmpty(String(cboEntity.selectedItem))){
+					Alert.show(iAseesment.translate(iAseesment.translate("PLEASE_SELECT_ENTITY@Please select entity.")), "", Alert.OK, this);
+				}else if(cboElementName.selectedItem == null || StringUtils.isEmpty(cboElementName.selectedItem.toString())){
+					Alert.show(iAseesment.translate(iAseesment.translate("ASSESSMENT_FIELD@Please select one field.")), "", Alert.OK, this);
+				}else if(checkDuplicatePDFHeaderItem()){
+					Alert.show(iAseesment.translate("GLOBAL_FIELD_IS_ALREADY_EXIST@Field is already exist."), "", Alert.OK, this);
+				}
+				else{
+					if(dtoCurrentPDFHeader==null){
+						dtoCurrentPDFHeader = new DtoAssessmentPDFHeader();
+						dtoCurrentPDFHeader.modelId = cboAssPdfModel.selectedItem.recordId;
+						dtoCurrentPDFHeader.ordering = lstPDFHeaderField.length+1;
+					}
+					dtoCurrentPDFHeader.entity = cboEntity.selectedItem as String;
+					dtoCurrentPDFHeader.elementName = cboElementName.selectedItem as String;
+					dtoCurrentPDFHeader.display_name = txtDisplayName.text;
+					iAseesment.upsertAssPDFHeader(dtoCurrentPDFHeader);
+					changeAssessmentPDFHeader();
+					btnSavePDFHeader.enabled = false;
+					
+				}
+			}
+			public function saveCustomTextHeader():void{
+				var assModel:DtoConfiguration = cboAssPdfModel.selectedItem as DtoConfiguration;
+				if(assModel != null){ //Bug #6514
+					if(dtoCustomTextPDFHeader == null) dtoCustomTextPDFHeader = new DtoAssessmentPDFHeader();
+					dtoCustomTextPDFHeader.modelId = cboAssPdfModel.selectedItem.recordId;
+					dtoCustomTextPDFHeader.isCustomText = true;
+					dtoCustomTextPDFHeader.customText = txtHeader.text ;
+					dtoCustomTextPDFHeader.ordering = 0;
+					iAseesment.upsertAssPDFHeader(dtoCustomTextPDFHeader);
+				}
+			}
+			private function checkDuplicatePDFHeaderItem():Boolean{
+				if(lstPDFHeaderField!=null ){
+					for each(var obj:DtoAssessmentPDFHeader in lstPDFHeaderField){
+						if(obj!=dtoCurrentPDFHeader){
+							if(obj.entity == cboEntity.selectedItem && obj.elementName == cboElementName.selectedItem){
+								return true;
+							}
+						}
+					}
+				}
+					
+				
+				return false;
+			}
+			public function getLabelDisplayName(item:Object):String{
+				//
+				if( cboEntity.selectedItem != null){
+					var entity:String = cboEntity.selectedItem as String;
+					return getFieldDisplay(item,entity)
+				}
+				return null;
+			}
+			
+			public function selectedItemPDFHeader(event:Event):void{
+				dtoCurrentPDFHeader = datagridPDFHeader.selectedItem as DtoAssessmentPDFHeader;
+				if(dtoCurrentPDFHeader!=null){
+					cboEntity.selectedItem = dtoCurrentPDFHeader.entity;
+										
+				}
+				btnSavePDFHeader.enabled = true;
+				reloadHeaderElementField(dtoCurrentPDFHeader);
+				enableMoveUpDownButton(dtoCurrentPDFHeader);
+			}			
+			
+			// CH : Finish 
+			
+			private function onHeaderMoveUp():void{
+				
+				var headerSelected:DtoAssessmentPDFHeader = datagridPDFHeader.selectedItem as DtoAssessmentPDFHeader;			
+				var order:int = lstPDFHeaderField.getItemIndex(headerSelected);
+				var headerMoveDown:DtoAssessmentPDFHeader = lstPDFHeaderField.getItemAt(order-1) as DtoAssessmentPDFHeader;
+				lstPDFHeaderField.removeItemAt(order);
+				lstPDFHeaderField.addItemAt(headerSelected,order-1);	
+				var orderDown:int = headerSelected.ordering;
+				headerSelected.ordering=headerMoveDown.ordering;
+				headerMoveDown.ordering = orderDown;
+				iAseesment.upsertAssPDFHeader(headerSelected);
+				iAseesment.upsertAssPDFHeader(headerMoveDown);
+				
+				datagridPDFHeader.validateNow();
+				enableMoveUpDownButton(headerSelected);
+			}
+			
+			
+			
+			private function onHeaderMoveDown():void{				
+				var headerSelected:DtoAssessmentPDFHeader = datagridPDFHeader.selectedItem as DtoAssessmentPDFHeader;			
+				var order:int = lstPDFHeaderField.getItemIndex(headerSelected);
+				var headerMoveDown:DtoAssessmentPDFHeader = lstPDFHeaderField.getItemAt(order+1) as DtoAssessmentPDFHeader;
+				lstPDFHeaderField.removeItemAt(order);
+				lstPDFHeaderField.addItemAt(headerSelected,order+1);	
+				var orderDown:int = headerSelected.ordering;
+				headerSelected.ordering=headerMoveDown.ordering;
+				headerMoveDown.ordering = orderDown;
+				iAseesment.upsertAssPDFHeader(headerSelected);
+				iAseesment.upsertAssPDFHeader(headerMoveDown);				
+				datagridPDFHeader.validateNow();
+				enableMoveUpDownButton(headerSelected);
+			}
+			
+			private function enableMoveUpDownButton(selectedHeader:DtoAssessmentPDFHeader,setAsSelected:Boolean = true):void{
+				if(selectedHeader!=null){
+					btnmoveDown.enabled=lstPDFHeaderField.getItemIndex(selectedHeader)<lstPDFHeaderField.length-1;
+					btnmoveUp.enabled = lstPDFHeaderField.getItemIndex(selectedHeader)>0;					
+					if(setAsSelected){
+						datagridPDFHeader.selectedItem = selectedHeader;
+					}
+					
+				}else{
+					btnmoveDown.enabled = false;
+					btnmoveUp.enabled = false;					
+				}
+			}
+			
+//			private function setSelectedAllColorCombo():void{
+//				var lstDataHeaderColor:ArrayCollection = cboBGColorHeaderData.dataProvider as ArrayCollection;
+//				var lstGridColor:ArrayCollection = cboBGColorHeaderGrid.dataProvider as ArrayCollection;
+//				var lstPageColor:ArrayCollection = cboBGColorPage.dataProvider as ArrayCollection;
+//				lstPDFColor = iAseesment.getAllAssPDFColorTheme();
+//				for each(var dto:DtoPDFColorTheme in lstPDFColor){
+//					if(dto.colorType == IMG_BG_PDF_COLORS[0]){
+//						for (var i:int;i<lstDataHeaderColor.length;i++ ){
+//							if(dto.color == lstDataHeaderColor[i].data){
+//								cboBGColorHeaderData.selectedIndex =i;
+//							}
+//						}
+//					}else if(dto.colorType == IMG_BG_PDF_COLORS[1]){
+//						for(var j:int;j<lstGridColor.length;j++){
+//							if(dto.color == lstGridColor[j].data){
+//								cboBGColorHeaderGrid.selectedIndex = j;
+//							}
+//						}
+//					}else{
+//						for(var k:int;k<lstPageColor.length;k++){
+//							if(dto.color == lstPageColor[k].data){
+//								cboBGColorPage.selectedIndex = k;
+//							}
+//						}
+//					}
+//				}
+//			}
+			
+		]]>		
+		
+	</mx:Script>
+
+	<mx:TabNavigator top="0" left="0"  width="100%" height="100%" right="00" bottom="00" change="onChangeTab(event)" id="tabstrip">
+		
+		<!-- tab Page Configuration-->
+		<mx:VBox width="100%" id="tabPage" label="{iAseesment.translate('GLOBAL_PAGE_CONFIGURATION@Page Configuration')}">
+			
+			
+			<mx:Form width="100%" height="100%" left="1">
+				<mx:FormItem width="100%" paddingBottom="15">
+					<mx:HBox width="100%" horizontalAlign="right" paddingBottom="5" >
+						<mx:Button click="newPageClick()" label="{iAseesment.translate('GLOBAL_ADD_NEW@Add New')}"/>
+					</mx:HBox>
+					<mx:HBox width="100%">
+						<mx:DataGrid height="200" id="datagridPage"  top="0" width="100%" doubleClickEnabled="true" click="onPageGridClick()">
+							<mx:columns>
+								<mx:DataGridColumn dataField="assessmentType" headerText="{iAseesment.translate('GLOBAL_ASSESSMENT_TYPE@Assessment Type')}"/>
+								<mx:DataGridColumn dataField="pageName" headerText="{iAseesment.translate('GLOBAL_ASSESSMENT_PAGE@Assessment Page')}"/>
+								<mx:DataGridColumn width="80" headerText="{iAseesment.translate('GLOBAL_ASSESSMENT_DELETIONS@Deletion')}">
+									<mx:itemRenderer>
+										<mx:Component>											
+											<mx:Button label="{outerDocument.iAseesment.translate('GLOBAL_DELETE@Delete')}" click="{outerDocument.deleteAssPage()}"/>
+										</mx:Component>
+									</mx:itemRenderer>
+								</mx:DataGridColumn>
+							</mx:columns>
+						</mx:DataGrid>
+					</mx:HBox>
+				</mx:FormItem>
+				
+				
+				<components:FieldSet width="100%" gap="6" paddingLeft="10"   cornerRadius="8" legend="{iAseesment.translate('GLOBAL_DETAIL@Detail')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+					
+					<mx:VBox paddingTop="15" width="100%">
+						<mx:FormItem required="true" width="100%">
+							<mx:HBox width="100%">
+								<mx:Label width="180" text="{iAseesment.translate('GLOBAL_ASSESSMENT_TYPE@Assessment Type')}"/>
+								<mx:ComboBox width="200" id="cboPageType" change="changePageAssessment(event)" dataProvider="{getPageComboDataProvider()}"/>
+								<!--	<mx:Label width="40" />
+								<mx:CheckBox id="chkCreateSumPerPage" enabled="false" click="{cboMapPageTotal.visible=chkCreateSumPerPage.selected}" label="{iAseesment.translate('CREATE_SUM_PER_PAGE@Create sum per page')}"/>-->
+							</mx:HBox>
+						</mx:FormItem>
+						<mx:FormItem required="true" width="100%">
+							<mx:HBox width="100%">
+								<mx:Label width="180" text="{iAseesment.translate('GLOBAL_ASSESSMENT_PAGE@Assessment Page')}"/>
+								<mx:TextInput  width="200" id="txtAssessmentPage"/>
+								<!--<mx:Label width="40" />
+								<mx:ComboBox id="cboMapPageTotal" width="200" visible="false"  labelFunction="{getTotalPageFieldDisplayName}"/>-->
+							</mx:HBox>
+						</mx:FormItem>
+						<mx:FormItem width="100%">
+							<mx:HBox width="100%"  verticalAlign="middle">
+								<mx:VBox width="100%">
+									<mx:Label text="{iAseesment.translate('GLOBAL_ASSESSMENT@Assessment')}"/>
+									<mx:List dataProvider="{_availablePageItems}" id="listPageAssessment" labelField="assessementName" doubleClickEnabled="true" height="180" allowMultipleSelection="true" width="{(this.width-155)/2}"  doubleClick="aList_doubleClickHandler(event,PAGE)"  />
+								</mx:VBox>
+								<mx:VBox id="boxPagelMove" width="15">
+									<mx:LinkButton id="allPageRightBtn" icon="@Embed('/assets/all-right.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_ALL_ITEMS_TO_RIGHT')}" click="allRightBtn_clickHandler(event,PAGE)" />  
+									<mx:LinkButton id="onePageRightBtn" icon="@Embed('/assets/one-right.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_SELECTED_ITEMS_TO_RIGHT')}" click="oneRightBtn_clickHandler(event,PAGE)" /> 	
+									<mx:Spacer height="2" />
+									<mx:LinkButton id="switchPageBtn" icon="@Embed('/assets/switch-h.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_SWITCH_SELECTION_ITEMS')}" click="switchBtn_clickHandler(event,PAGE)" /> 
+									<mx:Spacer height="2" /> 
+									<mx:LinkButton id="onePageLeftBtn" icon="@Embed('/assets/one-left.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_SELECTED_ITEMS_TO_LEFT')}" click="oneLeftBtn_clickHandler(event,PAGE)" />
+									<mx:LinkButton id="allPageLeftBtn" icon="@Embed('/assets/all-left.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_ALL_ITEMS_TO_LEFT')}" click="allLeftBtn_clickHandler(event,PAGE)" />
+								</mx:VBox> 
+								<mx:VBox width="100%">
+									<mx:Label text="{iAseesment.translate('GLOBAL_ASSESSMENT_SELECTED@Assessment Selected')}"/>
+									<mx:List doubleClick="sList_doubleClickHandler(event,PAGE)" labelField="assessementName" dataProvider="{_selectedPageItems}" doubleClickEnabled="true" height="180" allowMultipleSelection="true"  width="{(this.width-155)/2}" id="listPageAssessmentSelected"/>
+								</mx:VBox>
+								<mx:VBox id="boxPageUpDown" width="100%">
+									<mx:LinkButton  icon="@Embed('/assets/triangle-up.gif')" id="btnPagemoveup" width="16" height="16" toolTip="{'Up'}" click="up_clickHandler(event,PAGE)" />  
+									<mx:Spacer height="2" />
+									<mx:LinkButton icon="@Embed('/assets/triangle-down.gif')" id="btnPagemovedown" width="16" height="16" toolTip="{'Down'}" click="down_clickHandler(event,PAGE)" />
+								</mx:VBox>
+							</mx:HBox>
+							<mx:HBox width="100%" horizontalAlign="right" paddingBottom="10" paddingRight="20">
+								<mx:Button name="cancel"  label="{iAseesment.translate('GLOBAL_CANCEL@Cancel')}" click="cancelPageConfig(event)"/>
+								<mx:Button name="save" id="buttonPageSave" click="savePage()" label="{iAseesment.translate('GLOBAL_SAVE@Save')}" />
+							</mx:HBox>
+						</mx:FormItem>
+					</mx:VBox>
+				</components:FieldSet>
+			</mx:Form>
+			
+		</mx:VBox >
+		<!-- tab Model Configuration-->
+		<mx:VBox width="100%" id="tabModel" label="{iAseesment.translate('GLOBAL_MODEL_CONFIGURATION@Model Configuration')}">
+			
+			
+			<mx:Form id="myform" width="100%" height="100%">
+				<mx:FormItem width="100%" paddingBottom="10">
+					<mx:HBox width="100%" horizontalAlign="right" paddingBottom="5" >
+						<mx:Button click="newClick()" label="{iAseesment.translate('GLOBAL_ADD_NEW@Add New')}"/>
+					</mx:HBox>
+					<mx:HBox width="100%">
+						<mx:DataGrid height="190" id="datagridModel"  top="0" dataProvider="{dataModelItems}" width="100%" doubleClickEnabled="true" click="onGridClick()">
+							<mx:columns>
+								<mx:DataGridColumn dataField="assessmentType" headerText="{iAseesment.translate('GLOBAL_ASSESSMENT_TYPE@Assessment Type')}"/>
+								<mx:DataGridColumn dataField="assessmentModel" headerText="{iAseesment.translate('GLOBAL_ASSESSMENT_MODEL@Assessment Model')}"/>
+								<mx:DataGridColumn dataField="type" labelFunction="{modelLabel}" headerText="{iAseesment.translate('GLOBAL_ASSESSMENT_MODEL_TYPE@Type')}"/>
+								<mx:DataGridColumn dataField="sumType" labelFunction="{sumTypeLabel}" headerText="{iAseesment.translate('GLOBAL_SUM_TYPE@Sum Type')}"/>
+								<mx:DataGridColumn width="80"  headerText="{iAseesment.translate('GLOBAL_ASSESSMENT_DELETIONS@Deletions')}">
+									<mx:itemRenderer>
+										<mx:Component>
+											<mx:Button label="{outerDocument.iAseesment.translate('GLOBAL_DELETE@Delete')}"  click="{outerDocument.deleteAssModel()}"/>
+										</mx:Component>
+									</mx:itemRenderer>
+								</mx:DataGridColumn>
+							</mx:columns>
+						</mx:DataGrid>
+					</mx:HBox>
+				</mx:FormItem>
+				
+				
+				
+				<components:FieldSet width="100%" gap="6" paddingLeft="10" cornerRadius="8" legend="{iAseesment.translate('GLOBAL_DETAIL@Detail')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+					
+					<mx:VBox paddingTop="15" width="100%">
+						
+						<mx:FormItem required="true" width="100%">
+							
+							
+							<mx:HBox width="100%">
+								<mx:Label width="180" text="{iAseesment.translate('GLOBAL_ASSESSMENT_TYPE@Assessment Type')}"/>
+								<mx:ComboBox width="200" id="cboType" enabled="false" change="changeAssessment(event)" dataProvider="{getComboData()}"/>
+								<!--<mx:Label width="40" />
+								<mx:CheckBox id="chkCreateSumPerModel" enabled="false" click="{cboMapModelTotal.visible=chkCreateSumPerModel.selected}" label="{iAseesment.translate('CREATE_SUM_PER_MODEL@Create sum per model')}" />-->
+							</mx:HBox>
+						</mx:FormItem>
+						
+						
+						<mx:FormItem required="true" width="100%">
+							<mx:HBox width="100%">
+								<mx:Label width="180" text="{iAseesment.translate('GLOBAL_ASSESSMENT_MODEL@Assessment Model')}"/>
+								<mx:TextInput enabled="false"  width="200" id="txtAssessmentModel"/>
+								<!--<mx:Label width="40" />
+								<mx:ComboBox id="cboMapModelTotal" width="200" visible="false"  labelFunction="{getTotalModelFieldDisplayName}" />-->
+							</mx:HBox>
+						</mx:FormItem>
+						<mx:FormItem required="true" width="100%">
+							<mx:HBox width="100%">
+								<mx:Label width="180" text="{iAseesment.translate('GLOBAL_ASSESSMENT_MODEL_TYPE@Type')}"/>
+								<mx:ComboBox id="cboModelType" width="200" dataProvider="{getModelTypeProvider()}" selectedIndex="0"/>
+							</mx:HBox>
+						</mx:FormItem>
+						<mx:FormItem required="true" width="100%">
+							<mx:HBox>
+								<mx:Label width="180" text="{iAseesment.translate('GLOBAL_SUM_TYPE@Sum Type')}"/>
+								<mx:ComboBox id="cboSumType" width="200" dataProvider="{getSumTypeProvider()}" selectedIndex="0"/>
+							</mx:HBox>
+						</mx:FormItem>
+						<mx:FormItem width="100%">
+							
+							
+							
+							<mx:HBox width="100%" verticalAlign="middle">
+								
+								<mx:VBox width="100%">
+									<mx:Label text="{iAseesment.translate('GLOBAL_PAGE@Page')}"/>
+									<mx:List enabled="false" dataProvider="{_availableItems}" id="listAssessment" labelField="pageName" doubleClickEnabled="true" height="150" allowMultipleSelection="true" width="{(this.width-155)/2}" doubleClick="aList_doubleClickHandler(event,MODEL)"  />
+								</mx:VBox>
+								<mx:VBox id="boxModelMove" enabled="false"  width="15">
+									
+									<mx:LinkButton id="allRightBtn" icon="@Embed('/assets/all-right.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_ALL_ITEMS_TO_RIGHT')}" click="allRightBtn_clickHandler(event,MODEL)" />  
+									<mx:LinkButton id="oneRightBtn" icon="@Embed('/assets/one-right.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_SELECTED_ITEMS_TO_RIGHT')}" click="oneRightBtn_clickHandler(event,MODEL)" /> 	
+									<mx:Spacer height="2" />
+									<mx:LinkButton id="switchBtn" icon="@Embed('/assets/switch-h.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_SWITCH_SELECTION_ITEMS')}" click="switchBtn_clickHandler(event,MODEL)" /> 
+									<mx:Spacer height="2" /> 
+									<mx:LinkButton id="oneLeftBtn" icon="@Embed('/assets/one-left.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_SELECTED_ITEMS_TO_LEFT')}" click="oneLeftBtn_clickHandler(event,MODEL)" />
+									<mx:LinkButton id="allLeftBtn" icon="@Embed('/assets/all-left.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_ALL_ITEMS_TO_LEFT')}" click="allLeftBtn_clickHandler(event,MODEL)" />
+									
+								</mx:VBox> 
+								<mx:VBox width="100%">
+									<mx:Label text="{iAseesment.translate('GLOBAL_PAGE_SELECTED@Page Selected')}"/>
+									<mx:List enabled="false" labelField="pageName" doubleClick="sList_doubleClickHandler(event,MODEL)" dataProvider="{_selectedItems}" doubleClickEnabled="true" height="150" allowMultipleSelection="true"  width="{(this.width-155)/2}" id="listAssessmentSelected"/>
+								</mx:VBox>
+								<mx:VBox id="boxModelUpDown" enabled="false" width="100%">
+									
+									<mx:LinkButton  icon="@Embed('/assets/triangle-up.gif')" id="btnmoveup" width="16" height="16" toolTip="{'Up'}" click="up_clickHandler(event,MODEL)" />  
+									<mx:Spacer height="2" />
+									<mx:LinkButton icon="@Embed('/assets/triangle-down.gif')" id="btnmovedown" width="16" height="16" toolTip="{'Down'}" click="down_clickHandler(event,MODEL)" />
+									
+								</mx:VBox>
+							</mx:HBox>
+							<mx:HBox width="100%" horizontalAlign="right" paddingBottom="10"  paddingRight="20">								
+								<mx:Button name="cancel"  id="cancel" label="{iAseesment.translate('GLOBAL_CANCEL@Cancel')}" click="cancelConfig(event)"/>
+								<mx:Button name="save" click="saveModel()" label="{iAseesment.translate('GLOBAL_SAVE@Save')}" id="buttonSave"/>
+							</mx:HBox>
+							
+						</mx:FormItem>
+						
+					</mx:VBox>
+				</components:FieldSet>
+				
+			</mx:Form>
+			
+		</mx:VBox >
+		
+		<!-- tab Mapping-->
+		<mx:VBox width="100%" label="{iAseesment.translate('GLOBAL_MAPPING@Mapping')}" height="100%" id="tabMapping" creationComplete="initMappingTab();initTableColumnSumField()">
+			<mx:Form height="100%" width="100%">
+				<mx:FormItem required="true" width="100%">
+					<mx:HBox width="100%">
+						<mx:Label width="180" text="{iAseesment.translate('GLOBAL_ASSESSMENT_MODEL@Assessment Model')}"/>
+						<mx:ComboBox width="200" id="cboMappingModel" labelField="assessmentModel"  change="changeMappingAssessmentModel()" dataProvider="{getAllModel()}"/>
+					</mx:HBox>
+				</mx:FormItem>
+				<mx:FormItem width="100%">
+					<mx:HBox width="100%" >
+						<mx:DataGrid height="125" id="datagridMapping" width="100%" doubleClickEnabled="true" click="onGridMappingClick()">
+							<mx:columns>
+								<mx:DataGridColumn dataField="assessementName"  headerText="{iAseesment.translate('GLOBAL_ASSESSMENT@Assessment')}"/>
+							</mx:columns>
+						</mx:DataGrid>
+					</mx:HBox>
+				</mx:FormItem>
+				<components:FieldSet width="100%" gap="6" paddingLeft="10" cornerRadius="8" legend="{iAseesment.translate('GLOBAL_MAPPING_AND_DISPLAY@Mapping And Display')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+					
+					<mx:VBox paddingTop="15" width="100%">
+						
+						<mx:FormItem width="100%">
+							<mx:HBox paddingLeft="15" width="100%" paddingBottom="10" paddingRight="20">
+								<!--<mx:HBox paddingLeft="15" width="100%" paddingBottom="10" paddingRight="20">
+									<mx:CheckBox id="chkCreateSumPerAss" enabled="false" click="{cboMapAssTotal.visible=chkCreateSumPerAss.selected}" label="{iAseesment.translate('CREATE_SUM_PER_ASS@Create sum per assessment')}" />
+									<mx:ComboBox id="cboMapAssTotal" width="200" visible="false"  labelFunction="{getFieldDisplayName}" />
+								</mx:HBox>-->
+								<mx:HBox width="100%" horizontalAlign="right" paddingBottom="5" paddingRight="10">
+									<mx:Button doubleClickEnabled="true" id="btnEditColumn" click="openEditablePopup()" label="{iAseesment.translate('GLOBAL_EDIT_COLUMN@Edit Column')}"/>
+								</mx:HBox>
+							</mx:HBox>
+							
+							<mx:HBox width="100%" top="10"  paddingRight="10">
+								<mx:AdvancedDataGrid sortExpertMode="true" editable="true"  height="125" id="datagridQuestion" top="0" width="100%" doubleClickEnabled="true">
+									
+								</mx:AdvancedDataGrid>
+							</mx:HBox>
+							
+						</mx:FormItem>
+						<mx:HBox paddingLeft="15" width="100%" paddingBottom="10" paddingRight="20">
+							<mx:HBox paddingLeft="15" width="100%" paddingBottom="10" paddingRight="20">
+								<mx:Button  label="{iAseesment.translate('GLOBAL_COPY_MAPPING_TO_MODEL@Copy Mapping To Model')}" id="btnUseDefaultMapping" click="saveMapping(true)" />
+							</mx:HBox>
+							<mx:HBox width="100%" horizontalAlign="right" >								
+								<mx:Button label="{iAseesment.translate('GLOBAL_CANCEL@Cancel')}" click="cancelMapping()"/>
+								<mx:Button click="saveMapping()" label="{iAseesment.translate('GLOBAL_SAVE@Save')}" id="btnsameMapping"  />
+							</mx:HBox>
+						</mx:HBox>
+					</mx:VBox>
+				</components:FieldSet>
+				
+				
+				
+				<components:FieldSet width="100%" gap="6" paddingLeft="10" cornerRadius="8" legend="{iAseesment.translate('GLOBAL_TOTAL_SESSION_FILEDS@Total Mapping Fields')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+					
+					<mx:VBox paddingTop="15" width="100%">
+						
+						<mx:FormItem width="100%">
+							<mx:HBox width="100%" top="20"  paddingRight="10">
+								<mx:AdvancedDataGrid sortExpertMode="true" change="{btnSaveSumField.enabled = true;}" editable="true"  height="125" id="datagridTotalField" top="0" width="100%" doubleClickEnabled="true">
+									
+								</mx:AdvancedDataGrid>
+							</mx:HBox>
+						</mx:FormItem>
+						<mx:HBox paddingLeft="15" width="100%" paddingBottom="10" paddingRight="20">
+							<mx:HBox width="100%" horizontalAlign="right" >								
+								<mx:Button label="{iAseesment.translate('GLOBAL_CANCEL@Cancel')}" click="cancelSumField()"/>
+								<mx:Button click="saveSumField()" enabled="false" label="{iAseesment.translate('GLOBAL_SAVE@Save')}" id="btnSaveSumField"  />
+							</mx:HBox>
+						</mx:HBox>
+					</mx:VBox>
+					
+				</components:FieldSet>
+				
+				
+				
+			</mx:Form>			
+		</mx:VBox>
+		
+		<!-- tab Splitor Assessment-->
+		<mx:VBox width="100%" id="tabSplitter" label="{iAseesment.translate('GLOBAL_SPLITTOR_ASSESSMENT@Assessment Splitter')}" creationComplete="initializedSplitter()">
+			<mx:Form height="100%" width="100%">
+				
+				<mx:FormItem width="100%" paddingBottom="15">
+					<mx:HBox width="100%" horizontalAlign="right" paddingBottom="5" >
+						<mx:Button click="newSplitterClick()" label="{iAseesment.translate('GLOBAL_ADD_NEW@Add New')}"/>
+					</mx:HBox>
+					<mx:HBox width="100%">
+						<mx:DataGrid change="{buttonSplitterSave.enabled = true;}" click="onGridSplitterClick()" height="110" id="datagridSplitter" top="0" width="100%" doubleClickEnabled="true">
+							<mx:columns>
+								<mx:DataGridColumn labelFunction="{getModelName}" dataField="modelId" headerText="{iAseesment.translate('GLOBAL_ASSESSMENT_MODEL@Assessment Model')}"/>
+								<mx:DataGridColumn dataField="delimiter" headerText="{iAseesment.translate('GLOBAL_DELIMITER@Delimiter')}"/>
+								<mx:DataGridColumn width="80"  headerText="{iAseesment.translate('GLOBAL_ASSESSMENT_DELETIONS@Deletions')}">
+									<mx:itemRenderer>
+										<mx:Component>
+											<mx:Button label="{outerDocument.iAseesment.translate('GLOBAL_DELETE@Delete')}"  click="{outerDocument.deleteAssSplitter()}"/>
+										</mx:Component>
+									</mx:itemRenderer>
+								</mx:DataGridColumn>
+							</mx:columns>
+						</mx:DataGrid>
+					</mx:HBox>
+				</mx:FormItem>
+				
+				<components:FieldSet width="100%" gap="6" paddingLeft="10" cornerRadius="8" legend="{iAseesment.translate('GLOBAL_DETAIL@Detail')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+				
+					<mx:VBox paddingTop="15" width="100%">
+						<mx:FormItem required="true" width="100%" paddingBottom="10">
+							<mx:HBox width="100%">
+								<mx:Label width="180" text="{iAseesment.translate('GLOBAL_ASSESSMENT_MODEL@Assessment Model')}"/>
+								<mx:ComboBox width="200" id="cboSpliterModel" labelField="assessmentModel" change="changeSplitterAssessment(event)" dataProvider="{getSplitterComboDataProvider()}" />
+							</mx:HBox>
+							
+						</mx:FormItem>
+						
+						<mx:FormItem required="true" width="100%" paddingBottom="10">
+							<mx:HBox width="100%">
+								<mx:Label width="180" text="{iAseesment.translate('GLOBAL_DELIMITER@Delimiter')}"/>
+								<mx:TextInput width="200" id="txtDelimiter" />
+							</mx:HBox>
+						</mx:FormItem>
+						
+						<mx:FormItem width="100%">
+							<mx:HBox width="100%"  verticalAlign="middle">
+								<mx:VBox width="100%">
+									<mx:Label text="{iAseesment.translate('GLOBAL_AVAILABLE_FIELD@Available Fields')}"/>
+									<mx:List id="listSplitterField" labelFunction="{getFieldDisplayNameSplitter}" doubleClickEnabled="true" height="180" allowMultipleSelection="true" width="{(this.width-155)/2}" dataProvider="{_availableSplitterItems}"  doubleClick="aList_doubleClickHandler(event,FIELD)"  />
+								</mx:VBox>
+								<mx:VBox id="boxSplitterMove" width="15">
+									<mx:LinkButton icon="@Embed('/assets/all-right.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_ALL_ITEMS_TO_RIGHT')}" click="allRightBtn_clickHandler(event,FIELD)" />  
+									<mx:LinkButton icon="@Embed('/assets/one-right.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_SELECTED_ITEMS_TO_RIGHT')}" click="oneRightBtn_clickHandler(event,FIELD)" /> 	
+									<mx:Spacer height="2" />
+									<mx:LinkButton icon="@Embed('/assets/switch-h.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_SWITCH_SELECTION_ITEMS')}" click="switchBtn_clickHandler(event,FIELD)" /> 
+									<mx:Spacer height="2" /> 
+									<mx:LinkButton icon="@Embed('/assets/one-left.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_SELECTED_ITEMS_TO_LEFT')}" click="oneLeftBtn_clickHandler(event,FIELD)" />
+									<mx:LinkButton icon="@Embed('/assets/all-left.gif')" width="16" height="16" toolTip="{iAseesment.translate('MULTISELECTLIST_MOVE_ALL_ITEMS_TO_LEFT')}" click="allLeftBtn_clickHandler(event,FIELD)" />
+								</mx:VBox> 
+								<mx:VBox width="100%">
+									<mx:Label text="{iAseesment.translate('GLOBAL_SELECTED_FIELD@Selected Fields')}"/>
+									<mx:List doubleClick="sList_doubleClickHandler(event,FIELD)" labelFunction="{getFieldDisplayNameSplitter}" dataProvider="{_selectedSplitterItems}" doubleClickEnabled="true" height="180" allowMultipleSelection="true"  width="{(this.width-155)/2}" id="listSplitterSelected"/>
+								</mx:VBox>
+								<mx:VBox id="boxSplitterUpDown" width="100%">
+									<mx:LinkButton  icon="@Embed('/assets/triangle-up.gif')" width="16" height="16" toolTip="{'Up'}" click="up_clickHandler(event,FIELD)" />  
+									<mx:Spacer height="2" />
+									<mx:LinkButton icon="@Embed('/assets/triangle-down.gif')" width="16" height="16" toolTip="{'Down'}" click="down_clickHandler(event,FIELD)" />
+								</mx:VBox>
+							</mx:HBox>
+							<mx:HBox width="100%" horizontalAlign="right" paddingBottom="5" paddingRight="20">
+								<mx:Button name="cancel"  label="{iAseesment.translate('GLOBAL_CANCEL@Cancel')}" click="cancelSplitter(event)"/>
+								<mx:Button name="save" id="buttonSplitterSave" click="saveSplitter()" label="{iAseesment.translate('GLOBAL_SAVE@Save')}" />
+							</mx:HBox>
+						</mx:FormItem>
+					</mx:VBox>
+					
+				</components:FieldSet>
+			</mx:Form>
+		</mx:VBox>
+		<mx:VBox id="tabPDFHeader" width="100%"  label="{iAseesment.translate('GLOBAL_PDF_HEADER@PDF Header')}" >
+			<mx:Form height="100%" width="100%" paddingTop="20">
+				<mx:FormItem width="100%" paddingBottom="15">
+					<mx:HBox width="100%" paddingBottom="10">
+						<mx:Label width="180" text="{iAseesment.translate('GLOBAL_ASSESSMENT_MODEL@Assessment Model')}" paddingLeft="20"/>
+						<mx:ComboBox width="200" id="cboAssPdfModel" labelField="assessmentModel" change="changeAssessmentPDFHeader()" dataProvider="{getAllModel()}" />
+					</mx:HBox>
+					<components:FieldSet legend="{iAseesment.translate('GLOBAL_TITLE@Title')}"  height="80" width="100%" gap="10" paddingLeft="10" cornerRadius="8"  skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+						<mx:HBox width="100%" paddingTop="20">
+							<mx:Label text="{iAseesment.translate('GLOBAL_HEADER_TEXT@Header Text')}" paddingLeft="20"/>
+							<mx:TextInput   height="40" width="80%" id="txtHeader"  />
+							<mx:Button id="btnSaveCustomText"  label="{iAseesment.translate('GLOBAL_SAVE@Save')}" click="saveCustomTextHeader()" enabled="false"/>
+							<mx:Label text="" width="20"/>
+						</mx:HBox>
+					</components:FieldSet>
+				</mx:FormItem>
+				<mx:FormItem width="100%">
+					<mx:HBox width="100%">
+						<mx:AdvancedDataGrid sortExpertMode="true" height="250" id="datagridPDFHeader"  top="0" dataProvider="{lstPDFHeaderField}" width="100%" doubleClickEnabled="true" click="selectedItemPDFHeader(event)" >
+							<mx:columns>
+								<mx:AdvancedDataGridColumn labelFunction="getEntityDisplayName" dataField="entity" headerText="{iAseesment.translate('GLOBAL_ENTITY@Entity')}"/>
+								<mx:AdvancedDataGridColumn labelFunction="getHeaderDisplayName" dataField="elementName" headerText="{iAseesment.translate('GLOBAL_FIELD_NAME@Field Name')}"/>
+								<mx:AdvancedDataGridColumn dataField="display_name" headerText="{iAseesment.translate('GLOBAL_DISPLAY_NAME@Display Name')}"/>
+								<mx:AdvancedDataGridColumn width="80"  headerText="{iAseesment.translate('GLOBAL_ASSESSMENT_DELETIONS@Deletions')}">
+									<mx:itemRenderer>
+										<mx:Component>
+											<mx:Button label="{outerDocument.iAseesment.translate('GLOBAL_DELETE@Delete')}"  click="{outerDocument.deletePDFHeader(data)}"/>
+										</mx:Component>
+									</mx:itemRenderer>
+								</mx:AdvancedDataGridColumn>
+							</mx:columns>
+						</mx:AdvancedDataGrid>
+						<mx:VBox>
+							<mx:Button label="{iAseesment.translate('GLOBAL_MOVEUP@Move Up')}" id="btnmoveUp" width="120" enabled="false" click="onHeaderMoveUp()"/>
+							<mx:Button label="{iAseesment.translate('GLOBAL_MOVEDown@Move Down')}" id="btnmoveDown" width="120" enabled="false" click="onHeaderMoveDown()"/>
+						</mx:VBox>
+					</mx:HBox>
+				</mx:FormItem>
+				<mx:HBox horizontalAlign="right" width="100%">
+					<mx:Button id="btnNewPDFHeader"  label="{iAseesment.translate('GLOBAL_ADD_NEW@Add New')}" click="{clearPDFHeader();btnSavePDFHeader.enabled = true;}"  enabled="false"/>
+				</mx:HBox>
+				<mx:FormItem width="100%">
+					<components:FieldSet height="150" width="100%" gap="6" paddingLeft="10" cornerRadius="8" legend="{iAseesment.translate('GLOBAL_PDF_HEADER_FIELD@PDF Header Field')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+						<mx:VBox paddingTop="25" width="100%" paddingLeft="10">
+							<mx:FormItem required="true" width="100%">
+								<mx:HBox width="100%" paddingTop="5" paddingLeft="10">
+									<mx:Label width="180" text="{iAseesment.translate('GLOBAL_ENTITY@Entity')}" />
+									<mx:ComboBox width="200" id="cboEntity" labelFunction="{iAseesment.getDisplayNameEntity}" change="changeEntity(event)" dataProvider="{lstEntity}" />
+									
+								</mx:HBox>
+							</mx:FormItem>
+							<mx:FormItem width="100%">
+								<mx:HBox width="100%" paddingLeft="10">
+									<mx:Label width="180" text="{iAseesment.translate('GLOBAL_DISPLAY_NAME@Display Name')}"/>
+									<mx:TextInput id="txtDisplayName" width="200" />
+								</mx:HBox>
+							</mx:FormItem>
+							<mx:FormItem required="true" width="100%">
+								<mx:HBox width="100%" paddingLeft="10">
+									<mx:Label width="180" text="{iAseesment.translate('GLOBAL_FIELD_NAME@Field Name')}"/>
+									<mx:ComboBox width="200" id="cboElementName" labelFunction="{getLabelDisplayName}"  />
+								</mx:HBox>
+							</mx:FormItem>
+							<mx:HBox horizontalAlign="right" width="413">
+								<mx:Button id="btnSavePDFHeader"   label="{iAseesment.translate('GLOBAL_SAVE@Save')}" click="{upsertPDFHeader(); btnSavePDFHeader.enabled=true;}" enabled="false"/>
+							</mx:HBox>
+						</mx:VBox>
+					</components:FieldSet>
+				</mx:FormItem>
+			</mx:Form>
+			
+		
+		</mx:VBox>
+		
+	<!--	<mx:VBox id="tabPDFColorTheme" width="100%"  label="{iAseesment.translate('GLOBAL_PDF_THEME@PDF Theme')}" >
+			<mx:VBox paddingLeft="40" paddingTop="40">
+				<mx:HBox width="100%" paddingBottom="30" >
+					<mx:Label width="300" text="{iAseesment.translate('GLOBAL_BACKGROUND_DATA_HEADER_COLOR')}" paddingLeft="20"/>
+					<assessment:IconComboBox width="200" id="cboBGColorHeaderData"   dataProvider="{imagesBGPDFDataHeader}" />
+				</mx:HBox>
+				<mx:HBox width="100%" paddingBottom="30">
+					<mx:Label width="300" text="{iAseesment.translate('GLOBAL_BACKGROUND_HEADER_GRID_COLOR')}" paddingLeft="20"/>
+					<assessment:IconComboBox width="200" id="cboBGColorHeaderGrid"  dataProvider="{imagesBGPDFHeaderColorGrid}" />
+				</mx:HBox>
+				<mx:HBox width="100%" paddingBottom="30">
+					<mx:Label width="300" text="{iAseesment.translate('GLOBAL_BACKGROUND_PAGE_COLOR')}" paddingLeft="20"/>
+					<assessment:IconComboBox width="200" id="cboBGColorPage"   dataProvider="{imagesBGPDFPageColor}" />
+				</mx:HBox>
+				<mx:HBox horizontalAlign="right" width="500">
+					<mx:Button id="btnSavePDFColor"   label="{iAseesment.translate('GLOBAL_SAVE@Save')}" click="upsertPDFColor()" />
+				</mx:HBox>
+			   
+			</mx:VBox>
+		</mx:VBox>-->
+	</mx:TabNavigator>
+	<mx:HBox y="0" x="{tabstrip.width-100}"  paddingTop="-1" id="buttonsconfigure">
+		<mx:LinkButton icon="@Embed(source='/assets/save_config.png')" toolTip="{iAseesment.translate('EXPORT_ASSESSMENT_CONFIG@Export Assessment')}" click="exportConfiguration()"/>
+		<mx:LinkButton icon="@Embed(source='/assets/upload_config.png')" toolTip="{iAseesment.translate('IMPORT_ASSESSMENT_CONFIG@Import Assessment')}" click="importConfiguration()" />		
+	</mx:HBox>
+</mx:Canvas>

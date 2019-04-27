@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas
+	xmlns:control="gadget.control.*"
+	xmlns:mx="http://www.adobe.com/2006/mxml"  
+	
+	horizontalScrollPolicy="off"
+	creationComplete="init();" xmlns:s="library://ns.adobe.com/flex/spark"
+	>
+	
+	
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.rtc.util.Base64Encoder;
+			
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.util.StringUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.utils.Base64Decoder;
+			
+			private var nativeProcess:NativeProcess;
+			private var npInfo:NativeProcessStartupInfo;
+			private var processBuffer:ByteArray;
+			private var bLength:int = 0;
+			[Binable] public var isTouch:Boolean = false;
+			
+			private function init():void{
+				showImage();
+			}
+			
+			private function onStandardErrorData(e:ProgressEvent):void{
+				//need to log to data base
+				//trace(e.toString())
+				switchToTouchScreen();
+			}
+			
+			private function onStandardOutputData(e:ProgressEvent):void{
+				//tArea.text += nativeProcess.standardOutput.readUTFBytes(nativeProcess.standardOutput.bytesAvailable);
+				var str:String = nativeProcess.standardOutput.readUTFBytes(nativeProcess.standardOutput.bytesAvailable);
+				if(str!="Cancel"){
+					Database.preferencesDao.setValue(PreferencesDAO.USER_SIGNATURE,str);
+				}
+				showImage();
+			}
+			
+			protected function clearSign_clickHandler(event:MouseEvent):void{
+				Alert.show(i18n._('GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE'),i18n._('GLOBAL_DELETE') + " User Sign", Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+					if (event.detail==Alert.YES){
+						Database.preferencesDao.setValue(PreferencesDAO.USER_SIGNATURE,null);
+						showImage();
+					}    	 
+				});	
+			}
+			protected function startSign_clickHandler(event:MouseEvent):void{
+				if(isTouch){
+					show_TouchscreenSign();
+					return;
+				}
+				var os:String = flash.system.Capabilities.os.substr(0, 3);
+				var touchscreenType:String = flash.system.Capabilities.touchscreenType;
+				flash.system.Capabilities.touchscreenType.length;
+				if(touchscreenType=="none"){
+					if (!(os == "Win")) {
+						show_TouchscreenSign();
+					} else {
+						show_EpadSign();
+					}
+				}else{
+					show_TouchscreenSign();
+				}
+			}
+			protected function show_TouchscreenSign():void{
+				var flexPaint:FlexPaint = new FlexPaint();
+				flexPaint.saveFlexPaint = saveFlexPaint;
+				WindowManager.openModal(flexPaint);
+			}
+			
+			protected function switchToTouchScreen():void{
+				Alert.show("Warning : Epad device cannot be found.\nSwitch to mousepad", "", Alert.OK, this, function(event:CloseEvent):void{
+					show_TouchscreenSign();
+				});	
+			}
+			protected function show_EpadSign():void{
+				try{
+					startSign.enabled = false;
+					clearSign.enabled = false;
+					var arg:Vector.<String> = new Vector.<String>;
+					var jarFile:File =File.applicationDirectory.resolvePath("crm-jd-epadsign.jar");
+					arg.push("-Djava.library.path="+jarFile.parent.nativePath);
+					arg.push("-jar");
+					
+					arg.push(jarFile.nativePath);
+					
+					processBuffer = new ByteArray();					
+					npInfo = new NativeProcessStartupInfo();
+					npInfo.executable = new File("c:/windows/system32/javaw.exe");					
+					npInfo.arguments = arg;
+					nativeProcess = new NativeProcess();
+					nativeProcess.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onStandardOutputData);
+					nativeProcess.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onStandardErrorData);
+					nativeProcess.start(npInfo);
+					
+				}catch(e:Error){
+					//Alert.show("Trace " + e.getStackTrace() + " \nMessage : " + e.message , "", Alert.OK, this);
+					switchToTouchScreen();
+				}
+			
+			}
+			public function saveFlexPaint(byte:ByteArray):void{
+				if(byte!=null){
+					var base64EndC:Base64Encoder = new Base64Encoder();
+					base64EndC.encodeBytes(byte);
+					var str:String = base64EndC.toString();
+					Database.preferencesDao.setValue(PreferencesDAO.USER_SIGNATURE,str);
+				}				
+				showImage();
+			}
+			public function showImage():void{
+				var stringImage:String = Database.preferencesDao.getValue(PreferencesDAO.USER_SIGNATURE) as String;
+				
+				if (!StringUtils.isEmpty(stringImage)) {
+					var base64Dec:Base64Decoder = new Base64Decoder();
+					base64Dec.decode(stringImage);
+					var bytes:ByteArray = base64Dec.toByteArray();
+					var loader:Loader = new Loader();
+					loader.contentLoaderInfo.addEventListener(Event.COMPLETE, function(e:Event):void {
+						signImage.load(bytes);
+					});
+					loader.loadBytes(bytes);
+					signImage.visible= true;
+				}else{
+					signImage.visible = false;
+				}
+				startSign.enabled = true;
+				clearSign.enabled = true;
+			}
+			
+			
+			protected function epadSign_closeHandler(event:Event):void{
+				nativeProcess.closeInput();
+				startSign.enabled = true;
+				clearSign.enabled = true;
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style>
+		.epadSign{
+			border-visible:true;
+			border-style:solid;
+		}
+	</mx:Style>
+	
+	<mx:Canvas width="100%" >
+		<mx:VBox width="300" height="200">			
+			<mx:Canvas width="100%">
+				<mx:Button left="20" bottom="16" id="startSign" label="Start Sign" click="startSign_clickHandler(event);"/>	
+				<mx:Button left="110" bottom="16" id="clearSign" label="Clear Sign" click="clearSign_clickHandler(event);"/>	
+			</mx:Canvas>
+				<mx:HBox width="100%" height="100%" paddingLeft="20">
+					<mx:Canvas styleName="epadSign"  width="80%">
+						<mx:Image right="20" id= "signImage" horizontalAlign="right" verticalAlign="top" width="200" height="150"/>
+					</mx:Canvas>	
+				</mx:HBox>
+		</mx:VBox>
+		
+	</mx:Canvas>
+	
+</mx:Canvas>

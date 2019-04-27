@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 horizontalScrollPolicy="off">
+	<fx:Script>
+		<![CDATA[
+			import gadget.util.Utils;
+			
+			import mx.events.FlexEvent;
+
+			protected function hyperlink_clickHandler():void
+			{
+				// TODO Auto-generated method stub
+				var hyperText:String = data.WebSite.indexOf("http://") != -1 ? "" : "http://";
+				Utils.openURL(hyperText + data.WebSite, "_blank");
+			}
+
+
+			protected function initializeHandler(event:FlexEvent):void
+			{
+				// TODO Auto-generated method stub
+				var label:Label = event.currentTarget as Label;
+				label.addEventListener(MouseEvent.MOUSE_OVER, function(e:MouseEvent):void {
+					label.setStyle("textDecoration", "underline");
+					Mouse.cursor = MouseCursor.BUTTON;
+				});
+				label.addEventListener(MouseEvent.MOUSE_OUT, function(e:MouseEvent):void {
+					label.setStyle("textDecoration", "none");
+					Mouse.cursor = MouseCursor.ARROW;
+				});
+			}
+
+		]]>
+	</fx:Script>
+	
+	<mx:Label initialize="initializeHandler(event)" text="{data.WebSite}" color="0x1569C7" click="hyperlink_clickHandler()"/>
+	
+</mx:HBox>

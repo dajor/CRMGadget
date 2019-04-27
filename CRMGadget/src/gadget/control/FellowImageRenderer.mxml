@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+		 horizontalAlign="center"
+		 verticalGap="0" 
+		 borderStyle="none" 
+		 backgroundColor="white">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			
+			private function getAvatar(Id:String):Object {
+				var results:Array = Database.feedUserDAO.fetch({'Id':Id});
+				if(results.length > 0){
+					var avatar:String = results[0].Avatar;
+					if (!StringUtils.isEmpty(avatar)) {
+						var byteArray:ByteArray = ImageUtils.getByteArray(avatar);
+						return byteArray;
+					}else{
+						return ImageUtils.noPhoto;
+					}
+				}else{
+					return ImageUtils.noPhoto;
+				}
+				
+			}
+		]]>
+	</mx:Script>
+	<mx:Image id="image" width="50" height="50" source="{getAvatar(data.Id)}" toolTip="{data.Alias}"/>
+</mx:VBox>

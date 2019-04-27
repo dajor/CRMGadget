@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+		   width="1027" height="600"
+		   minWidth="1027" minHeight="600"
+		   cornerRadius="3" 
+		   showFlexChrome="false"  systemChrome="standard" title="CRM Gadget To Go - Netbreeze Dashboard">
+	
+	<mx:Script>
+		<![CDATA[
+			[Bindable] public var dashboardUrl:String;
+			private var fMax:Boolean = false;
+			private function viewRestoreMaxWindow():void {
+				if (fMax) {
+					fMax = false;
+					restore();
+				} else { 
+					fMax = true; 
+					maximize();
+				}
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main"  width="100%" height="100%" left="0" top="0" right="0" bottom="0">
+		<!--<mx:Canvas styleName="titleBar" doubleClickEnabled="true" doubleClick="viewRestoreMaxWindow()" mouseDown="nativeWindow.startMove()" height="24" top="2" left="2" right="2">
+			<mx:Image source="@Embed(source='/assets/help.png')" top="3" left="4" />
+			<mx:Label text="CRM Gadget To Go - The CRM Gadget Desktop Version for Oracle CRM On Demand" top="0" left="20"/>
+			<mx:Button styleName="iconMinimize" height="16" width="16" top="2" right="36" click="minimize()"/>
+			<mx:Button styleName="iconMaximize" height="16" width="16" top="2" right="20" click="viewRestoreMaxWindow()"/>
+			<mx:Button styleName="iconClose" height="16" width="16" top="2" right="4" click="close()"/>
+		</mx:Canvas>-->
+		<mx:VBox width="100%" height="100%" top="28" left="4" right="0" verticalGap="2">
+			<mx:HTML width="100%" height="100%" location="{dashboardUrl}" />
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+	xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:xsdLocal1="urn:/crmondemand/xml/salesprocess/Query"
+	targetNamespace="urn:crmondemand/ws/salesproc/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/"
+	xmlns:xsdLocal2="urn:/crmondemand/xml/salesprocess/Data" xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+	xmlns:tns="urn:crmondemand/ws/salesproc/">
+	<types>
+		<xsd:schema elementFormDefault="qualified"
+			attributeFormDefault="unqualified" xmlns:xsdLocal1="urn:/crmondemand/xml/salesprocess/Query"
+			targetNamespace="urn:/crmondemand/xml/salesprocess/Query" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:annotation>
+				<xsd:documentation>Copyright (C) 2001, 2008, Oracle and/or its affiliates. All rights reserved. Siebel XSD Generation</xsd:documentation>
+			</xsd:annotation>
+			<xsd:element name="ListOfSalesProcess" type="xsdLocal1:ListOfSalesProcessQuery" />
+			<xsd:complexType name="ListOfSalesProcessTopElmtQuery">
+				<xsd:sequence>
+					<xsd:element name="ListOfSalesProcess" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:ListOfSalesProcessQuery" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="ListOfSalesProcessQuery">
+				<xsd:sequence>
+					<xsd:element name="SalesProcess" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:SalesProcessQuery" />
+				</xsd:sequence>
+				<xsd:attribute name="pagesize" type="xsd:integer" />
+				<xsd:attribute name="startrownum" type="xsd:integer" />
+				<xsd:attribute name="recordcountneeded" type="xsd:boolean" />
+			</xsd:complexType>
+			<xsd:complexType name="SalesProcessQuery">
+				<xsd:sequence>
+					<xsd:element name="Id" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="Name" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="Translate" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="Default" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="Description" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="CreatedById" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="CreatedDate" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="CreatedBy" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="ModId" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="ModifiedById" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="ModifiedDate" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="ModifiedBy" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="TranslationLanguage" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="ListOfOpportunityType" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:ListOfOpportunityTypeQuery" />
+					<xsd:element name="ListOfSalesStage" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:ListOfSalesStageQuery" />
+				</xsd:sequence>
+				<xsd:attribute name="searchspec" type="xsd:string" />
+			</xsd:complexType>
+			<xsd:complexType name="ListOfOpportunityTypeQuery">
+				<xsd:sequence>
+					<xsd:element name="OpportunityType" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:OpportunityTypeQuery" />
+				</xsd:sequence>
+				<xsd:attribute name="pagesize" type="xsd:integer" />
+				<xsd:attribute name="startrownum" type="xsd:integer" />
+				<xsd:attribute name="recordcountneeded" type="xsd:boolean" />
+			</xsd:complexType>
+			<xsd:complexType name="OpportunityTypeQuery">
+				<xsd:sequence>
+					<xsd:element name="Id" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="Type" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="CreatedById" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="CreatedDate" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="CreatedBy" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="ModId" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="ModifiedById" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="ModifiedDate" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="ModifiedBy" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+				</xsd:sequence>
+				<xsd:attribute name="searchspec" type="xsd:string" />
+			</xsd:complexType>
+			<xsd:complexType name="ListOfSalesStageQuery">
+				<xsd:sequence>
+					<xsd:element name="SalesStage" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:SalesStageQuery" />
+				</xsd:sequence>
+				<xsd:attribute name="pagesize" type="xsd:integer" />
+				<xsd:attribute name="startrownum" type="xsd:integer" />
+				<xsd:attribute name="recordcountneeded" type="xsd:boolean" />
+			</xsd:complexType>
+			<xsd:complexType name="SalesStageQuery">
+				<xsd:sequence>
+					<xsd:element name="Id" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="Name" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="SalesCategoryName" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="Order" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="Probability" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="Description" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="CreatedById" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="CreatedDate" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="CreatedBy" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="ModId" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="ModifiedById" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="ModifiedDate" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+					<xsd:element name="ModifiedBy" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:queryType" />
+					<xsd:element name="TranslationLanguage" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:queryType" />
+				</xsd:sequence>
+				<xsd:attribute name="searchspec" type="xsd:string" />
+			</xsd:complexType>
+			<xsd:complexType name="queryType">
+				<xsd:simpleContent>
+					<xsd:extension base="xsd:string">
+						<xsd:attribute name="sortorder" type="xsd:string" />
+						<xsd:attribute name="sortsequence" type="xsd:string" />
+					</xsd:extension>
+				</xsd:simpleContent>
+			</xsd:complexType>
+		</xsd:schema>
+		<xsd:schema elementFormDefault="qualified"
+			attributeFormDefault="unqualified" targetNamespace="urn:crmondemand/ws/salesproc/"
+			xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:import namespace="urn:/crmondemand/xml/salesprocess/Data" />
+			<xsd:import namespace="urn:/crmondemand/xml/salesprocess/Query" />
+			<xsd:element name="SalesProcessQueryPage_Input">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element ref="xsdLocal1:ListOfSalesProcess"
+							minOccurs="0" />
+						<xsd:element name="LOVLanguageMode" minOccurs="0"
+							type="xsd:string" />
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="SalesProcessQueryPage_Output">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element ref="xsdLocal2:ListOfSalesProcess"
+							minOccurs="0" />
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+		</xsd:schema>
+		<xsd:schema elementFormDefault="qualified"
+			attributeFormDefault="unqualified" targetNamespace="urn:/crmondemand/xml/salesprocess/Data"
+			xmlns:xsdLocal2="urn:/crmondemand/xml/salesprocess/Data" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:annotation>
+				<xsd:documentation>Copyright (C) 2001, 2008, Oracle and/or its affiliates. All rights reserved. Siebel XSD Generation</xsd:documentation>
+			</xsd:annotation>
+			<xsd:element name="ListOfSalesProcess" type="xsdLocal2:ListOfSalesProcessData" />
+			<xsd:complexType name="ListOfSalesProcessTopElmtData">
+				<xsd:sequence>
+					<xsd:element name="ListOfSalesProcess" maxOccurs="1"
+						minOccurs="1" type="xsdLocal2:ListOfSalesProcessData" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="ListOfSalesProcessData">
+				<xsd:sequence>
+					<xsd:element name="SalesProcess" maxOccurs="unbounded"
+						minOccurs="0" type="xsdLocal2:SalesProcessData" />
+				</xsd:sequence>
+				<xsd:attribute name="lastpage" type="xsd:boolean" />
+				<xsd:attribute name="recordcount" type="xsd:integer" />
+			</xsd:complexType>
+			<xsd:complexType name="SalesProcessData">
+				<xsd:sequence>
+					<xsd:element name="Id" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Name" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Translate" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Default" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Description" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="CreatedById" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="CreatedDate" maxOccurs="1"
+						minOccurs="0" type="xsd:dateTime" />
+					<xsd:element name="CreatedBy" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="ModId" maxOccurs="1" minOccurs="0"
+						type="xsd:decimal" />
+					<xsd:element name="ModifiedById" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="ModifiedDate" maxOccurs="1"
+						minOccurs="0" type="xsd:dateTime" />
+					<xsd:element name="ModifiedBy" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="TranslationLanguage" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="ListOfOpportunityType" maxOccurs="1"
+						minOccurs="0" type="xsdLocal2:ListOfOpportunityTypeData" />
+					<xsd:element name="ListOfSalesStage" maxOccurs="1"
+						minOccurs="0" type="xsdLocal2:ListOfSalesStageData" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="ListOfOpportunityTypeData">
+				<xsd:sequence>
+					<xsd:element name="OpportunityType" maxOccurs="unbounded"
+						minOccurs="0" type="xsdLocal2:OpportunityTypeData" />
+				</xsd:sequence>
+				<xsd:attribute name="lastpage" type="xsd:boolean" />
+				<xsd:attribute name="recordcount" type="xsd:integer" />
+			</xsd:complexType>
+			<xsd:complexType name="OpportunityTypeData">
+				<xsd:sequence>
+					<xsd:element name="Id" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Type" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="CreatedById" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="CreatedDate" maxOccurs="1"
+						minOccurs="0" type="xsd:dateTime" />
+					<xsd:element name="CreatedBy" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="ModId" maxOccurs="1" minOccurs="0"
+						type="xsd:decimal" />
+					<xsd:element name="ModifiedById" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="ModifiedDate" maxOccurs="1"
+						minOccurs="0" type="xsd:dateTime" />
+					<xsd:element name="ModifiedBy" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="ListOfSalesStageData">
+				<xsd:sequence>
+					<xsd:element name="SalesStage" maxOccurs="unbounded"
+						minOccurs="0" type="xsdLocal2:SalesStageData" />
+				</xsd:sequence>
+				<xsd:attribute name="lastpage" type="xsd:boolean" />
+				<xsd:attribute name="recordcount" type="xsd:integer" />
+			</xsd:complexType>
+			<xsd:complexType name="SalesStageData">
+				<xsd:sequence>
+					<xsd:element name="Id" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Name" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="SalesCategoryName" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="Order" maxOccurs="1" minOccurs="0"
+						type="xsd:decimal" />
+					<xsd:element name="Probability" maxOccurs="1"
+						minOccurs="0" type="xsd:decimal" />
+					<xsd:element name="Description" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="CreatedById" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="CreatedDate" maxOccurs="1"
+						minOccurs="0" type="xsd:dateTime" />
+					<xsd:element name="CreatedBy" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="ModId" maxOccurs="1" minOccurs="0"
+						type="xsd:decimal" />
+					<xsd:element name="ModifiedById" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="ModifiedDate" maxOccurs="1"
+						minOccurs="0" type="xsd:dateTime" />
+					<xsd:element name="ModifiedBy" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="TranslationLanguage" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+				</xsd:sequence>
+			</xsd:complexType>
+		</xsd:schema>
+	</types>
+	<message name="SalesProcessQueryPage_Input">
+		<part name="SalesProcessQueryPage_Input" element="tns:SalesProcessQueryPage_Input" />
+	</message>
+	<message name="SalesProcessQueryPage_Output">
+		<part name="SalesProcessQueryPage_Output" element="tns:SalesProcessQueryPage_Output" />
+	</message>
+	<portType name="SalesProc">
+		<operation name="SalesProcessQueryPage">
+			<input message="tns:SalesProcessQueryPage_Input" />
+			<output message="tns:SalesProcessQueryPage_Output" />
+		</operation>
+	</portType>
+	<binding name="SalesProc" type="tns:SalesProc">
+		<soap:binding transport="http://schemas.xmlsoap.org/soap/http"
+			style="document" />
+		<operation name="SalesProcessQueryPage">
+			<soap:operation
+				soapAction="document/urn:crmondemand/ws/salesproc/:SalesProcessQueryPage" />
+			<input>
+				<soap:body use="literal" />
+			</input>
+			<output>
+				<soap:body use="literal" />
+			</output>
+		</operation>
+	</binding>
+	<service name="SalesProc">
+		<port binding="tns:SalesProc" name="SalesProc">
+			<soap:address
+				location="https://secure-ausomxapa.crmondemand.com/Services/Integration" />
+		</port>
+	</service>
+</definitions>

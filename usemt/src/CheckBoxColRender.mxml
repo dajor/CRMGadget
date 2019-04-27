@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			private var column:AdvancedDataGridColumn;
+			private var _chkEnable:Boolean;
+			private var _onChkChange:Function;
+			
+			 private function clickFunction():void{
+				 if(column!=null){			
+					 data[column.dataField] = chkBox.selected;
+				 }else{
+					 data.isSync=!data.isSync;
+				 }
+				 
+				 if(_onChkChange!=null){
+					 _onChkChange(data,column);
+				 }
+								
+			 }			
+			 override public function set data(value:Object):void{		
+				 super.data = value;
+				 if(column!=null && value){
+					 var val:Object = value[column.dataField];
+					 chkBox.selected=(val==true || val=="true" || val==1 || val=="1");
+				 }else{
+					 chkBox.selected = false;
+				 }
+				 if(Database.preferencesDao.isChkReadonlyWhenTrue()){
+					 chkBox.enabled = !chkBox.selected;
+				 }
+					
+			 }
+		
+			
+			public function set chkEnable(enable:Boolean):void{
+				_chkEnable = enable;
+			}
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					var grid:AdvancedDataGrid = value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						this.chkBox.enabled = _chkEnable;
+//						chkBox.enabled = column.editable;
+//						column.editable = false;//only edit for checkbox
+					}
+				}
+			}
+
+			public function set onChkChange(value:Function):void
+			{
+				_onChkChange = value;
+			}
+
+			
+		]]>
+		
+	</fx:Script>
+	<mx:HBox horizontalAlign="center" width="100%">
+		<s:CheckBox id="chkBox"   click="{clickFunction()}" />
+	</mx:HBox>	
+</s:MXAdvancedDataGridItemRenderer>

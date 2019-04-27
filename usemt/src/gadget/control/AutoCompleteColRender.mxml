@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								 xmlns:control="gadget.control.*">
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.DataGrid;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.controls.dataGridClasses.DataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			public var column:DataGridColumn;	
+			
+
+			public function set labelFunction(value:Function):void
+			{
+				if(value!=null){
+					this.cborender.labelFunction = value;
+				}
+			}
+
+			public function set labelField(field:String):void{
+				if(field!=null){
+					this.cborender.labelField = field;
+				}
+			}
+
+			public function get updateRelateField():Function
+			{
+				return _updateRelateField;
+			}
+
+			public function set updateRelateField(value:Function):void
+			{
+				_updateRelateField = value;
+			}
+
+			private var _updateRelateField:Function;
+					
+
+			public function set dataProvider(value:ArrayCollection):void
+			{
+				this.cborender.dataProvider = value;
+				this.cborender.validateNow();
+			}
+			
+			override public function setFocus():void{
+				super.setFocus();
+				this.cborender.setFocus();
+			}
+
+			override public function set data(value:Object):void{		
+				 super.data = value;
+				 if(column!=null && value){
+					 var val:Object = value[column.dataField];						
+					 ensureSelected(val);
+				 }
+				 cborender.setFocus();
+			 }		
+			
+			
+			private function ensureSelected(obj:Object):void{
+				if(obj!=null){
+					if(obj is String){
+						cborender.setSelectedItemByText(obj as String);
+					}else{
+						cborender.setSelectedItemByText(obj[cborender.labelField]);
+					}
+				}else{
+					cborender.selectedItem = obj;
+				}
+			}
+			
+			
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					var grid:DataGrid = value.owner as DataGrid;
+					var list:DataGridListData = value as DataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						cborender.width = column.width-3;
+					}
+				
+				}
+			}
+			
+			private function itemChange(event:Event):void{
+				if(data!=null && column!=null){
+					data[column.dataField] = cborender.selectedItem;
+					if(updateRelateField!=null){
+						updateRelateField(data,cborender.selectedItem);
+					}
+				}
+			}
+			public function get selectedItem():Object{
+				return cborender.selectedItem;			
+					
+			}
+			
+			protected function onSelectedItem(selectedObj:Object):void{
+				if(column!=null && data!=null && selectedObj!=null && updateRelateField!=null){					
+					updateRelateField(data,selectedObj);					
+				}
+			}
+			
+		]]>
+		
+	</fx:Script>
+	<control:AutoComplete id="cborender" height="100%" change="itemChange(event)" lookAhead="true" updateRelateFieldOnSelected="{onSelectedItem}"  labelField="Name"/>
+</s:MXDataGridItemRenderer>

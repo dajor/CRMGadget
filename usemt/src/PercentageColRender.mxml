@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			import mx.formatters.NumberFormatter;
+			private var grid:AdvancedDataGrid;
+			public var column:AdvancedDataGridColumn;
+			 private function clickFunction():void{
+				
+			 }		
+			override public function set data(value:Object):void{		
+				super.data = value;
+				if(column!=null && value){					
+					//TODO
+					var num:String = value[column.dataField];					
+					var nmf:NumberFormatter = new NumberFormatter()
+					nmf.precision = 2;
+					if(num == null || num ==""){
+						labelPerce.text =  "0.00%";
+					}else{
+						var percentageVal:String =nmf.format(num);
+						labelPerce.text = percentageVal + "%";
+					}
+					
+				}
+			}
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var listData:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(listData!=null){					
+						column = grid.columns[listData.columnIndex];						
+					}
+					
+				}
+			}
+		]]>
+		
+	</fx:Script>
+	<mx:Label id="labelPerce" textAlign="right" width="100%"/>
+
+</s:MXAdvancedDataGridItemRenderer>

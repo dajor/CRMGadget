@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable = "false"	
+	width="800" height="400"
+	title="MS Exchange Synchronization"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init()" xmlns:local="*">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.control.GridColumnRenderFactory;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.ComboBase;
+			import mx.controls.ComboBox;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			
+			public var entity:String;
+			public var dataRecord:ArrayCollection;
+			public var updateLastSync:Function;
+			private function init():void{
+				dataGrid.columns = columnTask();
+				dataGrid.dataProvider = dataRecord;
+			}
+			private function columnTask():Array{
+				var columns:Array = new Array();
+				var child:AdvancedDataGridColumn = new AdvancedDataGridColumn();				
+				child.headerText = "";
+				//child.dataField = "isAccept";
+				//child.styleFunction = Utils.styleFunction;				
+				child.itemRenderer=new GridColumnRenderFactory(CheckBoxColRender);
+				child.width = 60;				
+				columns.push(child);
+				
+				child = new AdvancedDataGridColumn();
+				child.headerText = i18n._('Subject');
+				child.dataField = "Subject";
+				//child.styleFunction = Utils.styleFunction;
+				child.width =200;
+				child.editable = false;
+				columns.push(child);
+				
+				child = new AdvancedDataGridColumn();
+				child.headerText = i18n._('Start Date');
+				child.dataField = "Start";
+				//child.styleFunction = Utils.styleFunction;
+				child.width = 200;
+				child.editable = false;
+				columns.push(child);
+				
+				child = new AdvancedDataGridColumn();
+				child.headerText = i18n._('End Date');
+				child.dataField = "End";
+				//child.styleFunction = Utils.styleFunction;
+				child.width = 200;
+				child.editable = false;
+				columns.push(child);
+				
+				return columns;
+			}
+			private function onSaveData():void{
+				var list:ArrayCollection = dataGrid.dataProvider as ArrayCollection;
+				var isUpdateLastSync:Boolean = false;
+				if(list.length >0){
+					for each(var obj:Object in list){
+						if(obj['isSync'] == true){
+							if(Database.getDao(entity).findByMSId(obj['ms_id']) == null){
+								// inser into table here
+								obj["deleted"] = false;
+								obj["error"] = false;
+								obj["OwnerId"] = obj["OwnerId"] == null || obj["OwnerId"]=="" ? Database.userDao.read().id : obj["OwnerId"];
+								Database.getDao(entity).insert(obj,false);
+								obj = Database.getDao(entity).selectLastRecord()[0];
+								var oidName:String = DAOUtils.getOracleId(entity);
+								obj[oidName] = "#" + obj.gadget_id;
+							}else{
+								obj.local_update = new Date().getTime();								
+							}
+							obj.ms_local_change = null;
+							
+							Database.getDao(entity).update(obj);
+							isUpdateLastSync = true;
+						}
+					}
+					
+					
+				}
+				if(isUpdateLastSync){		
+					for each(var updLastSycn:Object in list){
+						updateLastSync(updLastSycn['getMyClassName']);
+					}
+					close();
+				}else{
+					Alert.show('Please select at least one item','', Alert.OK, this);
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/sync.png')" title="{'MS Exchange Record'}"/>
+		<mx:VBox top="32" left="16" right="16" bottom="16" verticalGap="16">
+			<mx:Panel id="panelTitle" title="{i18n._('GLOBAL_SYNCHRONIZATOIN') + ' Record' }" width="100%">
+				<mx:VBox width="100%" paddingLeft="8" paddingRight="8" paddingTop="8" paddingBottom="8">
+					<mx:AdvancedDataGrid id="dataGrid" rowCount="10" width="100%" height="235" variableRowHeight="true" />		
+				</mx:VBox>
+			</mx:Panel>	
+			<mx:Canvas width="100%">
+				<mx:HBox right="0">
+					<mx:Button id="btnOk" label="{i18n._('GLOBAL_SAVE')}" click="onSaveData()" />
+					<mx:Button id="btnClose" label="{i18n._('GLOBAL_CLOSE')}"  click="close();" right="0"/>	
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

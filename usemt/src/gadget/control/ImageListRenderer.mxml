@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	horizontalScrollPolicy="off" 
+	horizontalAlign="center"
+	verticalAlign="middle">
+	<mx:Script>
+		<![CDATA[
+			private var _fieldImage:String;
+			
+			public function set fieldImage(value:String):void {
+				_fieldImage = value;
+			}
+			
+			public function get fieldImage():String {
+				return _fieldImage
+			}
+
+			public function getImage(e:Event):void {
+				var iImage:Image = e.currentTarget as Image;
+				var iLoader:Loader = new Loader();
+				if(data!=null && data[_fieldImage]) {
+					iLoader.contentLoaderInfo.addEventListener(Event.COMPLETE, function(e:Event):void {
+						iImage.source = e.currentTarget.content;
+					});
+					iLoader.contentLoaderInfo.addEventListener(IOErrorEvent.IO_ERROR, function(e:IOErrorEvent):void {
+						// error handler here
+						trace(e.text);
+					});
+					iLoader.load(new URLRequest(data[_fieldImage]));
+				}
+			}
+
+		]]>
+	</mx:Script>
+	<mx:Canvas>
+		<mx:Image width="16" height="16" creationComplete="getImage(event)" autoLoad="true" />
+	</mx:Canvas>
+</mx:HBox>

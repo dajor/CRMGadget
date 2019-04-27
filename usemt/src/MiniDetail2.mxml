@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="480" height="300"
+	title="{i18n._('GLOBAL_INPUT_MATERIAL_NUMBER')}"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init()"
+	
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.coreUI.util.StringUtils;
+			
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			
+			import mx.containers.FormItem;
+			import mx.controls.TextArea;
+			import mx.core.IUIComponent;
+			
+			[Bindable] public var generateProductList:Function;			
+			private function init():void {	
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function update_clickHanler(event:MouseEvent):void {
+				var preferences:Object = Database.preferencesDao.read();
+				var rep:String = preferences.cvs_separator;
+				if(rep == null || rep == ''){
+					rep = ',';
+				}else if(rep =='tab'){
+					rep = '\t';
+				}
+				//#1000 CRO
+				var str:String = produtNumber.text;
+				var reg:RegExp = new RegExp(rep , "gi");
+				str = str.replace(reg, '=');
+//				while(str.indexOf(rep)>-1)
+//					str = str.replace(rep,'=');
+				
+				//while(str.indexOf("\r")>-1)
+					//str = str.replace('\r',',');
+				str = str.replace(/\n/gi,',');
+				str = str.replace(/\r/gi,',');
+				generateProductList(event,StringUtils.isEmpty(str)?"empty":str);
+				close();				
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="480" height="250" right="0" bottom="0">
+		<control:TitleBar title="{i18n._('GLOBAL_INPUT_MATERIAL_NUMBER')}" id="titlebar" y="2" x="25"/>
+		<mx:VBox top="36" left="8" right="8" bottom="8">
+			<mx:Canvas width="95%" height="150">
+				<mx:HBox paddingTop="20">
+					<mx:Label textAlign="right" text="{i18n._('GLOBAL_MATERIAL_NUMBER')}" height="20" width="150" />
+					<mx:TextArea id="produtNumber" height="120" width="270" />
+				</mx:HBox>
+			</mx:Canvas>	
+			<mx:Canvas width="95%" height="50">
+				<mx:HBox width="100%" horizontalAlign="right">
+					<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" right="0" icon="{ImageUtils.cancelIcon}"/>
+					<mx:Button id="createBtn" label="{i18n._('GLOBAL_CREATE')}" click="update_clickHanler(event)" right="0" icon="{ImageUtils.acceptIcon}"/>
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

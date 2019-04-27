@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" xmlns:grid="com.fellow.grid.*" xmlns:control="gadget.control.*"
+		 verticalScrollPolicy="off"
+		 horizontalScrollPolicy="off"
+		 creationComplete="init();"
+		 paddingLeft="20"
+		 paddingRight="20"
+		 
+		 >
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.assessment.DtoColumn;
+			import com.assessment.DtoConfiguration;
+			
+			import gadget.assessment.AssessmentSectionTotal;
+			import gadget.dao.Database;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.HierarchicalData;
+			import mx.controls.TextInput;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			
+			[bindable]
+			private var _lstQuesData:ArrayCollection = new ArrayCollection();		
+			
+			[bindable] 
+			public var assname:String;
+			
+			[bindable] 
+			public var listColumns:Array;
+			
+			[Bindable]
+			public var assModel:DtoConfiguration;
+			[Bindable]
+			public var refreshPage:Function;
+			
+			[Bindable]
+			public var showHeadersSection:Boolean;
+			
+			private function displayName(col:DtoColumn,data:Object):Object{
+				
+				if(data is AssessmentSectionTotal){
+					if(StringUtils.isEmpty(assModel.sumType)){
+						return AssessmentSectionTotal(data).getPercentTotal(col);
+					}
+					return AssessmentSectionTotal(data).getPercentTotal(col).toFixed(2) + "%";
+				}else{
+					if(data.isHeader =="1"){
+						return "";
+					}
+					return data[col.colProperty]==null?"":data[col.colProperty];
+				}
+			}
+			
+			
+			public function createColumn(obj:DtoColumn,editable:Boolean = false):AdvancedDataGridColumn{
+				var child:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+				var property:String = obj.colProperty;
+				child.dataField = property;
+				child.headerText = obj.title;
+				child.dataTipFunction  = onBuildToolTip;
+				child.showDataTips = true;
+				child.setStyle("fontWeight","bold");
+				child.sortable = false;
+				child.editable = editable;
+				child.setStyle("foreColor","white");
+				if (obj.colProperty == "Question" ){
+					child.headerText = assname;
+					child.itemRenderer=new ClassFactory(SectionNameItemRenderer);
+					child.width = 450;
+					return child;
+				}
+				if (obj.dataType==DtoColumn.CHECK_BOX_TYPE){
+					var chkRender:ClassFactory = new ClassFactory(CheckBoxQuestionRender);
+					chkRender.properties={
+						'dtoCol':obj,
+						'displayName':displayName,						
+						'refreshPageTotal':refreshPage};
+					child.itemRenderer=chkRender;
+					child.editable = true;
+					child.width = getWidth(obj.title.length);
+					
+				}else if (obj.dataType==DtoColumn.RADIO_TYPE){
+					var radoiRender:ClassFactory = new ClassFactory(RadioQuestionRenderer);
+					radoiRender.properties={
+						'dtoCol':obj,
+						'displayName':displayName,
+						'groupProperties': listColumns, 
+						'refreshPageTotal':refreshPage};
+					child.itemRenderer=radoiRender;
+					child.editable = true;
+					child.width = getWidth(obj.title.length);
+					
+				}else if(obj.dataType==DtoColumn.DATE_TYPE){
+					child.itemRenderer = new ClassFactory(DateColumnRenderer);
+					child.width = 230;					
+				}else{
+					
+					child.itemRenderer = new ClassFactory(TextInputColRenderer);
+					child.width =230;
+				}
+				
+				return child;
+			}
+			private function getWidth(length:int):int{
+				var charWidth:int = 20*length;
+				
+				if(charWidth<80){
+					return 80;
+				}else{
+					return charWidth;
+				}
+				
+			}
+			private function onBuildToolTip(item:Object):String{
+				var str:String = "";
+				if (item != null) {
+					str = str + item.dataField;
+					
+				}
+				return str;
+			}
+			private function init():void
+			{
+				
+				
+				var columns:ArrayCollection = new ArrayCollection();
+				
+				for each (var field:DtoColumn in listColumns ){	
+					if(field.visible){
+						columns.addItem(createColumn(field));
+						
+					}
+				}
+				
+				
+				
+				lstQuestion.percentWidth = 100;
+				lstQuestion.columns = columns.source;
+				lstQuestion.showHeaders = showHeadersSection;
+				//TODO later
+			}
+			
+			public function get lstQuesData():ArrayCollection{
+				return this._lstQuesData;
+			}
+			
+			protected function getRowHeight():int{
+				
+				if(assModel!=null){
+					var rowHeight:int = 28;					
+					for each(var col:DtoColumn in listColumns){
+						if(col.dataType==DtoColumn.CHECK_BOX_TYPE || col.dataType == DtoColumn.RADIO_TYPE){
+							rowHeight=34;
+						}
+					}
+					return rowHeight;
+				}
+				return 34;
+				
+			}
+			
+			public function set lstQuesData(lstQuest:ArrayCollection):void{	
+				this.height = lstQuest.length*getRowHeight()+ (showHeadersSection ? 24 : 0); 
+				if(lstQuest.length==1){
+					this.height=this.height;
+				}
+				this._lstQuesData = lstQuest;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	
+	<control:MyAdvancedDataGrid id="lstQuestion" width="100%" 
+								dataProvider="{lstQuesData}"						
+								displayItemsExpanded="true"
+								showHeaders="true"
+								variableRowHeight="true"							 
+								sortableColumns="false"
+								height="100%"
+								
+								>
+		<control:columns>
+			<!--<mx:AdvancedDataGridColumn dataField="question"
+			headerText=""
+			sortable="false" width="710"
+			itemRenderer="gadget.control.SectionNameItemRenderer"
+			/>
+			<mx:AdvancedDataGridColumn dataField="answer"
+			headerText="Answer"
+			sortable="false" width="160"
+			itemRenderer="gadget.control.ComboBoxQuestionRender"
+			/>
+			<mx:AdvancedDataGridColumn dataField="comment"
+			headerText="Comment"
+			sortable="false" width="160"
+			itemRenderer="gadget.control.TextInputColRenderer"
+			/>
+			<mx:AdvancedDataGridColumn dataField="checkBoxPercent"
+			headerText="20%"
+			sortable="false"
+			width="60"
+			itemRenderer="gadget.control.CheckBoxQuestionRender" 
+			>
+			</mx:AdvancedDataGridColumn>-->
+		</control:columns>
+	</control:MyAdvancedDataGrid>
+</mx:VBox>

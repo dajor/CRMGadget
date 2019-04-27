@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:control="gadget.control.*"
+		   resizable="false"
+		   title="{entity} {i18n._('VALIDATIONLIST_TITLE_VALIDATION_RULES')}"
+		   width="440" height="300" verticalAlign="middle"
+		   showFlexChrome="false" transparent="true" systemChrome="none"
+		   creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.util.ImageUtils;
+			import gadget.window.WindowManager;
+			import gadget.i18n.i18n;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.ButtonBar;
+			import mx.events.ItemClickEvent;
+			
+			private static const CLOSE_STR:String = i18n._('GLOBAL_CLOSE');
+			private static const ADD_STR:String = i18n._('GLOBAL_ADD');
+			private static const EDIT_STR:String = i18n._('GLOBAL_EDIT');
+			private static const DELETE_STR:String = i18n._('GLOBAL_DELETE');
+			
+			[Bindable] public var entity:String;
+			// Change to use ImageUtils
+			//			[Bindable] [Embed("assets/accept.png")] private var acceptIcon:Class;
+			//			[Bindable] [Embed("assets/cancel.png")] private var cancelIcon:Class;
+			//			[Bindable] [Embed("assets/edit.png")] private var editIcon:Class;			
+			//			[Bindable] [Embed("assets/delete.png")] private var deleteIcon:Class;
+			
+			private function init():void {
+				refreshList();
+				initButtons();
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function initButtons():void {
+				actionButton.removeAllChildren();
+				var buttonBar:ButtonBar = new ButtonBar();
+				buttonBar.setStyle("right", "0");
+				var obj:Object = null;
+				var buttons:ArrayCollection = new ArrayCollection();
+				
+				buttons.addItem({label: CLOSE_STR, icon:ImageUtils.cancelIcon}); 
+				buttons.addItem({label: ADD_STR, icon: ImageUtils.acceptIcon});
+				buttons.addItem({label: EDIT_STR, icon: ImageUtils.editIcon});
+				buttons.addItem({label: DELETE_STR, icon: ImageUtils.deleteIcon});
+				
+				buttonBar.dataProvider = buttons;
+				buttonBar.addEventListener(ItemClickEvent.ITEM_CLICK, handleButtonBar);
+				
+				actionButton.addChild(buttonBar);
+			}
+			
+			private function handleButtonBar(event:ItemClickEvent):void {
+				if(event.label == CLOSE_STR){
+					this.close();
+				}else if(event.label == DELETE_STR){
+					deleteValidationRule();
+				}else{
+					openValidationDetail(event.label);
+				}
+			}	
+			
+			private function deleteValidationRule():void {
+				if(validationGrid.selectedItems.length == 0) return;
+				Database.validationDao.deleteValidation(validationGrid.selectedItem);
+				refreshList();
+			}
+			
+			private function openValidationDetail(mode:String="Update"):void {
+				var validationDetail:ValidationDetail = new ValidationDetail();
+				validationDetail.validationList = this;
+				validationDetail.entity = entity;
+				if(mode == ADD_STR){
+					validationDetail.isCreate = true;
+				}else{
+					if(validationGrid.selectedItems.length == 0) return;
+					validationDetail.isCreate = false;
+					validationDetail.validation = validationGrid.selectedItem;
+				}
+				
+				WindowManager.openModal(validationDetail);				
+			}
+			
+			public function refreshList():void {
+				var listValidations:ArrayCollection = Database.validationDao.selectEntity(entity);
+				validationGrid.dataProvider = listValidations;
+				(validationGrid.dataProvider as ArrayCollection).refresh();
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="440" height="300" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/validation_rules.png')" title="{entity} {i18n._('VALIDATIONLIST_TITLE_VALIDATION_RULES')}"/>
+		<mx:VBox top="40" left="16" right="16" bottom="16" width="100%" height="100%">
+			<mx:DataGrid id="validationGrid" width="100%" height="100%" doubleClickEnabled="true" doubleClick="openValidationDetail()">
+				<mx:columns>
+					<mx:DataGridColumn headerText="{i18n._('VALIDATIONLIST_DATAGRIDCOLUMN_HEADERTEXT_RULE_NAME')}" dataField="rule_name"/>
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox id="actionButton" horizontalAlign="right" width="100%"/>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

@@ -1,0 +1,754 @@
+﻿<model title="Foersaeljningsledare Butiks" type="Butiks" isCreateSum="false" sumType="%">
+  <page title="1 Försäljning" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="B-1 Försäljning- 1 Kunden">
+      <row isheader="true" title="B-1 Försäljning- 1 Kunden">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Är kunden identifierad på din marknad?">
+        <col value="1"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Vet du hur stor din marknadspotential är?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Gör du årligen kundundersökningar (NKI el. kundkompassen)samt följer upp med medarbetarna?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Har du något unikt i ditt kunderbjudande?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Följer du upp dina ICA-kortskunder kontinuerligt?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="20.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-1 Försäljning - 2 Kundvarv/kommunikation">
+      <row isheader="true" title="B-1 Försäljning - 2 Kundvarv/kommunikation">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Är du nöjd med butikens kundvarv/layout?">
+        <col value="1"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Gör du årligen en Säljplan för att alltid ha en attraktiv butik mot kund varje dag?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Finns det rutiner för skyltning av priser och kommunikationsmaterial i butiken?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Arbetas det med gavelexponeringar eller andra exponeringar på ett strukturerat sätt?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Anser du att varutrycket/fyllnadsgraden motsvarar kundens förväntningar?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="20.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-1 Försäljning- 3 Prisupplevelse &amp; matupplevelse">
+      <row isheader="true" title="B-1 Försäljning- 3 Prisupplevelse &amp; matupplevelse">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Anser du att priset motsvarar kundens förväntningar?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Finns rutiner för prisupplevelse?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har ni en utvecklingsplan för att förenkla och inspirera kunden varje dag?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Kan du idag på ett bra sätt jämföra/benchmarka din försäljningsutveckling?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Är du duktig på att upptäcka och förmedla trender?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-1 Försäljning- 4 Kundrelation">
+      <row isheader="true" title="B-1 Försäljning- 4 Kundrelation">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Finns tydligt kundfokus bland medarbetarna? (Hälsar, är hjälpsamma, trevliga?)">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Har kunden möjlighet att komma med förslag och funderingar?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har ni någon nöjd kund-garanti och följs den upp?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Jobbar ni med kundaktiviteter?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Jobbar ni med lokalt engagemang såsom sponsring?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-1 Försäljning- 5 Konkurrens">
+      <row isheader="true" title="B-1 Försäljning- 5 Konkurrens">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Kan du dina konkurrenters kunderbjudande och styrkor och svagheter?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Kan du erbjuda kunden mer eller minst lika mycket som dina konkurrenter?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Är dina medarbetare medvetna om butikens styrkor och svagheter?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Görs egna prisjämförelser mot dina konkurrenter?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Vet du hur din konkurrenssituation ser ut på längre sikt? (2-5 år)">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="Svar"/>
+      </row>
+      <row>
+        <col value="8.00"/>
+      </row>
+    </pageTotal>
+  </page>
+  <page title="2 Sortiment" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="B-2 Sortiment- 1 Kunderbjudande">
+      <row isheader="true" title="B-2 Sortiment- 1 Kunderbjudande">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Anser du att sortimentet i butiken motsvarar kundens förväntningar och behov idag?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Finns det rutiner kring butikens sortiment?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Finns en förnyelseplan för respektive avdelning?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Jobbar ni aktivt med EMV?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har du det stöd och de resurser som krävs för att underhålla och utveckla sortimentet?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-2 Sortiment- 2 Pris">
+      <row isheader="true" title="B-2 Sortiment- 2 Pris">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Använder du prisprofil?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Följer du din prisprofil?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Finns det en genomtänkt prisstrategi?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Aktiverar ni prisfiler varje vecka?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Följer ni externa leverantörers inpriser varje vecka?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B- 2 Sortiment- 3 Marginal">
+      <row isheader="true" title="B- 2 Sortiment- 3 Marginal">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Följer du upp ditt marginalutfall?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Följer du upp ditt marginalutfall på gavlar/exponeringar?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Följer du upp pris och marginal för externa leverantörer?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Följer du upp avvikelse per avdelning?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Följer du upp aktivitetspåverkan/kampanjandel?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-2 Sortiment- 4 Svinn">
+      <row isheader="true" title="B-2 Sortiment- 4 Svinn">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Registrerar du synligt svinn per avdelning?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Finns måltal för hur högt svinnet får vara i butiken?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Finns någon svinnansvarig i er butik?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Jobbar ni aktivt med åtgärder för att sänka synligt och osynligt svinn?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har du det stöd och de resurser som krävs för att minimera svinnet?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-2 Sortiment- 5 AOB">
+      <row isheader="true" title="B-2 Sortiment- 5 AOB">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Inventerar du minst en gång i veckan i AOB?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Jobbar ni med förhandsorder i AOB?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har ni säkerställda rutiner kring kross, svinn, internhandel, reklamationer och kassa enligt AOB dri">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Använder du dig av löpande bokslutsinventering i AOB?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har du det stöd och resurser som krävs för att underhålla utveckla AOB?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="Svar"/>
+      </row>
+      <row>
+        <col value="0.00"/>
+      </row>
+    </pageTotal>
+  </page>
+  <page title="3 Organisation" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="B-3 Organisation- 1 Omvärld,Affärsidé &amp; affärsplan">
+      <row isheader="true" title="B-3 Organisation- 1 Omvärld,Affärsidé &amp; affärsplan">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Uppdateras er organisation i takt med att omvärlden förändras?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Finns tydliga mål för närmaste året/åren?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Jobbar du/ni med affärsplan med mätbara, enkla och uppföljningsbara mål årligen?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Finns det en aktuell affärsidé?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-3 Organisation- 2 Ledning">
+      <row isheader="true" title="B-3 Organisation- 2 Ledning">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Lever du/ni upp till ICAs ledar- och medarbetarsyn?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Finns en tydlig organisation/organisationsschema/ansvarsområden?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Finns ledningsgrupp/driftsgrupp?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Jobbar du aktivt med och följer upp provköpen?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har du det stöd och resurser som krävs för att utveckla din organisation?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-3 Organisation- 3 Medarbetare">
+      <row isheader="true" title="B-3 Organisation- 3 Medarbetare">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Finns skriftliga anställningsavtal för alla medarbetare och även för personer utöver vanlig tid?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Finns program för introduktion av nya medarbetare?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Finns tydliga befattningsbeskrivningar för alla medarbetare?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Genomförs årliga medarbetarsamtal på ett strukturerat sätt?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Känns dina medarbetare motiverade och engagerade?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-3 Organisation- 4 Kommunikation">
+      <row isheader="true" title="B-3 Organisation- 4 Kommunikation">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Finns tydlig mötesstruktur för ledningsgruppen/driftsgrupen?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Finns tydlig mötesstruktur för alla medarbetare?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Törs alla säga vad de tycker på arbetsplatsen?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Fungerar möten mer som dialogmöten än bara rapportering?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Finns en fungerande internkommunikation med anslagstavlor, Intern-TV?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-3 Organisation- 5 Köpman">
+      <row isheader="true" title="B-3 Organisation- 5 Köpman">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Är du en aktiv handlare?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Brukar du vara med på handlarträffar, nätverk m.m?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Trivs du med att vara handlare?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Anser du att du har en bra arbetssituation idag?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Vet du vad du gör om 5 år?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="Svar"/>
+      </row>
+      <row>
+        <col value="0.00"/>
+      </row>
+    </pageTotal>
+  </page>
+  <page title="4 Effektiv Butik" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="B-4 Effektiv butik- 1 Personal">
+      <row isheader="true" title="B-4 Effektiv butik- 1 Personal">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Följs de totala personalkostnaderna upp löpande?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Har du kunskap och resurser för schemaläggning och timplanering?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Jobbar ni aktivt för att höja kostnadsmedvetenheten hos medarbetarna?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Följs antal arbetstimmar upp löpande?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Följer du upp sjukfrånvaro?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-4 Effektiv butik- 2 Lokal">
+      <row isheader="true" title="B-4 Effektiv butik- 2 Lokal">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Har du begärt in offert från andra aktörer för sophämtning?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Har du begärt in offert från andra aktörer för städning?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har du tagit konsulthjälp för butikens elförbrukning?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Har du ett bra stöd i fastighetsfrågor?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Får du den service du ska enligt hyresavtalet?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-4 Effektiv butik- 3 Reklam">
+      <row isheader="true" title="B-4 Effektiv butik- 3 Reklam">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Går du igenom profilens marknadsföringsmix varje år?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Har du en genomtänkt upplaga på DR och KSM?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Sätts de centralt utskickade kommunikationspaketen upp?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Tar du hjälp av ICA-reklamen för din marknadsföring?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Tar du hjälp av dina sponsringskontakter tex vid inventering/packningshjälp i kassan?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-4 Effektiv butik- 4 Administration">
+      <row isheader="true" title="B-4 Effektiv butik- 4 Administration">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Utnyttjar du tekniken som finns för din redovisning?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Har ni rutiner för inventering av lotter och spel?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har ni rutiner för pantkvitton och bonuscheckar?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Har ni rutiner för kassaavstämning?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har ni rutiner för pengahantering?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-4 Effektiv butik- 5 Övrigt?">
+      <row isheader="true" title="B-4 Effektiv butik- 5 Övrigt?">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Har du sett över dina service/leasing/bevaknings/värdetransport - avtal det senaste året?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Har dina medarbetare genomgått grundläggande säkerhetsutbildning?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Är du anmäld till ICA Säkerhetscenters sms-tjänst för att kunna ta emot varningar och nyheter?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Har du en förberedelse inför oförutsedda händelser?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Har du sett över dina företagsförsäkringar det senaste året?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="Svar"/>
+      </row>
+      <row>
+        <col value="0.00"/>
+      </row>
+    </pageTotal>
+  </page>
+  <page title="5 Rapport &amp; Uppföljning" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="B-5 Rapport &amp; uppföljning- 1 Budget &amp; uppföljning">
+      <row isheader="true" title="B-5 Rapport &amp; uppföljning- 1 Budget &amp; uppföljning">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Jobbar butiken med budget eller annan typ av ekonomisk planering?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Är den ekonomiska planeringen kommunicerad till samtliga medarbetare?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Finns det en plan för hur butiken ska nå uppsatt resultatmål?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Följs resultatrapporter upp löpande?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Kommuniceras det löpande till medarbetarna hur butiken presterar?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-5 Rapport &amp; uppföljning- 2 Diskussionsfrågor">
+      <row isheader="true" title="B-5 Rapport &amp; uppföljning- 2 Diskussionsfrågor">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Försäljningsutveckling">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Bruttovinstutveckling">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Övriga kostnader">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Resultat">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Uppföljning av nyckeltal?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="B-5 Rapport &amp; uppföljning- 3 Framtid/förnyelse">
+      <row isheader="true" title="B-5 Rapport &amp; uppföljning- 3 Framtid/förnyelse">
+        <col value="Svar"/>
+        <col value="Kommentar"/>
+      </row>
+      <row odd="true" title="Finns plan/ambition för kvalitetscertifiering?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Är du nöjd med butikens miljöarbete?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Finns det en plan för framtida investeringar i verksamheten?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="false" title="Genererar butiken tillräckligt resultat för att genomföra planerade investeringar?">
+        <col value="0"/>
+        <col value=""/>
+      </row>
+      <row odd="true" title="Totalt">
+        <col value="0.00"/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="Svar"/>
+      </row>
+      <row>
+        <col value="0.00"/>
+      </row>
+    </pageTotal>
+  </page>
+  <modelTotal>
+    <row title="">
+      <col value="Svar"/>
+    </row>
+    <row title="Totala Avvikelser">
+      <col value="1.60"/>
+    </row>
+  </modelTotal>
+  <header title="test">
+    <row title="Representant ICA" value=""/>
+    <row title="Butiksnamn" value="ICA Nära Duvbo"/>
+    <row title="Leverans Adress 1" value="Tulegatan 65"/>
+    <row title="Leverans Adress 2" value=""/>
+    <row title="Leverans Postnummer" value="17232"/>
+    <row title="Leverans Ort" value="SUNDBYBERG"/>
+    <row title="Profil" value="Nära"/>
+    <row title="Handlare" value=""/>
+    <row title="Primär Kontakt" value=""/>
+    <row title="Datum" value="2013-07-31"/>
+  </header>
+</model>

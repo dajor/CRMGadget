@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="580" 
+	height="160" 
+	verticalAlign="middle"
+	showFlexChrome="false" 
+	transparent="true" 
+	systemChrome="none" 
+	creationComplete="init()"
+	close="if(accepted) {crmGadget.start()} else {crmGadget.exit()}"
+	>
+
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.util.Utils;
+			
+			import mx.controls.Alert;
+			
+			public var crmGadget:CRMGadget;
+			//public var displayInputEncryptPasswordWindow:Function;
+			public var displayMainWindowAndInitDB:Function;
+			//public var displayVerifyEncryptPasswordWindow:Function;
+			public var accessDatabase:Function;
+			private var accepted:Boolean = false;
+			private var NOT_ENCRYPT_DB_FILE:File;
+			private var ENCRYPT_DB_FILE:File;
+			private function init():void {
+				radioChangeHandler();
+			}
+			
+			private function browserForSave():void {
+				try {
+					var file:File = new File();
+					file.addEventListener(Event.SELECT, uploadHandler);
+					file.browseForDirectory("Please select a directory...");
+				} catch (err:Error) {
+					trace("Failed: ", err.message);
+				}
+			}
+			
+			private function uploadHandler(event:Event):void  {
+				var file:File = event.target as File;
+				//writeFileTo(file);
+				databaseLocation.text = file.nativePath;
+			}
+			
+			public static function writeToConfigFile(path:String,databasePWD:String=""):void {
+				var applicationObject:Object = Utils.getAppInfo();
+				var userFile:File = File.userDirectory.resolvePath(Database.CUSTOM_DATABASE);				
+				var configDbXML:XML = Database.getConfigXML();
+				if(configDbXML==null){
+					configDbXML =	<configuration>
+						<databaselocation>{path}</databaselocation>
+						<appversion>{applicationObject.version}</appversion>
+						<database_password>{databasePWD}</database_password>
+						<accepted_eula>false</accepted_eula>
+						</configuration>
+				}else{
+					configDbXML.databaselocation = path;
+					configDbXML.appversion = applicationObject.version;
+					configDbXML.database_password = databasePWD;
+				}
+				Utils.writeUTFBytes(userFile, configDbXML.toXMLString());
+			}
+			
+			private function radioChangeHandler():void {
+				if(defaultLocation.selected) {
+					browser.enabled = false;
+				}else {
+					browser.enabled = true;
+				}
+			}
+
+			private function acceptHandler():void {
+				var path:String;
+				if((databaseLocation.text == null || databaseLocation.text == "") && customLocation.selected == "true") {
+					Alert.show("Please select database location", "", 4, this);
+					return;
+				}else if(defaultLocation.selected){
+					path = File.userDirectory.nativePath;
+				}else{
+					path = databaseLocation.text;
+				}
+				writeToConfigFile(path);
+				accepted = true;
+				
+				NOT_ENCRYPT_DB_FILE = File.applicationDirectory.resolvePath(Database.getCustomDatabasePathFromFile() + "/" + Database.DB_NAME);
+				ENCRYPT_DB_FILE = File.applicationDirectory.resolvePath(Database.getCustomDatabasePathFromFile() + "/" + Database.ENCRYPTED_DB_NAME);
+				
+				if(ENCRYPT_DB_FILE.exists){
+					//displayVerifyEncryptPasswordWindow();
+					accessDatabase();
+				}else if(NOT_ENCRYPT_DB_FILE.exists){
+					displayMainWindowAndInitDB(Database.DB_NAME);
+				}else{
+					//displayInputEncryptPasswordWindow();
+					accessDatabase();
+				}
+				this.close();
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="580" height="160" right="0" bottom="0" borderStyle="solid">
+		<control:TitleBar title="Initial database location"/>
+		<mx:HBox left="8" right="8" top="40" bottom="8">
+			<mx:VBox width="100%" height="100%" top="10" right="10" left="10" bottom="10">
+				<mx:VBox width="100%">
+					<mx:RadioButton label="User default location" groupName="radio" selected="true" id="defaultLocation" click="radioChangeHandler()" />
+					<mx:HBox>
+						<mx:RadioButton label="Use custom location" groupName="radio" id="customLocation" click="radioChangeHandler()" />
+						<mx:HBox id="browser">
+							<mx:TextInput id="databaseLocation" width="365" click="browserForSave()"/>
+							<mx:Button label="..." click="browserForSave()" />
+						</mx:HBox>
+					</mx:HBox>
+					<mx:HBox width="100%" horizontalAlign="right">
+						<mx:Button label="OK" click="acceptHandler();" />
+					</mx:HBox>
+				</mx:VBox>
+			</mx:VBox>
+		</mx:HBox>
+	</mx:Canvas>
+	
+</mx:Window>

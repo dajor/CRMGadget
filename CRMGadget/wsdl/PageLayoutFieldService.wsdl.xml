@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:tns="urn:crmondemand/ws/odesabs/pagelayout/pagelayoutfieldservice/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:apQuery="urn:/crmondemand/xml/pagelayout/pagelayoutfieldservice/query" xmlns:apData="urn:/crmondemand/xml/pagelayout/pagelayoutfieldservice/data" targetNamespace="urn:crmondemand/ws/odesabs/pagelayout/pagelayoutfieldservice/">
+	<types>
+		<xsd:schema elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="urn:crmondemand/ws/odesabs/pagelayout/pagelayoutfieldservice/" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:import namespace="urn:/crmondemand/xml/pagelayout/pagelayoutfieldservice/query"/>
+			<xsd:import namespace="urn:/crmondemand/xml/pagelayout/pagelayoutfieldservice/data"/>
+			<xsd:element name="PageLayoutFieldReadAll_Input">
+				<xsd:complexType/>
+			</xsd:element>
+			<xsd:element name="PageLayoutFieldReadAll_Output">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element ref="apData:ListOfPageLayout"/>
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="PageLayoutFieldRead_Input">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element ref="apQuery:PageLayout"/>
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="PageLayoutFieldRead_Output">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element ref="apData:ListOfPageLayout"/>
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="PageLayoutFieldUpsert_Input">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element ref="apData:PageLayout"/>
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="PageLayoutFieldUpsert_Output">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="Status" type="xsd:string"/>
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+		</xsd:schema>
+		<xsd:schema elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="urn:/crmondemand/xml/pagelayout/pagelayoutfieldservice/query" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:apQuery="urn:/crmondemand/xml/pagelayout/pagelayoutfieldservice/query">
+			<xsd:element name="PageLayout" type="apQuery:PageLayoutQuery"/>
+			<xsd:complexType name="PageLayoutQuery">
+				<xsd:sequence>
+					<xsd:element name="ObjectName" type="apData:string50" maxOccurs="1" minOccurs="1"/>
+					<xsd:element name="LayoutName" type="apData:string50" maxOccurs="1" minOccurs="0"/>
+					<xsd:element name="Description" type="apData:string255" maxOccurs="1" minOccurs="0"/>
+					<xsd:element name="ListOfPageLayoutField" type="apQuery:ListOfPageLayoutFieldQuery" maxOccurs="1" minOccurs="0"/>
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="ListOfPageLayoutFieldQuery">
+				<xsd:all>
+					<xsd:element name="PageLayoutField" type="apQuery:PageLayoutFieldQuery"/>
+				</xsd:all>
+			</xsd:complexType>
+			<xsd:complexType name="PageLayoutFieldQuery">
+				<xsd:sequence>
+					<xsd:element name="FieldName" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+					<xsd:element name="ReadOnly" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+					<xsd:element name="Required" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+					<xsd:element name="Section" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+					<xsd:element name="Column" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+					<xsd:element name="Row" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="Empty"/>
+		</xsd:schema>
+		<xsd:schema elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="urn:/crmondemand/xml/pagelayout/pagelayoutfieldservice/data" xmlns:apData="urn:/crmondemand/xml/pagelayout/pagelayoutfieldservice/data" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:element name="ListOfPageLayout" type="apData:ListOfPageLayoutData"/>
+			<xsd:complexType name="ListOfPageLayoutData">
+				<xsd:sequence>
+					<xsd:element ref="apData:PageLayout" maxOccurs="unbounded" minOccurs="0"/>
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:element name="PageLayout" type="apData:PageLayoutData"/>
+			<xsd:complexType name="PageLayoutData">
+				<xsd:all>
+					<xsd:element name="ObjectName" type="apData:string50" maxOccurs="1" minOccurs="1"/>
+					<xsd:element name="LayoutName" type="apData:string50" maxOccurs="1" minOccurs="1"/>
+					<xsd:element name="Description" type="apData:string255" maxOccurs="1" minOccurs="0"/>
+					<xsd:element name="ListOfPageLayoutField" type="apData:ListOfPageLayoutFieldData" maxOccurs="1" minOccurs="1"/>
+				</xsd:all>
+			</xsd:complexType>
+			<xsd:complexType name="ListOfPageLayoutFieldData">
+				<xsd:sequence>
+					<xsd:element name="PageLayoutField" type="apData:PageLayoutFieldData" maxOccurs="unbounded" minOccurs="0"/>
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="PageLayoutFieldData">
+				<xsd:sequence>
+					<xsd:element name="FieldName" type="xsd:string" maxOccurs="1" minOccurs="1"/>
+					<xsd:element name="ReadOnly" type="xsd:boolean" maxOccurs="1" minOccurs="1"/>
+					<xsd:element name="Required" type="xsd:boolean" maxOccurs="1" minOccurs="1"/>
+					<xsd:element name="Section" type="xsd:integer" maxOccurs="1" minOccurs="1"/>
+					<xsd:element name="Column" type="xsd:integer" maxOccurs="1" minOccurs="1"/>
+					<xsd:element name="Row" type="xsd:integer" maxOccurs="1" minOccurs="1"/>
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:simpleType name="string255">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="255"/>
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string50">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="50"/>
+				</xsd:restriction>
+			</xsd:simpleType>
+		</xsd:schema>
+	</types>
+	<message name="PageLayoutFieldReadAll_Input">
+		<part name="PageLayoutFieldReadAll_Input" element="tns:PageLayoutFieldReadAll_Input"/>
+	</message>
+	<message name="PageLayoutFieldReadAll_Output">
+		<part name="PageLayoutFieldReadAll_Output" element="tns:PageLayoutFieldReadAll_Output"/>
+	</message>
+	<message name="PageLayoutFieldRead_Input">
+		<part name="PageLayoutFieldRead_Input" element="tns:PageLayoutFieldRead_Input"/>
+	</message>
+	<message name="PageLayoutFieldRead_Output">
+		<part name="PageLayoutFieldRead_Output" element="tns:PageLayoutFieldRead_Output"/>
+	</message>
+	<message name="PageLayoutFieldUpsert_Input">
+		<part name="PageLayoutFieldUpsert_Input" element="tns:PageLayoutFieldUpsert_Input"/>
+	</message>
+	<message name="PageLayoutFieldUpsert_Output">
+		<part name="PageLayoutFieldUpsert_Output" element="tns:PageLayoutFieldUpsert_Output"/>
+	</message>
+	<portType name="PageLayoutFieldService">
+		<operation name="PageLayoutFieldReadAll">
+			<input message="tns:PageLayoutFieldReadAll_Input"/>
+			<output message="tns:PageLayoutFieldReadAll_Output"/>
+		</operation>
+		<operation name="PageLayoutFieldRead">
+			<input message="tns:PageLayoutFieldRead_Input"/>
+			<output message="tns:PageLayoutFieldRead_Output"/>
+		</operation>
+		<operation name="PageLayoutFieldUpsert">
+			<input message="tns:PageLayoutFieldUpsert_Input"/>
+			<output message="tns:PageLayoutFieldUpsert_Output"/>
+		</operation>
+	</portType>
+	<binding name="PageLayoutFieldService" type="tns:PageLayoutFieldService">
+		<soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+		<operation name="PageLayoutFieldReadAll">
+			<soap:operation soapAction="document/urn:crmondemand/ws/odesabs/PageLayoutField/:PageLayoutFieldReadAll"/>
+			<input>
+				<soap:body use="literal"/>
+			</input>
+			<output>
+				<soap:body use="literal"/>
+			</output>
+		</operation>
+		<operation name="PageLayoutFieldRead">
+			<soap:operation soapAction="document/urn:crmondemand/ws/odesabs/PageLayoutField/:PageLayoutFieldRead"/>
+			<input>
+				<soap:body use="literal"/>
+			</input>
+			<output>
+				<soap:body use="literal"/>
+			</output>
+		</operation>
+		<operation name="PageLayoutFieldUpsert">
+			<soap:operation soapAction="document/urn:crmondemand/ws/odesabs/PageLayoutField/:PageLayoutFieldUpsert"/>
+			<input>
+				<soap:body use="literal"/>
+			</input>
+			<output>
+				<soap:body use="literal"/>
+			</output>
+		</operation>
+	</binding>
+	<service name="PageLayoutFieldService">
+		<port name="PageLayoutFieldService" binding="tns:PageLayoutFieldService">
+			<soap:address location="https://secure-ausomxdsa.crmondemand.com/Services/cte/PageLayoutFieldService"/>
+		</port>
+	</service>
+</definitions>

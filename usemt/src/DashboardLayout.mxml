@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*" 
+	layout="absolute" width="860" height="540"
+	resizable="false"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	creationComplete="init()"
+	>
+	
+	<mx:Script>
+        <![CDATA[
+			import gadget.control.DashboardFieldItemRenderer;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.DashboardUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Canvas;
+			import mx.controls.Alert;
+			import mx.controls.List;
+			import mx.controls.TileList;
+			import mx.controls.listClasses.IListItemRenderer;
+			import mx.core.DragSource;
+			import mx.events.DragEvent;
+			import mx.managers.DragManager;
+			
+			private const CUSTOMLAYOUT_TITLE_LAYOUT_MANAGER:String = 'CUSTOMLAYOUT_TITLE_LAYOUT_MANAGER';
+			private const CUSTOMLAYOUT_TEXT_PAGE:String = 'GLOBAL_PAGE';
+			private const CUSTOMLAYOUT_ALERT_MSG_TITLE_INVALID_LAYOUT:String = 'CUSTOMLAYOUT_ALERT_MSG_TITLE_INVALID_LAYOUT';	
+			private const CUSTOMLAYOUT_ALERT_MSG_TEXT_THERE_MUST_BE:String = 'CUSTOMLAYOUT_ALERT_MSG_TEXT_THERE_MUST_BE';
+			private const CUSTOMLAYOUT_HEADER_LABEL_SECTION_HEADER:String = 'CUSTOMLAYOUT_HEADER_LABEL_SECTION_HEADER';
+			private const CUSTOMLAYOUT_DETAILBUTTONBAR_BUTTON_LABEL_SAVE:String = 'GLOBAL_SAVE';
+			
+			public static const DATAGRID_CODE:String = 'DATAGRID';
+			public static const PIE_CHART_CODE:String = 'PIECHART';
+			public static const BAR_CHART_CODE:String = 'BARCHART';
+			public static const COLUMN_CHART_CODE:String = 'COLUMNCHART';
+			public static const OPPORTUNITY_BY_ACCOUNT:String = 'OPPORTUNITY_BY_ACCOUNT';
+			public static const EMPLOYEES_AND_MANAGERS_LIST:String = 'EMPLOYEES_AND_MANAGERS_LIST';
+			public static const CONTACT_MAILING_LIST:String = 'CONTACT_MAILING_LIST';
+			public static const ACCOUNTS_BY_SALES_REP:String = 'ACCOUNTS_BY_SALES_REP';
+			public static const ACTIVITIES_BY_OPPORTUNITY:String = 'ACTIVITIES_BY_OPPORTUNITY';
+			public static const OPPORTUNITY_BY_SALES_STAGE:String = 'OPPORTUNITY_BY_SALES_STAGE';
+			//change request #1601 CRO
+			public static const NEXT_BIRSTDAY:String = 'NEXT_BIRSTDAY';
+			public static const NEW_CONTACTS:String = 'NEW_CONTACTS';
+			public static const NEW_OPPORTUNITIES:String = 'NEW_OPPORTUNITIES';
+			public static const NEW_MODIFIED_CUSTOMERS:String = 'NEW_MODIFIED_CUSTOMERS';
+			public static const NEW_CUSTOMERS:String = 'NEW_CUSTOMERS';
+			public static const DEFAULT_DASHBOARD_REPORT:Array = [OPPORTUNITY_BY_ACCOUNT, EMPLOYEES_AND_MANAGERS_LIST, CONTACT_MAILING_LIST, ACCOUNTS_BY_SALES_REP, ACTIVITIES_BY_OPPORTUNITY, OPPORTUNITY_BY_SALES_STAGE,NEXT_BIRSTDAY,NEW_CONTACTS,NEW_OPPORTUNITIES,NEW_MODIFIED_CUSTOMERS,NEW_CUSTOMERS];
+			
+			
+			[Bindable] private var leftPanelList:Array = new Array();
+			[Bindable] private var rightPanelList:Array = new Array();
+			[Bindable] public var item:Object;
+			[Bindable] public var entity:String;
+			[Bindable] public var dashboardChart:Dashboard;
+			
+			private var numOfPage:int = 4;
+
+			private function init():void {				
+				
+				// create page layout.
+				for(var p:int=0;p<numOfPage;p++){
+					leftPanelList[p] = new ArrayCollection();
+					rightPanelList[p] = new ArrayCollection();
+					var hbox:HBox = new HBox();
+					hbox.percentWidth=100;
+					hbox.percentHeight=100;
+					var dropTargetLeft:List = new List();
+					var dropTargetRight:List = new List();
+					setListStyleSheet(dropTargetLeft,leftPanelList[p]);
+					setListStyleSheet(dropTargetRight,rightPanelList[p]);
+					
+					hbox.addChild(dropTargetLeft);
+					hbox.addChild(dropTargetRight);
+					mainPage.addChild(hbox);
+				}
+				
+				var fields:ArrayCollection = Database.dashboardLayoutDAO.selectLayout();
+				var listOldHeaderField:ArrayCollection = new ArrayCollection();
+				//Utils.suppressWarning(fields);
+				for (var i:int = 0; i < fields.length; i++) {
+					var idx:int = fields[i].col==1?0:fields[i].col/2;
+					fields[i].dashboardFilter = DashboardUtils.getDashboardFilter(fields[i]);
+					if(fields[i].col%2==0){
+						leftPanelList[idx].addItem(fields[i]);
+					}else{
+						rightPanelList[idx].addItem(fields[i]);
+					}
+					if (fields[i].column_name.charAt(0) == '#') {
+						listOldHeaderField.addItem(fields[i]);
+					}
+					
+				}
+				
+				this.title = "Dashboard Layout";
+				titlebar.title = this.title;				
+				updateOldHeaderField(listOldHeaderField);
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}			
+			
+			
+			private function updateOldHeaderField(listHeader:ArrayCollection):void {
+				// fixed error duplicate header field column_name
+				for each(var header:Object in listHeader){
+					header.column_name = "{" + '#' + countFields('#') + "}"; 
+				}
+			}
+			
+			private function setListStyleSheet(list:List,_dataProvider:ArrayCollection):void {
+				list.setStyle("borderStyle","solid");
+				list.setStyle("borderThickness","2");
+				list.setStyle("rowHeight","30");
+				list.percentWidth=50;
+				list.percentHeight=100;
+				list.addEventListener(DragEvent.DRAG_ENTER,function(event:DragEvent):void {dragEnter(event);});
+				list.addEventListener(MouseEvent.MOUSE_MOVE,function(event:MouseEvent):void {dragField(event);});
+				list.addEventListener(DragEvent.DRAG_DROP,function(event:DragEvent):void {dragDrop(event);});
+				list.itemRenderer = new ClassFactory(DashboardFieldItemRenderer);
+				list.dataProvider = _dataProvider;
+			}			
+			
+			private function removeField(srcList:List, obj:Object):void {
+				var srcData:ArrayCollection = (srcList.dataProvider as ArrayCollection);
+				srcData.removeItemAt(srcData.getItemIndex(obj));	
+			}
+			
+			private function updateProperty(list:List, target:Object, obj:Object):void {
+				(list.dataProvider as ArrayCollection).refresh();
+			}
+			
+            // drag a field onto left or right panel.
+            private function dragEnter(event:DragEvent):void {
+                var dropTarget:List = event.currentTarget as List;
+                if (event.dragSource.hasFormat("item")) {
+                    // Accept the drop.
+                    DragManager.acceptDragDrop(dropTarget);
+                }
+            }
+            
+            private function findIndex(list:ArrayCollection, field:Object):int {
+            	for (var i:int = 0; i < list.length; i++) {
+            		if (list[i].column_name == field.column_name) {
+						return i;
+            		}
+            	}
+            	return -1;
+            }
+
+            // drop a field onto left or right panel
+            private function dragDrop(event:DragEvent):void {
+				var list:List = event.currentTarget as List;
+				var obj:Object = event.dragSource.dataForFormat("item");
+				var targetData:ArrayCollection = list.dataProvider as ArrayCollection;
+				for(var p:int=0;p<mainPage.length;p++){
+					var leftPanel:ArrayCollection = leftPanelList[p];
+					var rightPanel:ArrayCollection = rightPanelList[p];
+					if (findIndex(leftPanel, obj) != -1) {
+						leftPanel.removeItemAt(findIndex(leftPanel, obj));
+					}
+					if (findIndex(rightPanel, obj) != -1) {
+						rightPanel.removeItemAt(findIndex(rightPanel, obj));
+					}
+				}				
+        		var index:int = list.calculateDropIndex(event);
+        		if (index > targetData.length) {
+        			index = targetData.length;
+        		}
+        		targetData.addItemAt(obj, index);
+            }
+
+			// drag a field inside left or right panel
+            private function dragField(event:MouseEvent):void {
+                var list:List = event.currentTarget as List;
+                if (list.selectedIndex != -1) {
+                	var dragSource:DragSource = new DragSource();
+	                dragSource.addData(list.dataProvider[list.selectedIndex], 'item');
+	                var dragInitiator:IListItemRenderer = list.indexToItemRenderer(list.selectedIndex);
+	                DragManager.doDrag(dragInitiator, dragSource, event);
+
+                }
+             }
+            
+			// drag back a field to dictionnary
+			private function dragBackEnter(event:DragEvent):void {
+				var dropTarget:TileList = event.currentTarget as TileList;
+				if (event.dragSource.hasFormat("item") && event.dragInitiator.owner != dictionnary) {
+					var obj:Object = event.dragSource.dataForFormat("item");
+					DragManager.acceptDragDrop(dropTarget);
+				}
+			}
+
+			// drop back a field to dictionnary
+			private function dragBackDrop(event:DragEvent):void {
+				var obj:Object = event.dragSource.dataForFormat("item");
+				if(obj != null) Database.dashboardFilterDAO.delete_({column_name: obj.column_name});
+				var srcList:List = event.dragInitiator.owner as List;
+				var srcData:ArrayCollection = (srcList.dataProvider as ArrayCollection);
+				srcData.removeItemAt(srcData.getItemIndex(obj));
+			}
+            
+            private function save():Boolean {
+
+				if (leftPanelList[0].length == 0 && rightPanelList[0].length == 0) {
+					Alert.show(i18n._(CUSTOMLAYOUT_ALERT_MSG_TEXT_THERE_MUST_BE),i18n._(CUSTOMLAYOUT_ALERT_MSG_TITLE_INVALID_LAYOUT), Alert.OK, this);
+					return false;
+				}
+				
+				Database.begin();
+				Database.dashboardLayoutDAO.delete_all();
+				Database.dashboardFilterDAO.delete_all();
+				for (var p:int = 0; p < mainPage.getChildren().length; p++) {
+					var leftPanel:ArrayCollection = leftPanelList[p];
+					var rightPanel:ArrayCollection = rightPanelList[p];
+					for (var j:int = 0; j <2; j++) {
+						for (var i:int = 0; i < (j== 0 ? leftPanel.length : rightPanel.length); i++) {
+							var layout:Object = new Object();
+							layout.col = j+2*p;
+							layout.row = i;
+							layout.column_name = (j==0 ? leftPanel[i].column_name : rightPanel[i].column_name);
+							layout.custom = (j==0 ? leftPanel[i].custom : rightPanel[i].custom);
+							// Dashboard Filter
+							var dashboardFilter:ArrayCollection = (j==0 ? leftPanel[i].dashboardFilter : rightPanel[i].dashboardFilter);
+							for each(var objFilter:Object in dashboardFilter) {
+								Database.dashboardFilterDAO.replace(objFilter);
+							}
+							// Dashboard Layout
+							Database.dashboardLayoutDAO.insert(layout);
+						}
+					}
+					
+				}
+				Database.commit();
+				dashboardChart.reload();
+				close();
+				return true;
+            }
+			
+			private function previousPageClick():void{
+				var pageIndex:int = mainPage.selectedIndex;
+				if(pageIndex>0) selectPage(--pageIndex);
+			}
+			
+			private function nextPageClick():void{			
+				var pageIndex:int = mainPage.selectedIndex;
+				if(pageIndex<numOfPage-1) selectPage(++pageIndex);
+			}
+			
+			private function selectPage(idx:int):void{
+				labelPage.text = i18n._(CUSTOMLAYOUT_TEXT_PAGE) + " " + (idx+1);
+				mainPage.selectedIndex = idx;
+			}
+			
+			private function getFields():ArrayCollection {
+				var fields:ArrayCollection = new ArrayCollection();
+				// list
+				var list:Object = new Object();
+				list.label = 'Datagrid';
+				list.custom = 'Datagrid';
+				list.column_name = '{' + DATAGRID_CODE + '}';
+				fields.addItem(list);
+				
+				// pie chart
+				var pieChart:Object = new Object();
+				pieChart.label = 'Pie chart';
+				pieChart.custom = 'Pie chart';
+				pieChart.column_name = '{' + PIE_CHART_CODE + '}';
+				fields.addItem(pieChart);
+				
+				// bar chart
+				var barChart:Object = new Object();
+				barChart.label = 'Column chart';
+				barChart.custom = 'Column chart';
+				barChart.column_name = '{' + COLUMN_CHART_CODE + '}';
+				fields.addItem(barChart);
+				
+				// header
+				var header:Object = new Object();
+				header.label = i18n._(CUSTOMLAYOUT_HEADER_LABEL_SECTION_HEADER);
+				header.custom = 'header';
+				header.column_name = '#';
+				fields.addItem(header);
+				
+				// default dashboard layout
+				for each(var column_name:String in DEFAULT_DASHBOARD_REPORT) {
+					var object:Object = new Object();
+					var label:String = column_name.split("_").join(" ");
+					object.tooltip = label;
+					object.label = StringUtils.reduceTextLength(label, 15);
+					object.custom = column_name;
+					object.column_name = column_name;
+					fields.addItem(object);
+				}
+				
+				return fields;
+			}
+			
+			private function countFields(code:String):int {
+				code = "{"+code;	//VAHI count bugfix
+				var num:int = 0;
+				for (var p:int = 0; p < mainPage.length; p++) {
+					for (var j:int = 0; j < 2; j++) {
+						var panel:ArrayCollection = (j == 0 ? leftPanelList[p] : rightPanelList[[p]]);
+						for (var i:int = 0; i < panel.length; i++) {
+							if (panel[i].column_name.indexOf(code) > -1) {
+								var tmp:int = parseInt(panel[i].column_name.substring(code.length));
+								if (tmp >= num) {
+									num = tmp + 1;
+								}
+							}
+						} 
+					}
+				}
+				return num;
+			}
+			
+			// drag a field from dictionnary
+			private function dragDictionnaryField(event:MouseEvent):void {
+				var tileList:TileList = event.currentTarget as TileList;
+				if (tileList.selectedIndex != -1 && event.stageX < 820) {
+					var dragSource:DragSource = new DragSource();
+					var dropObject:Object = new Object();
+					dropObject.column_name = tileList.dataProvider[tileList.selectedIndex].column_name;
+					if (dropObject.column_name.indexOf('#') > -1) {
+						dropObject.column_name = "{" + '#' + countFields('#') + "}"; // '#' + headerCount();
+					}
+					if (dropObject.column_name.indexOf(DATAGRID_CODE) > -1){
+						dropObject.column_name = "{" + DATAGRID_CODE + countFields(DATAGRID_CODE) + "}";
+					}
+					if (dropObject.column_name.indexOf(PIE_CHART_CODE) > -1){
+						dropObject.column_name = "{" + PIE_CHART_CODE + countFields(PIE_CHART_CODE) + "}";
+					}
+					if (dropObject.column_name.indexOf(COLUMN_CHART_CODE) > -1){
+						dropObject.column_name = "{" + COLUMN_CHART_CODE + countFields(COLUMN_CHART_CODE) + "}";
+					}
+					if (dropObject.column_name.indexOf(OPPORTUNITY_BY_ACCOUNT) > -1) {
+						dropObject.column_name = "{" + OPPORTUNITY_BY_ACCOUNT + countFields(OPPORTUNITY_BY_ACCOUNT) + "}";
+					}
+					if (dropObject.column_name.indexOf(EMPLOYEES_AND_MANAGERS_LIST) > -1) {
+						dropObject.column_name = "{" + EMPLOYEES_AND_MANAGERS_LIST + countFields(EMPLOYEES_AND_MANAGERS_LIST) + "}";
+					}
+					if (dropObject.column_name.indexOf(CONTACT_MAILING_LIST) > -1) {
+						dropObject.column_name = "{" + CONTACT_MAILING_LIST + countFields(CONTACT_MAILING_LIST) + "}";
+					}
+					if (dropObject.column_name.indexOf(ACCOUNTS_BY_SALES_REP) > -1) {
+						dropObject.column_name = "{" + ACCOUNTS_BY_SALES_REP + countFields(ACCOUNTS_BY_SALES_REP) + "}";
+					}
+					if (dropObject.column_name.indexOf(ACTIVITIES_BY_OPPORTUNITY) > -1) {
+						dropObject.column_name = "{" + ACTIVITIES_BY_OPPORTUNITY + countFields(ACTIVITIES_BY_OPPORTUNITY) + "}";
+						dropObject.defaultLayout = ACTIVITIES_BY_OPPORTUNITY;
+					}
+					if (dropObject.column_name.indexOf(OPPORTUNITY_BY_SALES_STAGE) > -1) {
+						dropObject.column_name = "{" + OPPORTUNITY_BY_SALES_STAGE + countFields(OPPORTUNITY_BY_SALES_STAGE) + "}";
+					}
+					if (dropObject.column_name.indexOf(NEXT_BIRSTDAY) > -1) {
+						dropObject.column_name = "{" + NEXT_BIRSTDAY + countFields(NEXT_BIRSTDAY) + "}";
+					}
+					if (dropObject.column_name.indexOf(NEW_CONTACTS) > -1) {
+						dropObject.column_name = "{" + NEW_CONTACTS + countFields(NEW_CONTACTS) + "}";
+					}
+					if (dropObject.column_name.indexOf(NEW_OPPORTUNITIES) > -1) {
+						dropObject.column_name = "{" + NEW_OPPORTUNITIES + countFields(NEW_OPPORTUNITIES) + "}";
+					}
+					if (dropObject.column_name.indexOf(NEW_CUSTOMERS) > -1) {
+						dropObject.column_name = "{" + NEW_CUSTOMERS + countFields(NEW_CUSTOMERS) + "}";
+					}
+					if (dropObject.column_name.indexOf(NEW_MODIFIED_CUSTOMERS) > -1) {
+						dropObject.column_name = "{" + NEW_MODIFIED_CUSTOMERS + countFields(NEW_MODIFIED_CUSTOMERS) + "}";
+					}
+					
+					dropObject.custom = DEFAULT_DASHBOARD_REPORT.indexOf(tileList.dataProvider[tileList.selectedIndex].column_name)>-1?dropObject.column_name:tileList.dataProvider[tileList.selectedIndex].custom;
+					//dropObject.entity = entity;                 	
+					dragSource.addData(dropObject, 'item');
+					var dragInitiator:IListItemRenderer = tileList.indexToItemRenderer(tileList.selectedIndex);
+					DragManager.doDrag(dragInitiator, dragSource, event);
+				}
+			}
+        ]]>
+	</mx:Script>	
+	
+	<mx:Canvas styleName="main" left="0" top="0" width="860" height="540" right="0" bottom="0">
+		<control:TitleBar id="titlebar" icon="@Embed(source='/assets/customize.png')"/>
+		<mx:VBox left="16" right="16" top="32" bottom="16">
+			<mx:HBox width="100%" horizontalAlign="right">
+				<mx:LinkButton id="btnPreviousClick" icon="{ImageUtils.previousDayIcon}" click="previousPageClick()"/>
+				<mx:Label id="labelPage" text="{i18n._(CUSTOMLAYOUT_TEXT_PAGE)} 1" fontSize="12" fontWeight="bold" textAlign="center"/>
+				<mx:LinkButton id="btnNextClick" icon="{ImageUtils.nextDayIcon}" click="nextPageClick()"/>
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:TileList borderStyle="solid" id="dictionnary"
+							 mouseMove="dragDictionnaryField(event)" 
+							 dragEnter="dragBackEnter(event)" 
+							 dragDrop="dragBackDrop(event)" 
+							 width="100%" 
+							 height="66"
+							 direction="horizontal" dataProvider="{getFields()}"
+							 columnWidth="160" rowHeight="32"
+							 verticalScrollPolicy="auto">
+					<mx:itemRenderer>
+						<mx:Component>
+							<mx:Canvas>
+								<mx:Script>
+									<![CDATA[
+										private function getBackgroundColor(data:Object):uint {
+											if(data.column_name == '#') return 0xCCCCFF;
+											if(data.column_name == '{' + DashboardLayout.DATAGRID_CODE + '}') return 0xE7F98D;
+											if(data.column_name == '{' + DashboardLayout.PIE_CHART_CODE + '}') return 0x70B0F9;
+											if(data.column_name == '{' + DashboardLayout.COLUMN_CHART_CODE + '}') return 0xCCB3DC;
+											return 0xCCFFCC;
+										}
+									]]>
+								</mx:Script>
+								<mx:Canvas horizontalScrollPolicy="off" backgroundColor="{getBackgroundColor(data)}" borderStyle="outset" left="2" right="2" top="2" bottom="2"> 
+									<mx:Label text="{data.label}" toolTip="{data.tooltip?data.tooltip:''}"/>	
+								</mx:Canvas>
+							</mx:Canvas>
+						</mx:Component>
+					</mx:itemRenderer>
+				</mx:TileList>			
+			</mx:HBox>
+			<mx:ViewStack id="mainPage" width="824" height="100%">	
+			</mx:ViewStack>
+			<mx:HBox width="100%">		
+				<control:DetailButtonBar buttonLabel="GLOBAL_SAVE" action="save"/>
+			</mx:HBox>			
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="390" height="220"
+	title="{i18n._(entity)}" 
+	showFlexChrome="false" transparent="true" systemChrome="none" creationComplete="init()">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.control.ImageTextInput;
+			import gadget.dao.BaseDAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.SupportRegistry;
+			import gadget.i18n.i18n;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.validators.Validator;
+
+			[Bindable] public var selectedItem:Object;
+//			[Bindable] private var allItems:ArrayCollection;
+//			[Binable] public var listField:ArrayCollection;
+			public var action:Function;
+			public var item:Object;
+			[Bindable] public var entity:String; 
+			public var filter:String;
+			private var selectedUser:Object;
+			
+			private function init():void {
+				userInput.clickFunc=finderClick;
+				userInput.enabled=true;
+				loadPickList(buyingRole,'BuyingRole',false);
+			
+				
+			}
+			
+			private function finderClick(event:MouseEvent):void {
+				
+				var entityFinder:EntityFinder = new EntityFinder();
+				entityFinder.entity = "Contact";
+				
+				entityFinder.action = function(other:Object):void {				
+					selectedUser=other;
+					userInput.item = {'element_name':item.relation.labelDest[0], 'data':item};
+					userInput.data = item.relation ;
+					userInput.text=other[item.relation.labelDest[0]];
+					
+					
+				};
+				WindowManager.openModal(entityFinder);
+				
+				
+			}
+			
+			private function okAction():void{
+				var validatorErrorArray:Array =Validator.validateAll([userV,accessPfVal]);
+				var errorMessageArray:Array = [];
+				if (validatorErrorArray.length != 0) {				
+					for each (var err:Object in validatorErrorArray) {
+						var errField:String = ''; 
+						if (err.currentTarget) {
+							var parent:Object=err.currentTarget.source.parent;
+							
+							errField = FormItem(parent).label + " : ";
+						}
+						errorMessageArray.push(errField + err.message);
+					}
+					
+					
+				}
+				
+				if(errorMessageArray.length>0){
+					Alert.show(errorMessageArray.join("\n"), "Invalid form...", Alert.OK, this);
+					return;
+				}
+				
+				var objContactRole:Object = new Object();
+				if(item.item != null){
+					objContactRole.OpportunityId = item.item.OpportunityId;
+					objContactRole.BuyingRole = buyingRole.selectedItem.data;
+					objContactRole.ContactId = selectedUser.ContactId;
+					objContactRole.ContactFirstName = selectedUser.ContactFirstName;
+					objContactRole.ContactLastName = selectedUser.ContactLastName;
+				}
+				
+				action(objContactRole);
+				close();
+				
+			}
+
+			private var list:ArrayCollection =  new ArrayCollection([
+				{data:"",label:""},{data:"User",label:"User"},{data:"Evaluator",label:"Evaluator"},{data:"Approver",label:"Approver"},
+				{data:"Decision Maker",label:"Decision Maker"},{data:"User and Evaluator",label:"User and Evaluator"},{data:"User and Approver",label:"User and Approver"},
+				{data:"User and Decision Maker",label:"User and Decision Maker"},{data:"Evaluator and Approver",label:"Evaluator and Approver"},
+				{data:"Evaluator and Decision Maker",label:"Evaluator and Decision Maker"},{data:"Unknown",label:"Unknown"},{data:"Attending",label:"Attending"},{data:"Department Head",label:"Department Head"},
+				{data:"Director",label:"Director"},{data:"Purchase Officer",label:"Purchase Officer"},{data:"Works at",label:"Works at"},{data:"Pharmacist",label:"Pharmacist"},
+				{data:"Principal Investigator",label:"Principal Investigator"},{data:"Site Coordinator",label:"Site Coordinator"},{data:"Sub-Investigator",label:"Sub-Investigator"},{data:"Primary",label:"Primary"},
+				{data:"Lab Technician",label:"Lab Technician"},{data:"Is affiliated with",label:"Is affiliated with"},{data:"N/A",label:"N/A"},{data:"Co-Applicant",label:"Co-Applicant"},
+				{data:"Co-Signer",label:"Co-Signer"},{data:"Authorized User",label:"Authorized User"},{data:"Tender Responsible",label:"Tender Responsible"}
+			]);
+			private function loadPickList(pick:ComboBox,field:String,isTeamRole:Boolean=true):void{
+				pick.dataProvider = list;
+				pick.selectedIndex = 0;
+			}
+
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/search.png')" title="{i18n._(item.related)}"/>
+		<mx:VBox top="32" left="16" right="16" verticalGap="3">
+			<!--<mx:Label id="info" left="0"/>-->
+			<mx:Form width="100%">
+				<mx:FormItem label="Contact" required="true">
+					<control:ImageTextInput  width="200" id="userInput"  />
+				</mx:FormItem>
+				<mx:FormItem required="true" label="Buying Role"  >					
+					<mx:ComboBox id="buyingRole" width="160" selectedIndex="0" rowCount="3" />
+				</mx:FormItem>				
+			</mx:Form>
+			<mx:HBox width="100%" horizontalAlign="right" right="8">
+				<mx:Button id="okBtn" label="Ok" click="okAction()" />
+				<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="this.close()"/>				
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+	<mx:StringValidator id="userV" source="{userInput}"
+						property="text"							
+						/>
+	<mx:NumberValidator id="accessPfVal" source="{buyingRole}" minValue="1" 
+						property="selectedIndex" lowerThanMinError="This Field is required."/>
+</mx:Window>

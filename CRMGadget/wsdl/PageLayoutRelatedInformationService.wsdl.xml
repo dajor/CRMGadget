@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions targetNamespace="urn:crmondemand/ws/odesabs/pagelayout/pagelayoutrelatedinformation/" xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:tns="urn:crmondemand/ws/odesabs/pagelayout/pagelayoutrelatedinformation/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:apData="urn:/crmondemand/xml/pagelayout/pagelayoutrelatedinformation/data" xmlns:apQuery="urn:/crmondemand/xml/pagelayout/pagelayoutrelatedinformation/query">
+    <types>
+        <xsd:schema elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="urn:crmondemand/ws/odesabs/pagelayout/pagelayoutrelatedinformation/" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+            <xsd:import namespace="urn:/crmondemand/xml/pagelayout/pagelayoutrelatedinformation/query"/>
+            <xsd:import namespace="urn:/crmondemand/xml/pagelayout/pagelayoutrelatedinformation/data"/>
+            <xsd:element name="PageLayoutRelatedInformationReadAll_Input">
+                <xsd:complexType/>
+            </xsd:element>
+            <xsd:element name="PageLayoutRelatedInformationReadAll_Output">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element ref="apData:ListOfPageLayoutRelatedInformation"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="PageLayoutRelatedInformationUpsert_Input">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element ref="apData:PageLayoutRelatedInformation"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="PageLayoutRelatedInformationUpsert_Output">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="Status" type="xsd:string"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:schema>
+        <xsd:schema elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="urn:/crmondemand/xml/pagelayout/pagelayoutrelatedinformation/query" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:apQuery="urn:/crmondemand/xml/pagelayout/pagelayoutrelatedinformation/query">
+            <xsd:element name="PageLayoutRelatedInformation" type="apQuery:PageLayoutRelatedInformationQuery"/>
+            <xsd:complexType name="PageLayoutRelatedInformationQuery">
+                <xsd:sequence>
+                    <xsd:element name="ObjectName" type="apData:string50" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="LayoutName" type="apData:string50" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="ListOfPageRelatedInformation" type="apQuery:ListOfPageRelatedInformationQuery" maxOccurs="1" minOccurs="0"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="ListOfPageRelatedInformationQuery">
+                <xsd:sequence>
+                    <xsd:element name="PageRelatedInformation" type="apQuery:PageRelatedInformationQuery" maxOccurs="unbounded" minOccurs="0"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="PageRelatedInformationQuery">
+                <xsd:sequence>
+                    <xsd:element name="Name" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="Availability" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+                    <xsd:element name="RelatedInformationLayout" type="apQuery:Empty" maxOccurs="1" minOccurs="0"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="Empty"/>
+        </xsd:schema>
+        <xsd:schema elementFormDefault="qualified" attributeFormDefault="unqualified" targetNamespace="urn:/crmondemand/xml/pagelayout/pagelayoutrelatedinformation/data" xmlns:apData="urn:/crmondemand/xml/pagelayout/pagelayoutrelatedinformation/data" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+            <xsd:element name="ListOfPageLayoutRelatedInformation" type="apData:ListOfPageLayoutRelatedInformationData"/>
+            <xsd:complexType name="ListOfPageLayoutRelatedInformationData">
+                <xsd:sequence>
+                    <xsd:element ref="apData:PageLayoutRelatedInformation" maxOccurs="unbounded" minOccurs="0"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:element name="PageLayoutRelatedInformation" type="apData:PageLayoutRelatedInformationData"/>
+            <xsd:complexType name="PageLayoutRelatedInformationData">
+                <xsd:sequence>
+                    <xsd:element name="ObjectName" type="apData:string50" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="LayoutName" type="apData:string50" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="ListOfPageRelatedInformation" type="apData:ListOfPageRelatedInformationData" maxOccurs="1" minOccurs="0"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="ListOfPageRelatedInformationData">
+                <xsd:sequence>
+                    <xsd:element name="PageRelatedInformation" type="apData:PageRelatedInformationData" maxOccurs="unbounded" minOccurs="0"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:complexType name="PageRelatedInformationData">
+                <xsd:sequence>
+                    <xsd:element name="Name" type="xsd:string" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="Availability" type="apData:integer1" maxOccurs="1" minOccurs="1"/>
+                    <xsd:element name="RelatedInformationLayout" type="xsd:string" maxOccurs="1" minOccurs="0"/>
+                </xsd:sequence>
+            </xsd:complexType>
+            <xsd:simpleType name="integer1">
+                <xsd:restriction base="xsd:integer">
+                    <xsd:minInclusive value="-1"/>
+                    <xsd:maxInclusive value="1"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="string50">
+                <xsd:restriction base="xsd:string">
+                    <xsd:maxLength value="50"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+            <xsd:simpleType name="string75">
+                <xsd:restriction base="xsd:string">
+                    <xsd:maxLength value="75"/>
+                </xsd:restriction>
+            </xsd:simpleType>
+        </xsd:schema>
+    </types>
+    <message name="PageLayoutRelatedInformationReadAll_Input">
+        <part name="PageLayoutRelatedInformationReadAll_Input" element="tns:PageLayoutRelatedInformationReadAll_Input"/>
+    </message>
+    <message name="PageLayoutRelatedInformationReadAll_Output">
+        <part name="PageLayoutRelatedInformationReadAll_Output" element="tns:PageLayoutRelatedInformationReadAll_Output"/>
+    </message>
+    <message name="PageLayoutRelatedInformationUpsert_Input">
+        <part name="PageLayoutRelatedInformationUpsert_Input" element="tns:PageLayoutRelatedInformationUpsert_Input"/>
+    </message>
+    <message name="PageLayoutRelatedInformationUpsert_Output">
+        <part name="PageLayoutRelatedInformationUpsert_Output" element="tns:PageLayoutRelatedInformationUpsert_Output"/>
+    </message>
+    <portType name="PageLayoutRelatedInformationService">
+        <operation name="PageLayoutRelatedInformationReadAll">
+            <input message="tns:PageLayoutRelatedInformationReadAll_Input"/>
+            <output message="tns:PageLayoutRelatedInformationReadAll_Output"/>
+        </operation>
+        <operation name="PageLayoutRelatedInformationUpsert">
+            <input message="tns:PageLayoutRelatedInformationUpsert_Input"/>
+            <output message="tns:PageLayoutRelatedInformationUpsert_Output"/>
+        </operation>
+    </portType>
+    <binding name="PageLayoutRelatedInformationService" type="tns:PageLayoutRelatedInformationService">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <operation name="PageLayoutRelatedInformationReadAll">
+            <soap:operation soapAction="document/urn:crmondemand/ws/odesabs/pagelayout/pagelayoutrelatedinformation:PageLayoutRelatedInformationReadAll"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+        <operation name="PageLayoutRelatedInformationUpsert">
+            <soap:operation soapAction="document/urn:crmondemand/ws/odesabs/pagelayout/pagelayoutrelatedinformation:PageLayoutRelatedInformationUpsert"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+    </binding>
+    <service name="PageLayoutRelatedInformationService">
+        <port name="PageLayoutRelatedInformationService" binding="tns:PageLayoutRelatedInformationService">
+            <soap:address location="https://secure-ausomxdsa.crmondemand.com/Services/cte/PageLayoutRelatedInformationService"/>
+        </port>
+    </service>
+</definitions>

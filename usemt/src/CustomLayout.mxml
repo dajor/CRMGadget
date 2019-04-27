@@ -1,0 +1,739 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*" 
+	layout="absolute" width="860" height="540"
+	resizable="false"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	creationComplete="init()"
+	close="if(detail) detail.reload()">
+	
+	<mx:Script>
+        <![CDATA[
+			import gadget.control.CalculatedField;
+			import gadget.control.FieldItemRenderer;
+			import gadget.dao.BookDAO;
+			import gadget.dao.CustomFieldDAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.LocaleService;
+			import gadget.util.FieldUtils;
+			import gadget.util.GetLayoutUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.LayoutUtils;
+			import gadget.util.MenuUtils;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Canvas;
+			import mx.controls.Alert;
+			import mx.controls.LinkButton;
+			import mx.controls.List;
+			import mx.controls.TileList;
+			import mx.controls.listClasses.IListItemRenderer;
+			import mx.controls.listClasses.ListBase;
+			import mx.core.DragSource;
+			import mx.events.DragEvent;
+			import mx.managers.DragManager;
+			
+			private const CUSTOMLAYOUT_TITLE_LAYOUT_MANAGER:String = 'CUSTOMLAYOUT_TITLE_LAYOUT_MANAGER';	
+			//CRO 05.01.2011
+			private const CUSTOMLAYOUT_TEXT_PAGE:String = 'GLOBAL_PAGE';
+			private const CUSTOMLAYOUT_ALERT_MSG_TITLE_INVALID_LAYOUT:String = 'CUSTOMLAYOUT_ALERT_MSG_TITLE_INVALID_LAYOUT';	
+			private const CUSTOMLAYOUT_ALERT_MSG_TEXT_THERE_MUST_BE:String = 'CUSTOMLAYOUT_ALERT_MSG_TEXT_THERE_MUST_BE';
+			private const CUSTOMLAYOUT_ALERT_MSG_TEXT_THE_REQUIRED_FIELD:String = 'CUSTOMLAYOUT_ALERT_MSG_TEXT_THE_REQUIRED_FIELD';	
+			private const CUSTOMLAYOUT_ALERT_MSG_TEXT_MUST_ME_INCLUDE:String = 'CUSTOMLAYOUT_ALERT_MSG_TEXT_MUST_ME_INCLUDE';
+			private const CUSTOMLAYOUT_HEADER_LABEL_SECTION_HEADER:String = 'CUSTOMLAYOUT_HEADER_LABEL_SECTION_HEADER';	
+			private const CUSTOMLAYOUT_ALERT_MSG_TITLE_ERROR_REQUEST_SERVICE:String = 'CUSTOMLAYOUT_ALERT_MSG_TITLE_ERROR_REQUEST_SERVICE';
+			private const CUSTOMLAYOUT_LABEL_TEXT_DRAG_AND_DROP_THE_FIELDS:String = 'CUSTOMLAYOUT_LABEL_TEXT_DRAG_AND_DROP_THE_FIELDS';	
+			private const CUSTOMLAYOUT_FORM_ITEM_LABEL_QUICT_SEARCH:String = 'CUSTOMLAYOUT_FORM_ITEM_LABEL_QUICT_SEARCH';
+			private const CUSTOMLAYOUT_BUTTON_LABEL_RESET_TO_DEFAULTS:String = 'GLOBAL_RESET_TO_DEFAULTS';	
+			private const CUSTOMLAYOUT_BUTTON_LABEL_FETCH:String = 'CUSTOMLAYOUT_BUTTON_LABEL_FETCH';
+			//CRO 05.01.2011
+			private const CUSTOMLAYOUT_DETAILBUTTONBAR_BUTTON_LABEL_SAVE:String = 'GLOBAL_SAVE';
+			
+			
+			[Bindable] private var leftPanelList:Array = new Array();
+			[Bindable] private var rightPanelList:Array = new Array();
+			[Bindable] public var item:Object;
+  			[Bindable] public var entity:String;
+			[Bindable] public var subtype:int = 0;
+  			[Bindable] public var detail:Detail;
+			
+			public static const SQLLIST_CODE:String = "SQLLIST";
+			public static const SQLFIELD_CODE:String = "SQLFIELD";
+			public static const HTMLFIELD_CODE:String = "HTMLFIELD";
+			public static const GOOGLEMAP_CODE:String = "GOOGLEMAP";
+			public static const RELATION_CODE:String = "RELATION";
+			public static const NEWS_CODE:String = "NEWS";
+			public static const CALCULATED_CODE:String = "CALCULATEDFIELD";
+			public static const CUSTOMFIELD_CODE:String = "CUSTOMFIELD";
+			public static const BINDPICKLIST_CODE:String = "BINDPICKLISTFIELD";
+			public var PAGE_HEADER:Dictionary = new Dictionary();
+			
+			
+			private var numOfPage:int = 4;
+
+			private function init():void {
+				if(item!=null && !StringUtils.isEmpty(item.subtype)) subtype = item.subtype;
+				else if (item != null) subtype = LayoutUtils.getSubtypeIndex(item);
+				
+				// create page layout.
+				for(var p:int=0;p<numOfPage;p++){
+					leftPanelList[p] = new ArrayCollection();
+					rightPanelList[p] = new ArrayCollection();
+					var hbox:HBox = new HBox();
+					hbox.percentWidth=100;
+					hbox.percentHeight=100;
+					var dropTargetLeft:List = new List();
+					var dropTargetRight:List = new List();
+					setListStyleSheet(dropTargetLeft,leftPanelList[p]);
+					setListStyleSheet(dropTargetRight,rightPanelList[p]);
+					
+					hbox.addChild(dropTargetLeft);
+					hbox.addChild(dropTargetRight);
+					mainPage.addChild(hbox);
+					PAGE_HEADER[p]=getPageTitleTranslate(p);
+					MenuUtils.getContextMenuDetailLayout(dropTargetLeft, removeField, updateProperty);
+					MenuUtils.getContextMenuDetailLayout(dropTargetRight, removeField, updateProperty);
+				}
+				labelPage.text = getPageHeader(0);//select the first page
+				
+				
+				var fields:ArrayCollection = Database.layoutDao.selectLayout(entity, subtype);
+				var listOldHeaderField:ArrayCollection = new ArrayCollection();
+				Utils.suppressWarning(fields);
+				for (var i:int = 0; i < fields.length; i++) {
+					var idx:int = fields[i].col==1?0:fields[i].col/2;
+					if(fields[i].col%2==0){
+						leftPanelList[idx].addItem(fields[i]);
+					}else{
+						rightPanelList[idx].addItem(fields[i]);
+					}
+					if (fields[i].column_name.charAt(0) == '#') {
+						listOldHeaderField.addItem(fields[i]);
+					}
+					
+				}
+//				var customLayout:Object =  Database.customLayoutDao.readSubtype(entity,subtype);
+//				var displayName:String = customLayout.display_name == null ? entity : customLayout.display_name;
+				var displayName:String =  Database.customLayoutDao.getDisplayName(entity,subtype);
+				
+				this.title = displayName + " " + i18n._(CUSTOMLAYOUT_TITLE_LAYOUT_MANAGER);
+				titlebar.title = this.title;
+				
+				updateOldHeaderField(listOldHeaderField);
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function updateOldHeaderField(listHeader:ArrayCollection):void {
+				// fixed error duplicate header field column_name
+				for each(var header:Object in listHeader){
+					header.column_name = "{" + '#' + countFields('#') + "}"; 
+				}
+			}
+			
+			private function setListStyleSheet(list:List,_dataProvider:ArrayCollection):void {
+				list.setStyle("borderStyle","solid");
+				list.setStyle("borderThickness","2");
+				list.setStyle("rowHeight","30");
+				list.percentWidth=50;
+				list.percentHeight=100;
+				list.addEventListener(DragEvent.DRAG_ENTER,function(event:DragEvent):void {dragEnter(event);});
+				list.addEventListener(MouseEvent.MOUSE_MOVE,function(event:MouseEvent):void {dragField(event);});
+				list.addEventListener(DragEvent.DRAG_DROP,function(event:DragEvent):void {dragDrop(event);});
+				list.itemRenderer = new ClassFactory(FieldItemRenderer);
+				list.dataProvider = _dataProvider;
+			}
+			
+			
+			private function removeField(srcList:List, obj:Object):void {
+				var srcData:ArrayCollection = (srcList.dataProvider as ArrayCollection);
+				srcData.removeItemAt(srcData.getItemIndex(obj));	
+			}
+			
+			private function updateProperty(list:List, target:Object, obj:Object):void {
+				(list.dataProvider as ArrayCollection).refresh();
+			}
+
+			// drag a field from dictionnary
+			private function dragDictionnaryField(event:MouseEvent):void {
+                var tileList:TileList = event.currentTarget as TileList;
+                if (tileList.selectedIndex != -1 && event.stageX < 820) {
+                	var dragSource:DragSource = new DragSource();
+                	var dropObject:Object = new Object();
+                	dropObject.column_name = tileList.dataProvider[tileList.selectedIndex].column_name;
+                	// if (dropObject.column_name == '#') {
+					if (dropObject.column_name.indexOf('#')>-1) {
+                		dropObject.column_name = "{" + '#' + countFields('#') + "}"; // '#' + headerCount();
+                	}
+					if (dropObject.column_name.indexOf(SQLLIST_CODE) > -1){
+						dropObject.column_name = "{" + SQLLIST_CODE + countFields(SQLLIST_CODE) + "}";
+					}
+					if (dropObject.column_name.indexOf(SQLFIELD_CODE) > -1){
+						dropObject.column_name = "{" + SQLFIELD_CODE + countFields(SQLFIELD_CODE) + "}";
+					}
+					if (dropObject.column_name.indexOf(HTMLFIELD_CODE) > -1){
+						dropObject.column_name = "{" + HTMLFIELD_CODE + countFields(HTMLFIELD_CODE) + "}";
+					}
+					if (dropObject.column_name.indexOf(NEWS_CODE) > -1){
+						dropObject.column_name = "{" + NEWS_CODE + countFields(NEWS_CODE) + "}";
+					}
+					if (dropObject.column_name.indexOf(RELATION_CODE) > -1){
+						dropObject.column_name = "{" + RELATION_CODE + countFields(RELATION_CODE) + "}";
+					}
+					if (dropObject.column_name.indexOf(CALCULATED_CODE) > -1){
+						dropObject.column_name = "{" + CALCULATED_CODE + countFields(CALCULATED_CODE) + "}";
+					}
+					
+					dropObject.custom = tileList.dataProvider[tileList.selectedIndex].custom;
+                	dropObject.entity = entity;                 	
+	                dragSource.addData(dropObject, 'item');
+	                var dragInitiator:IListItemRenderer = tileList.indexToItemRenderer(tileList.selectedIndex);
+	                DragManager.doDrag(dragInitiator, dragSource, event);
+                }
+             }
+			
+			
+			private function previousPageClick():void{
+				var pageIndex:int = mainPage.selectedIndex;
+				if(pageIndex>0) selectPage(--pageIndex);
+			}
+			private function nextPageClick():void{			
+				var pageIndex:int = mainPage.selectedIndex;
+				if(pageIndex<numOfPage-1) selectPage(++pageIndex);
+			}
+			
+			private function previousFieldClick():void{
+				btnPreField.enabled = false;
+				btnNextField.enabled = true;
+				doSearch();
+			}
+			private function nextFieldClick():void{
+				btnPreField.enabled = true;
+				btnNextField.enabled = false;
+				doSearch(true);
+			}
+			
+			private function selectPage(idx:int):void{
+				labelPage.text = getPageHeader(idx);
+				mainPage.selectedIndex = idx;
+			}
+			
+			private function getPageHeader(idx:int):String{				
+				if(entity!=null){
+					
+					var objCustomField:Object = PAGE_HEADER[idx]?PAGE_HEADER[idx].customField:null; 
+						
+					if(objCustomField==null){
+						//try to get it from db
+						objCustomField  = Database.customFieldDao.selectCustomFieldWithSubType(entity,"#header_"+entity+"_"+subtype+"_"+idx ,subtype,LocaleService.getLanguageInfo().LanguageCode);
+					}
+					if(objCustomField!=null && objCustomField.value){
+						var headerValue:String = CustomFieldDAO.getHeaderValue(objCustomField.value);				
+					
+					
+						if(!StringUtils.isEmpty(headerValue)){
+							return headerValue;
+						}		
+					}
+					
+				}
+				return i18n._(CUSTOMLAYOUT_TEXT_PAGE) + " " + (idx+1);
+			}
+			
+			
+            // drag a field onto left or right panel.
+            private function dragEnter(event:DragEvent):void {
+                var dropTarget:List = event.currentTarget as List;
+                if (event.dragSource.hasFormat("item")) {
+                    // Accept the drop.
+                    DragManager.acceptDragDrop(dropTarget);
+                }
+            }
+            
+            private function findIndex(list:ArrayCollection, field:Object):int {
+            	for (var i:int = 0; i < list.length; i++) {
+            		if (list[i].column_name == field.column_name) {
+						return i;
+            		}
+            	}
+            	return -1;
+            }
+
+            // drop a field onto left or right panel
+            private function dragDrop(event:DragEvent):void {
+				var list:List = event.currentTarget as List;
+				var obj:Object = event.dragSource.dataForFormat("item");
+				if(obj!=null){
+					var defaultMandatory:Boolean = FieldUtils.getDefaultMandatory(obj.entity,obj.column_name);
+					if(defaultMandatory){
+						obj.mandatory = defaultMandatory;
+					}
+				}
+				var targetData:ArrayCollection = list.dataProvider as ArrayCollection;
+				for(var p:int=0;p<mainPage.length;p++){
+					var leftPanel:ArrayCollection = leftPanelList[p];
+					var rightPanel:ArrayCollection = rightPanelList[p];					
+					// var srcData:ArrayCollection = (event.dragInitiator.owner as ListBase).dataProvider as ArrayCollection;
+					if (findIndex(leftPanel, obj) != -1) {
+						leftPanel.removeItemAt(findIndex(leftPanel, obj));
+					}
+					if (findIndex(rightPanel, obj) != -1) {
+						rightPanel.removeItemAt(findIndex(rightPanel, obj));
+					}
+				}
+				
+        		var index:int = list.calculateDropIndex(event);
+        		if (index > targetData.length) {
+        			index = targetData.length;
+        		}
+        		targetData.addItemAt(obj, index);
+            }
+
+			// drag a field inside left or right panel
+            private function dragField(event:MouseEvent):void {
+                var list:List = event.currentTarget as List;
+                if (list.selectedIndex != -1) {
+                	var dragSource:DragSource = new DragSource();
+	                dragSource.addData(list.dataProvider[list.selectedIndex], 'item');
+	                var dragInitiator:IListItemRenderer = list.indexToItemRenderer(list.selectedIndex);
+	                DragManager.doDrag(dragInitiator, dragSource, event);
+
+                }
+             }
+            
+            // drag back a field to dictionnary
+            private function dragBackEnter(event:DragEvent):void {
+                var dropTarget:TileList = event.currentTarget as TileList;
+                if (event.dragSource.hasFormat("item") && event.dragInitiator.owner != dictionnary) {
+                    var obj:Object = event.dragSource.dataForFormat("item");
+                    DragManager.acceptDragDrop(dropTarget);
+                }
+            }
+
+			// drop back a field to dictionnary
+            private function dragBackDrop(event:DragEvent):void {
+            	var obj:Object = event.dragSource.dataForFormat("item");
+            	var srcList:List = event.dragInitiator.owner as List;
+            	var srcData:ArrayCollection = (srcList.dataProvider as ArrayCollection);
+            	srcData.removeItemAt(srcData.getItemIndex(obj));
+            }
+            
+            private function save():Boolean {
+            	if (leftPanelList[0].length == 0 && rightPanelList[0].length == 0) {
+            		Alert.show(i18n._(CUSTOMLAYOUT_ALERT_MSG_TEXT_THERE_MUST_BE),i18n._(CUSTOMLAYOUT_ALERT_MSG_TITLE_INVALID_LAYOUT), Alert.OK, this);
+            		return false;
+            	}
+
+            	var missing:Array = [];
+            	for (var k:int = 0; k < dictionnary.dataProvider.length; k++) {
+            		if (dictionnary.dataProvider[k].required) {
+            			var found:Boolean = false;
+            			for (var l:int = 0; l < 2; l++) {
+            				var panel:ArrayCollection = (l == 0 ? leftPanelList[0] : rightPanelList[0]); 
+            				for (var m:int = 0; m < panel.length; m++) {
+            					if (panel[m].column_name == dictionnary.dataProvider[k].column_name) {
+            						found = true;
+            						break;
+            					}
+            				}
+            				if (found) {
+            					break;
+            				}
+            			}
+            			if (found == false) {
+            				missing.push(dictionnary.dataProvider[k].label);
+            			}
+            		}
+            	}
+            	if (missing.length > 0) {
+            		Alert.show(i18n._(CUSTOMLAYOUT_ALERT_MSG_TEXT_THE_REQUIRED_FIELD) + " " + missing.join(", ") + " " + i18n._(CUSTOMLAYOUT_ALERT_MSG_TEXT_MUST_ME_INCLUDE), i18n._(CUSTOMLAYOUT_ALERT_MSG_TITLE_INVALID_LAYOUT), Alert.OK, this);
+            		return false;
+            	}
+				
+            	Database.begin();
+            	Database.layoutDao.deleteLayout(entity, subtype);
+				
+				for (var p:int = 0; p < mainPage.getChildren().length; p++) {
+					//save page header
+					var pageField:Object = PAGE_HEADER[p].customField;
+					if(pageField!=null){
+						pageField.subtype= subtype;
+						Database.customFieldDao.delete_({entity:entity, subtype:subtype, column_name:pageField["column_name"]});
+						Database.customFieldDao.insert(pageField);
+					}
+					var leftPanel:ArrayCollection = leftPanelList[p];
+					var rightPanel:ArrayCollection = rightPanelList[p];
+					for (var j:int = 0; j <2; j++) {
+						for (var i:int = 0; i < (j== 0 ? leftPanel.length : rightPanel.length); i++) {
+							var layout:Object = new Object();
+							layout.col = j+2*p;
+							layout.row = i;
+							layout.entity = entity;
+							layout.subtype = subtype;
+							layout.column_name = (j ==0 ? leftPanel[i].column_name : rightPanel[i].column_name);
+							layout.custom = (j ==0 ? leftPanel[i].custom : rightPanel[i].custom);
+							layout.readonly = (j ==0 ? leftPanel[i].readonly : rightPanel[i].readonly);
+							layout.mandatory = (j ==0 ? leftPanel[i].mandatory : rightPanel[i].mandatory);
+							layout.max_chars = (j ==0 ? leftPanel[i].max_chars : rightPanel[i].max_chars);
+							Database.layoutDao.insert(layout);
+							if(layout.column_name.indexOf(SQLLIST_CODE) > -1) { // SQLLIST
+								var criterias:ArrayCollection = (j ==0 ? leftPanel[i].criterias : rightPanel[i].criterias);
+								if(criterias) {
+									for each(var criteria:Object in criterias) {
+										Database.sqlListDAO.insert(criteria);
+									}
+								}
+							}
+							if (layout.column_name.indexOf(CALCULATED_CODE) > -1 || layout.column_name.indexOf("#") > -1){ 
+								var customField:Object = (j ==0 ? leftPanel[i].customField : rightPanel[i].customField);
+								if(customField){
+									customField["subtype"] = subtype;
+									// if(layout.column_name.indexOf("#") > -1) customField["column_name"] = layout.column_name + "_" + layout.col;
+									//Database.customFieldDao.deleteCustomField(customField);
+									// HSC : 6686
+									Database.customFieldDao.delete_({entity:entity, subtype:subtype, column_name:customField["column_name"]});
+									Database.customFieldDao.insert(customField);
+								}
+							}else if(layout.column_name.indexOf(CUSTOMFIELD_CODE) > -1){
+								//var objCusField:Object = Database.customFieldDao.selectCustomField(layout.entity,layout.column_name);
+								//Database.customFieldDao.addTableColumn(objCusField.entity,objCusField.fieldName,"TEXT");
+							}
+						}
+					}
+					
+				}
+				
+	            Database.commit();
+            	return true;
+            }
+            
+            private function getFields():ArrayCollection {
+            	var fields:ArrayCollection = new ArrayCollection();
+            	for each (var field:Object in FieldUtils.allFields(entity)) {
+					Utils.suppressWarning(new ArrayCollection([field]));
+					var tmp:Object = new Object();
+					tmp.label = field.display_name;
+					tmp.column_name = field.element_name;
+            		fields.addItem(tmp);
+            	}		
+				
+				if(entity == 'Contact'){
+					tmp = new Object();
+					tmp.label = i18n._("GLOBAL_PICTURE");
+					tmp.column_name = "picture";
+					fields.addItem(tmp);
+				}
+				
+				if(entity == 'Account' || entity == 'Contact' || entity == 'Lead'){
+					tmp = new Object();
+					tmp.label = i18n._("GLOBAL_GOOGLE_MAP");
+					tmp.column_name = "{" + GOOGLEMAP_CODE + "}";
+					fields.addItem(tmp);
+				}
+				
+				var sqlList:Object = new Object();
+				sqlList.label = i18n._("GLOBAL_SQL_LIST");
+				sqlList.custom = "";
+				sqlList.column_name = '{' + SQLLIST_CODE + '}';
+				fields.addItem(sqlList);
+				
+				var sqlField:Object = new Object();
+				sqlField.label = i18n._("GLOBAL_SQL_FIELD");
+				sqlField.custom = "";
+				sqlField.column_name = '{' + SQLFIELD_CODE + '}';
+				fields.addItem(sqlField);
+				
+				var htmlField:Object = new Object();
+				htmlField.label = i18n._("GLOBAL_WEB_LINK");
+				htmlField.custom = "";
+				htmlField.column_name = '{' + HTMLFIELD_CODE + '}';
+				fields.addItem(htmlField);
+				
+				var newsField:Object = new Object();
+				newsField.label = i18n._("GLOBAL_NEWS");
+				newsField.custom = "%" + DAOUtils.getNameColumn(entity) + "%";
+				newsField.column_name = '{' + NEWS_CODE + '}';
+				fields.addItem(newsField);
+
+				if(Relation.getMNReferenced(entity).length>0){
+					var relationField:Object = new Object();
+					relationField.label = i18n._("GLOBAL_RELATION");
+					relationField.custom = "";
+					relationField.column_name = '{' + RELATION_CODE + '}';
+					fields.addItem(relationField);
+				}	
+				
+				/*var calculatedField:Object = new Object();
+				calculatedField.label = i18n._("Calculated Field");
+				calculatedField.custom = "Formula";
+				calculatedField.column_name = '{' + CALCULATED_CODE + '}';
+				fields.addItem(calculatedField); */
+			
+				
+				var header:Object = new Object();
+				header.label = i18n._(CUSTOMLAYOUT_HEADER_LABEL_SECTION_HEADER);
+				header.custom = "header";
+				header.column_name = '#';
+				fields.addItem(header); 
+				Utils.suppressWarning(fields);
+				return fields;
+            }
+			
+			private function getCustomFields():ArrayCollection {
+				var fields:ArrayCollection = new ArrayCollection();
+				for each (var field:Object in Database.customFieldDao.customField(entity,LocaleService.getLanguageInfo().LanguageCode)) {
+					// if(!StringUtils.isEmpty(field.fieldName)){
+					var colName:String = field.column_name;
+					if(colName.indexOf(CUSTOMFIELD_CODE)>-1){
+						Utils.suppressWarning(new ArrayCollection([field]));
+						var tmp:Object = new Object();
+						tmp.label = field.displayName;
+						tmp.column_name = field.column_name;
+						fields.addItem(tmp);
+					}
+				}	
+				
+				var calculatedField:Object = new Object();
+				calculatedField.label = i18n._("GLOBAL_CALCULATED_FIELD");
+				calculatedField.custom = "Formula";
+				calculatedField.column_name = '{' + CALCULATED_CODE + '}';
+				fields.addItem(calculatedField);
+				
+				Utils.suppressWarning(fields);
+				return fields;
+			}
+			
+			
+            private function reset():void {
+				FieldUtils.reset();
+				removeAllChildPanel();
+            	var defaultFields:Array = FieldUtils.getDefaultFields(entity);
+				if(defaultFields==null) return;
+				for (var i:int = 0; i < defaultFields.length; i++) {
+					if(defaultFields[i].subtype != null && defaultFields[i].subtype != subtype) continue;
+					var layout:Object = new Object();
+					layout.entity = entity;
+					layout.column_name = defaultFields[i].column_name;
+					layout.custom = defaultFields[i].custom;
+					if (defaultFields[i].col == 0) {
+						leftPanelList[0].addItem(layout);
+					} else {
+						rightPanelList[0].addItem(layout);
+					}
+				}	
+            }
+            
+			
+			private function removeAllChildPanel():void {
+				for(var i:int=0;i<mainPage.getChildren().length;i++){
+					leftPanelList[i].removeAll();
+					rightPanelList[i].removeAll();
+				}
+			}
+            private function headerCount():int {
+            	var num:int = 0;
+            	for (var j:int = 0; j < 2; j++) {
+            		var panel:ArrayCollection = (j == 0 ? leftPanelList[mainPage.selectedIndex] : rightPanelList[mainPage.selectedIndex]);
+            		for (var i:int = 0; i < panel.length; i++) {
+            			if (panel[i].column_name.charAt(0) == '#') {
+            				var tmp:int = int(panel[i].column_name.substring(1));
+            				if (tmp >= num) {
+            					num = tmp + 1;
+            				}
+            			}
+            		} 
+            	}
+            	return num;
+            }
+			
+			private function countFields(code:String):int {
+				code = "{"+code;	//VAHI count bugfix
+				var num:int = 0;
+				for (var p:int = 0; p < mainPage.length; p++) {
+					for (var j:int = 0; j < 2; j++) {
+						var panel:ArrayCollection = (j == 0 ? leftPanelList[p] : rightPanelList[[p]]);
+						for (var i:int = 0; i < panel.length; i++) {
+							if (panel[i].column_name.indexOf(code) > -1) {
+								var tmp:int = parseInt(panel[i].column_name.substring(code.length));
+								if (tmp >= num) {
+									num = tmp + 1;
+								}
+							}
+						} 
+					}
+				}
+				return num;
+			}
+			
+			private function doSearch(customField:Boolean=false):void{
+				if(btnPreField.enabled) customField = true;
+				if (searchInput.text.length >= 1) {
+					var data:ArrayCollection = new ArrayCollection();
+					var resultList:ArrayCollection = new ArrayCollection();
+					if(customField){
+						resultList = Database.customFieldDao.findFieldsByDisplayName(entity, searchInput.text);
+					}
+					else{
+						resultList = Database.fieldDao.findFieldsByDisplayName(entity, searchInput.text);
+						if(resultList==null || resultList.length<1){
+							//try select with record type 
+							resultList = Database.fieldDao.findFieldsByDisplayName(DAOUtils.getRecordType(entity), searchInput.text);
+						}
+					}
+					for each(var objectField:Object in resultList){
+						var object:Object = new Object();
+						object.label = customField?objectField.displayName:objectField.display_name;
+						object.column_name = customField?objectField.column_name:objectField.element_name;
+						data.addItem(object);
+					}
+					Utils.suppressWarning(data);
+					dictionnary.dataProvider = data;
+				} else {
+					dictionnary.dataProvider = customField?getCustomFields():getFields();
+				}
+			}
+			private function fetch():void{
+				fetchBtn.enabled = false;
+				var username:String = Database.preferencesDao.getValue("sodlogin") as String;
+				var password:String = Database.preferencesDao.getValue("sodpass") as String;
+				var url:String = Database.preferencesDao.getValue("sodhost") as String;
+				GetLayoutUtils.getFetchFields(username, password, url, entity, requestSuccess, requestFailed);
+				
+			}
+			
+			private function requestFailed(error:String):void{
+				fetchBtn.enabled = true;
+				Alert.show(error, i18n._(CUSTOMLAYOUT_ALERT_MSG_TITLE_ERROR_REQUEST_SERVICE), 4, this);
+			}
+			
+			private function requestSuccess(objectFields:ArrayCollection):void{
+				removeAllChildPanel();
+				for each(var objectField:Object in objectFields){
+					if (objectField.col == 0) {
+						leftPanelList[0].addItem(objectField);
+					} else if (objectField.col == 1){
+						rightPanelList[0].addItem(objectField);
+					}
+				}
+				fetchBtn.enabled = true;
+			}
+			
+			
+			protected function getPageTitleTranslate(idx:int):Object{
+				var colName:String= "#header_"+entity+"_"+subtype+"_"+idx;
+				var obj:Object = new Object();
+				obj.column_name = colName;
+				obj.entity=entity;
+				
+				obj.languageCode=LocaleService.getLanguageInfo().LanguageCode;
+				var objCustomField:Object = Database.customFieldDao.selectCustomFieldWithSubType(entity,colName ,subtype,obj.languageCode);			
+				obj["customField"] = objCustomField;
+				obj.custom=getPageHeader(idx);
+				return obj;
+			}
+
+			protected function labelPage_doubleClickHandler(event:MouseEvent):void
+			{
+				
+				
+				var calculatedField:CalculatedField = new CalculatedField();
+				// quickSearch.mainWindow = this;
+				calculatedField.postSave =function(newLbl:String):void{
+					labelPage.text=newLbl;
+				};
+				calculatedField.tempHeaderVal = labelPage.text;
+				calculatedField.dataField = PAGE_HEADER[mainPage.selectedIndex];
+				WindowManager.openModal(calculatedField);
+				
+			}
+
+        ]]>
+	</mx:Script>
+	
+	
+	<mx:Canvas styleName="main" left="0" top="0" width="860" height="540" right="0" bottom="0">
+		<control:TitleBar id="titlebar" icon="@Embed(source='/assets/customize.png')"/>
+		<mx:VBox left="16" right="16" top="32" bottom="16">
+			<mx:HBox width="100%">
+				<mx:HBox width="20%" id="pageButton">
+					<mx:LinkButton doubleClickEnabled="true" id="btnPreviousClick" icon="{ImageUtils.previousDayIcon}" click="previousPageClick()"/>
+					<mx:Label id="labelPage"  doubleClickEnabled="true" doubleClick="labelPage_doubleClickHandler(event)" fontSize="12" fontWeight="bold" textAlign="center"/>
+					<mx:LinkButton doubleClickEnabled="true" id="btnNextClick" icon="{ImageUtils.nextDayIcon}" click="nextPageClick()"/>
+				</mx:HBox>
+				<mx:Label text= "{i18n._(CUSTOMLAYOUT_LABEL_TEXT_DRAG_AND_DROP_THE_FIELDS)}" paddingLeft="10"/>
+				<mx:Form paddingBottom="0" paddingTop="0" paddingRight="0" >
+					<mx:FormItem label="" horizontalAlign="right">
+						<mx:HBox>
+							<mx:Label text= "{i18n._(CUSTOMLAYOUT_FORM_ITEM_LABEL_QUICT_SEARCH)}" paddingLeft="0"/>
+							<mx:TextInput  id="searchInput" change="doSearch()" width="120"/>
+						</mx:HBox>
+					</mx:FormItem>
+				</mx:Form>			
+				<mx:HBox horizontalAlign="right">
+					<mx:LinkButton doubleClickEnabled="true" id="btnPreField" icon="{ImageUtils.fieldIcon}" toolTip="Entity Fields" click="previousFieldClick()"  width="16" enabled="false"/>
+					<mx:LinkButton doubleClickEnabled="true" id="btnNextField" icon="{ImageUtils.customFieldIcon}" toolTip="Custom Fields" click="nextFieldClick()"  width="16"/>
+				</mx:HBox>	
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:TileList borderStyle="solid" id="dictionnary"
+							 mouseMove="dragDictionnaryField(event)" 
+							 dragEnter="dragBackEnter(event)" 
+							 dragDrop="dragBackDrop(event)" 
+							 width="100%" 
+							 height="66"
+							 direction="horizontal" dataProvider="{getFields()}"
+							 columnWidth="160" rowHeight="32">
+					<mx:itemRenderer>
+						<mx:Component>
+							<mx:Canvas>
+								<mx:Script>
+									<![CDATA[
+										private function getBackgroundColor(data:Object):uint {
+											//if(data.column_name == '#') return 0xCCCCFF;
+											if(data.column_name == '#') return 0xCCCCFF;
+											if(data.column_name == '{' + CustomLayout.GOOGLEMAP_CODE + '}' || data.column_name == 'picture') return 0xFF9900;
+											if(data.column_name == '{' + CustomLayout.SQLLIST_CODE + '}') return 0xE7F98D;
+											if(data.column_name == '{' + CustomLayout.SQLFIELD_CODE + '}') return 0xE7F98D;
+											if(data.column_name == '{' + CustomLayout.HTMLFIELD_CODE + '}') return 0x70B0F9;
+											if(data.column_name == '{' + CustomLayout.NEWS_CODE + '}') return 0x70B0F9;
+											if(data.column_name == '{' + CustomLayout.RELATION_CODE + '}') return 0xCCB3DC;
+											if(data.column_name == '{' + CustomLayout.CALCULATED_CODE + '}') return 0xCCB3DC;
+											if(data.column_name.indexOf(CustomLayout.CUSTOMFIELD_CODE) > -1) return 0xFFB3DC;
+											if(data.required) return 0xFFCCCC;
+											return 0xCCFFCC;
+										}
+									]]>
+								</mx:Script>
+								<mx:Canvas horizontalScrollPolicy="off" backgroundColor="{getBackgroundColor(data)}" borderStyle="outset" left="2" right="2" top="2" bottom="2"> 
+									<mx:Label text="{data.label}"/>	
+								</mx:Canvas>
+							</mx:Canvas>
+						</mx:Component>
+					</mx:itemRenderer>
+				</mx:TileList>			
+			</mx:HBox>
+			
+			<mx:ViewStack id="mainPage" width="824" height="100%">	
+			</mx:ViewStack>
+			<mx:HBox width="100%">
+				<mx:Canvas>
+					<mx:HBox top="8">
+						<mx:Button doubleClickEnabled="true" label="{i18n._(CUSTOMLAYOUT_BUTTON_LABEL_RESET_TO_DEFAULTS)}" click="reset()" />
+						<mx:Button doubleClickEnabled="true" id="fetchBtn" label="{i18n._(CUSTOMLAYOUT_BUTTON_LABEL_FETCH)}" click="fetch()" />
+					</mx:HBox>
+				</mx:Canvas><!--CRO 05.01.2011 CUSTOMLAYOUT_DETAILBUTTONBAR_BUTTON_LABEL_SAVE-->			
+				<control:DetailButtonBar buttonLabel="GLOBAL_SAVE" action="save"/>
+			</mx:HBox>
+			
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

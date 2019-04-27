@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.OpportunityDAO;
+			import gadget.i18n.i18n;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.controls.listClasses.BaseListData;
+			import mx.core.Window;
+			import mx.events.CloseEvent;
+			
+			import org.purepdf.utils.pdf_core;
+			private var grid:AdvancedDataGrid;			
+			private var _deleteFunction:Function = defaultDeleteFunction;
+			private var _visibleDeleteBtn:Function =defaultVisbleDeleteBtn;
+			private var _postDelete:Function;
+			
+			
+			
+			private function defaultVisbleDeleteBtn(item:Object):Boolean{
+				var isSHowDeleteButton:Boolean = false;
+				if(!item.isNew){
+					for(var f:String in item){
+						if(f!='mx_internal_uid' && item[f]!=null && !StringUtils.isEmpty(item[f].toString())){
+							isSHowDeleteButton = true;
+							break;
+						}
+					}
+				}
+				return isSHowDeleteButton;
+			}
+			
+			override public function set data(value:Object):void{		
+				super.data = value;
+				
+				btnDelete.visible=_visibleDeleteBtn(value);
+			}		
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid = value.owner as AdvancedDataGrid;		
+					
+				}
+			}
+			
+			
+			
+			private function defaultDeleteFunction(item:Object):void{
+				var items:ArrayCollection = grid.dataProvider as ArrayCollection;
+				if(items!=null && items.length>0){
+					var rowInd:int=items.getItemIndex(item);
+					items.removeItemAt(rowInd);					
+					if(postDelete!=null){
+						postDelete(item);
+					}
+					grid.dataProvider = items;
+					grid.validateNow();
+				}
+			}
+			public final function deleteRow():void{
+				
+				Alert.show(i18n._("GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE@Are you sure you want to delete?"), i18n._('GLOBAL_DELETE@Delete'), Alert.YES | Alert.NO, Window(WindowManager.getTopWindow()), alertListener, null, Alert.NO);
+				
+				
+			
+			
+			}
+			
+			private function alertListener(eventObj:CloseEvent):void {
+				
+				if (eventObj.detail==Alert.YES) {
+					var rows:ArrayCollection = grid.dataProvider as ArrayCollection;
+					if(rows!=null){						
+						if(deleteFunction!=null){
+							deleteFunction(data);
+						}else{
+							defaultDeleteFunction(data);	
+						}
+						//clare co7 fields
+						for each(var co7f:String in OpportunityDAO.CO7_IMP_CAL_FIELD){
+							delete data[OpportunityDAO.CO7_PREFIX+co7f];
+						}
+						for each(var q:String in OpportunityDAO.ALL_FY_QUATER){
+							delete data[q];
+						}
+						//delete co7ids
+						delete data['co7_gadget_id'];
+						delete data['co7_Id'];
+						
+						//opportunity no co7
+						data.isNoCo7=true;
+						delete data['editable'];
+						data.origOP = Utils.copyModel(data,false);
+						delete data['origCo7']
+						var groupList:ArrayCollection = new ArrayCollection();
+						for each(var r:Object in rows){
+							if(r.gadget_id==data.gadget_id && r!=data){
+								groupList.addItem(r);
+							}
+						}
+						if(groupList.length>0){
+							var idx:int = rows.getItemIndex(data);
+							if(idx!=-1){
+								rows.removeItemAt(idx);
+							}
+							var editable:Boolean = true;
+							for each(var g:Object in groupList){
+								//only first row can editable
+								g.editable = editable;
+								editable = false;
+							}
+							MyAdvancedDataGrid(grid).setNewDataProvider(rows);
+						}else{
+							MyAdvancedDataGrid(grid).refreshRow(listData.rowIndex);
+						}
+					}
+					
+					
+					
+					
+				}
+			}
+			
+			
+			
+			
+			public function get postDelete():Function
+			{
+				return _postDelete;
+			}
+			
+			public function set postDelete(value:Function):void
+			{
+				_postDelete = value;
+			}
+			
+			public function get deleteFunction():Function
+			{
+				return _deleteFunction;
+			}
+			
+			public function set deleteFunction(value:Function):void
+			{
+				_deleteFunction = value;
+			}
+			
+			public function get visibleDeleteBtn():Function
+			{
+				return _visibleDeleteBtn;
+			}
+			
+			public function set visibleDeleteBtn(value:Function):void
+			{
+				_visibleDeleteBtn = value;
+			}
+			
+			
+		]]>
+		
+	</fx:Script>
+	
+	<mx:LinkButton id="btnDelete" icon="@Embed(source='/assets/cancel.png')" toolTip="{i18n._('GLOBAL_DELETE@Delete')}" click="{deleteRow()}" />
+</s:MXAdvancedDataGridItemRenderer>

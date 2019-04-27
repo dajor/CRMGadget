@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:control="gadget.control.*"
+		   resizable="false"
+		   title="Attachments"
+		   width="350" height="290" verticalAlign="middle"
+		   showFlexChrome="false" transparent="true" systemChrome="none"
+		   creationComplete="init()"
+		  >
+	<mx:Script>
+		<![CDATA[
+			import mx.containers.Canvas;
+			import mx.controls.ProgressBar;
+			public var actionFunction:Function;
+			public var progressLabel:String;
+			public var proWidth:int=200;
+			public var closeFunction:Function;
+			private function init():void {
+				this.width=proWidth+150;
+				progressBar.label = progressLabel;
+				mainP.width=proWidth;
+				progressBar.width=proWidth;				
+				var loadTimer:Timer = new Timer(10, 1); 
+				loadTimer.addEventListener(TimerEvent.TIMER, incrementTime); 
+				loadTimer.start();
+			}
+			
+			
+			
+			private function incrementTime(event:TimerEvent):void {
+				try{
+					if(actionFunction != null) actionFunction();
+				}finally{
+					if(closeFunction!=null){
+						closeFunction(this);
+					}else{
+						nativeWindow.close();
+					}
+				}
+			}
+		]]>
+	</mx:Script>			
+	
+	<mx:Canvas styleName="main" left="0" top="0" width="200" height="20" right="0" bottom="0" id="mainP">
+		<mx:ProgressBar id="progressBar"
+						indeterminate="true"
+						labelPlacement="center"
+						textAlign="center"						 
+						/>		
+	</mx:Canvas>
+
+</mx:Window>

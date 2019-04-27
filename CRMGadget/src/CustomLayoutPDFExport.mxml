@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:control="gadget.control.*"
+		   resizable="false"
+		   title="DAILYAGENDA_PDF_EXPORT_LAYOUT"
+		   width="300" height="390" verticalAlign="middle"
+		   showFlexChrome="false" transparent="true" systemChrome="none"
+		   creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.CacheUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.ButtonBar;
+			import mx.events.ItemClickEvent;
+			
+			private const GLOBAL_CLOSE:String = 'GLOBAL_CLOSE' ;
+			private const GLOBAL_SAVE:String = 'GLOBAL_SAVE' ;
+			
+			public static var agenda_pdf_layout_cache:CacheUtils = null;
+			
+			public static var EXPORT_FIELDS:Array = [
+				{fieldName:"stTime",displayName:i18n._('GLOBAL_START_TIME'), checked:true, width:17}, 
+				{fieldName:"enTime",displayName:i18n._('GLOBAL_ENDTIME'), checked:true, width:17}, 
+				{fieldName:"Subject",displayName:i18n._('GLOBAL_SUBJECT'), checked:true, width:28},
+				{fieldName:"mark",displayName:i18n._('PDFUTIL_MARK'), checked:true, width:15}, 
+				{fieldName:"AccountName",displayName:i18n._('GLOBAL_ACCOUNT_NAME'), checked:true, width:40},
+				{fieldName:"address",displayName:i18n._('GLOBAL_ADDRESS'), checked:true, width:38},
+				{fieldName:"MainPhone",displayName:i18n._('PDFUTIL_TELEPHONE_NUMBER'), checked:true, width:-1},
+				{fieldName:"conFirstName",displayName:i18n._("CONTACT_FIRST_NAME"), checked:true, width:-1},
+				{fieldName:"conLastName",displayName:i18n._('CONTACT_LAST_NAME'), checked:true, width:-1},
+				{fieldName:"conCellularPhone",displayName:i18n._('CONTACT_MOBILE_PHONE'), checked:true, width:-1} 
+			];
+			
+			private function init():void {
+				refreshList();
+				initButtons();
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function initButtons():void {
+				actionButton.removeAllChildren();
+				var buttonBar:ButtonBar = new ButtonBar();
+				buttonBar.setStyle("right", "0");
+				var obj:Object = null;
+				var buttons:ArrayCollection = new ArrayCollection();
+				
+				buttons.addItem({label: i18n._(GLOBAL_CLOSE), icon:ImageUtils.cancelIcon}); 
+				buttons.addItem({label: i18n._(GLOBAL_SAVE), icon: ImageUtils.addIcon});
+				
+				buttonBar.dataProvider = buttons;
+				buttonBar.addEventListener(ItemClickEvent.ITEM_CLICK, handleButtonBar);
+				
+				actionButton.addChild(buttonBar);
+			}
+			
+			private function handleButtonBar(event:ItemClickEvent):void {
+				if(event.label == i18n._(GLOBAL_CLOSE)){
+					this.close();
+				}else{
+					var hasCheckColumn:Boolean = false;
+					for each(var column_field:Object in customLayoutGrid.dataProvider){
+						if(column_field.checked){
+							hasCheckColumn = true;
+							break;
+						}
+					}
+					
+					if(!hasCheckColumn){
+						Alert.show(i18n._('GLOBAL_EMPTY_COLUMN') , 
+							i18n._('PLEASE_CHECK_AT_LEASE_ONE_COLUMN'), 
+							Alert.OK , this.parentApplication as MainWindow);
+					}else{
+						agenda_pdf_layout_cache.clear();
+						for each(var export_Field:Object in customLayoutGrid.dataProvider){
+							agenda_pdf_layout_cache.put(export_Field.fieldName, export_Field);
+						}
+						this.close();
+					}
+					
+				}
+			}	
+			
+			public static function initExportLayout():void{
+				if(!agenda_pdf_layout_cache){
+					agenda_pdf_layout_cache = new CacheUtils("DAILYAGENDA_PDF_EXPORT_LAYOUT");	
+					for each(var export_Field:Object in EXPORT_FIELDS){
+						agenda_pdf_layout_cache.put(export_Field.fieldName, export_Field);
+					}
+				}
+			}
+			
+			public function refreshList():void {
+				var listCustomLayout:ArrayCollection = Database.customLayoutDao.readAll();
+				var provider:ArrayCollection = new ArrayCollection();
+				for each(var export_Field:Object in EXPORT_FIELDS){
+					var colObject:Object = new Object();
+					var dataObject:Object = agenda_pdf_layout_cache.get(export_Field.fieldName);
+					colObject['fieldName'] = dataObject.fieldName;
+					colObject['displayName'] = dataObject.displayName;
+					colObject['checked'] = dataObject.checked;
+					colObject['width'] = dataObject.width;
+					provider.addItem(colObject);
+				}
+				
+				Utils.suppressWarning(provider);
+				customLayoutGrid.dataProvider = provider;
+				(customLayoutGrid.dataProvider as ArrayCollection).refresh();
+			}
+			
+		]]>
+		
+		
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="290" height="390" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/customize.png')" title="{i18n._('DAILYAGENDA_PDF_EXPORT_LAYOUT')}"/>
+		<mx:VBox top="40" left="16" right="16" bottom="16" width="100%" height="100%">
+			<mx:AdvancedDataGrid id="customLayoutGrid" width="100%" height="100%" doubleClickEnabled="false" sortableColumns="false">
+				<mx:columns>
+					<mx:AdvancedDataGridColumn dataField="fieldName" headerText="" width="0" visible="false" sortable="false"/>
+					<mx:AdvancedDataGridColumn dataField="displayName" headerText="{i18n._('GLOBAL_COLUMN_NAME')}" width="200" sortable="false"/>
+					<mx:AdvancedDataGridColumn dataField="checked" headerText="" width="60" itemRenderer="CheckBoxColRender" sortable="false"/>
+				</mx:columns>
+			</mx:AdvancedDataGrid>
+			<mx:HBox id="actionButton" horizontalAlign="right" width="100%"/>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

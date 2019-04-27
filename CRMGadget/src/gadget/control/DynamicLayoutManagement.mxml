@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:control="gadget.control.*"
+		   resizable="false"
+		   width="400" height="400"
+		   title="{i18n._('DYNAMIC_BLOCK_MANAGMENT@Dynamic block management')}"
+		   showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+		   creationComplete="init(event)"
+		   >
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.sync.incoming.FieldManagementService;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridItemRenderer;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			
+			
+			private function refreshListDataGrid():void{				
+				
+				fieldsGrid.dataProvider = Database.blockLayoutDao.getAvailableName(getEntity());
+			}
+			
+			private function entityChangeHandler():void{
+				var listField:ArrayCollection = getOnlyPicklist(getEntity());
+				cboDriving.dataProvider = listField;
+				refreshListDataGrid();
+			}
+			
+			protected function init(event:FlexEvent):void
+			{
+				fieldsGrid.addEventListener(MouseEvent.DOUBLE_CLICK, function(e:MouseEvent):void{
+					if(e.target is DataGridItemRenderer && !(e.target.data is DataGridColumn)){
+						var obj:Object = e.target.data;					
+						var blockLayout:BlockLayoutManager = new BlockLayoutManager();
+						blockLayout.item = obj;
+						blockLayout.isCreate = false;
+						blockLayout.posSave = function(obj:Object):void{
+							refreshListDataGrid();
+						};
+						WindowManager.openModal(blockLayout);
+					}
+				});
+				
+				cboEntitys.setFocus();
+				
+			}
+			
+			private function getOnlyPicklist(entity:String):ArrayCollection{
+				var allPicklist:ArrayCollection = new ArrayCollection();
+				var data:ArrayCollection = new ArrayCollection();
+				allPicklist.addItem({label:'',data:''});
+				
+				data = Utils.getColumns(entity, true, true);
+				for each (var picklist:Object in data){
+					if(picklist.type=='Picklist'){
+						allPicklist.addItem(picklist);
+					}
+				}
+				
+				return allPicklist;
+			}
+		
+			
+			private function getEntity():String{
+				return CalculatedField.getComboDataField(cboEntitys);
+			}
+			
+			private function getSelectedField():String{
+				var selected:Object = cboDriving.selectedItem;
+				if(selected!=null){
+					return selected.data;
+				}
+				
+				return '';
+				
+			}
+			
+			protected function btnCreate_clickHandler(event:MouseEvent):void
+			{
+				var entity:String = getEntity();
+				if(StringUtils.isEmpty(entity)){
+					Alert.show(i18n._('FIELDMANAGMENTWINDOW_PLEASE_SELECT_ENTITY_FRIST'),this.title, Alert.OK, this);
+				}else{
+					var driver:String = getSelectedField();
+					if(StringUtils.isEmpty(driver)){
+						Alert.show(i18n._('PLEASE_SELECT_FIELD_FRIST@Please select a Driving Picklist first.'),this.title, Alert.OK, this);	
+					}else{
+						var blockLayout:BlockLayoutManager = new BlockLayoutManager();
+						blockLayout.item = {'entity':entity,'parent_field':driver};
+						blockLayout.isCreate = true;
+						blockLayout.posSave = function(obj:Object):void{
+							refreshListDataGrid();
+						};
+						WindowManager.openModal(blockLayout);
+					}
+				}
+				
+			}
+			
+			//@TODO
+			private function checkUsingField(list:ArrayCollection):Boolean{
+				var customfields:ArrayCollection = Database.layoutDao.selectDynamicBlock(list[0].entity);
+				for each (var cusField:Object in customfields) {
+					for each(var objDeleteF:Object in list){
+						if(cusField.column_name==(CustomLayout.BLOCK_DYNAMIC_CODE +'_'+objDeleteF.gadget_id)){
+							Alert.show(i18n._("FIELDMANAGMENTWINDOW_CAN_NOT_DELETE_THIS_FIELD") + "<" + objDeleteF.Name + ">." + i18n._("FIELDMANAGMENTWINDOW_IT_IS_USING_IN_THE_PROJECT"),titlebar.title, Alert.OK, this);
+							return true;
+						}
+					}
+				}
+				return false;
+			}
+			
+			//TODO
+			protected function changePickList(event:ListEvent):void
+			{
+				//refreshListDataGrid();
+			}
+			//@TODO
+			protected function btndelete_clickHandler(event:MouseEvent):void
+			{
+				var selectedList:ArrayCollection = FieldManagmentWindow.getListSelectedData(fieldsGrid);
+				if(selectedList.length>0){
+					if(checkUsingField(selectedList)) return;
+					Alert.show(i18n._('GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE'),titlebar.title, Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+						if (event.detail==Alert.YES){
+							Database.begin();
+							try{
+								for each(var obj:Object in selectedList){
+									Database.blockLayoutDao.delete_({'gadget_id':obj.gadget_id});
+									Database.blockDependField.delete_({'parent_id':obj.gadget_id});
+								}
+								Database.commit();
+							}catch(e:Error){
+								Database.rollback();
+							}
+							refreshListDataGrid();
+						}    	 
+					});
+				}else{
+					Alert.show(i18n._('GLOBAL_PLEASE_SELECtT_A_RECORD@Please select a record.'), "", Alert.OK, this);
+				}	
+				
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar title="{i18n._('DYNAMIC_BLOCK_MANAGMENT@Dynamic block management')}" icon="@Embed(source='/assets/customize.png')" id="titlebar" y="2" x="25"/>
+		<!--mx:VBox top="40" left="0" right="0" bottom="0"-->
+		<!-- mx:Canvas width="100%" -->
+		<mx:VBox top="40" left="0" right="0" bottom="0">
+			<mx:Form paddingTop="5" paddingLeft="0" width="100%">	
+				<mx:FormItem>
+					<mx:HBox paddingLeft="10">
+						<mx:Label text="{i18n._('GLOBAL_ENTITY')}"  width="100" fontWeight="bold" />
+						<mx:ComboBox id="cboEntitys" dataProvider="{FieldManagmentWindow.entityList}" labelFunction="{FieldManagmentWindow.getEntityDisplayName}" change="entityChangeHandler()" width="160" />
+						
+					</mx:HBox>
+				</mx:FormItem>
+				<mx:FormItem>
+					<mx:HBox paddingLeft="10">						
+						<mx:Label width="100" text="{i18n._('DRIVING_PICKLIST@Driving Picklist')}"/>
+						<mx:ComboBox width="160" id="cboDriving"  change="changePickList(event)"/>						
+					</mx:HBox>
+				</mx:FormItem>
+				<mx:FormItem paddingTop="10">
+					<mx:VBox>							
+						<mx:HBox paddingLeft="10">
+							<mx:DataGrid id="fieldsGrid" width="100%"  doubleClickEnabled="true" height="200">
+								<mx:columns>
+									<mx:DataGridColumn sortable="false" width="30" dataField="batchUpdate" headerText="{i18n._('check Delete')}" itemRenderer="CheckBoxRenderer" headerRenderer="CheckBoxRenderer" rendererIsEditor="true" />
+									<mx:DataGridColumn dataField="Name" width="320" headerText="{i18n._('GLOBAL_NAME@Name')}"/>									
+								</mx:columns>
+							</mx:DataGrid>
+						</mx:HBox>
+						<mx:HBox paddingLeft="10" width="100%">
+							<mx:Button id="btnNewField" label="{i18n._('GLOBAL_CREATE')}" click="btnCreate_clickHandler(event)" right="0"/>
+							<mx:Button id="btndeleteField" label="{i18n._('GLOBAL_DELETE')}" click="btndelete_clickHandler(event)" right="0"/>	
+							
+						</mx:HBox>
+						<mx:HBox width="95%" horizontalAlign="right">
+							<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" right="0" icon="{ImageUtils.cancelIcon}"/>
+						</mx:HBox>
+					</mx:VBox>						
+				</mx:FormItem>				
+			</mx:Form>
+			
+		</mx:VBox>	
+		
+	</mx:Canvas>
+</mx:Window>

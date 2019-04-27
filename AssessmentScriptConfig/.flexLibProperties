@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<flexLibProperties includeAllClasses="true" version="3">
+  <includeClasses>
+    <classEntry path="com.assessment.AssessmentConfLayout"/>
+    <classEntry path="com.assessment.IAssessment"/>
+    <classEntry path="com.assessment.DtoConfiguration"/>
+    <classEntry path="com.assessment.DtoPage"/>
+    <classEntry path="com.assessment.EditTableWindow"/>
+    <classEntry path="com.assessment.DtoColumn"/>
+    <classEntry path="com.assessment.DtoAssessment"/>
+    <classEntry path="com.assessment.EditColumnLayout"/>
+    <classEntry path="com.assessment.DtoAssessmentSplitter"/>
+    <classEntry path="com.assessment.ImageUtils"/>
+    <classEntry path="com.assessment.DtoPDFColorTheme"/>
+  </includeClasses>
+  <includeResources/>
+  <namespaceManifests/>
+</flexLibProperties>

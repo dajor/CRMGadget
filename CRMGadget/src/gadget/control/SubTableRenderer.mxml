@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.util.GUIUtils;
+			import gadget.util.Relation;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			public var column:AdvancedDataGridColumn;
+			import org.purepdf.utils.StringUtils;
+			
+			[Embed(source='/assets/triangle-down.gif')] [Bindable] private static var iconDown:Class;
+			[Embed(source='/assets/triangle-right.png')] [Bindable] private static var iconRight:Class;
+			[Bindable] private var dataField:String=null;
+			private var _columnCalculate:ArrayCollection;
+			private var _isCalculate:Boolean;
+			public static var RELATION:String = "Relation";
+
+			public function get isCalculate():Boolean
+			{
+				return _isCalculate;
+			}
+
+			public function set isCalculate(value:Boolean):void
+			{
+				_isCalculate = value;
+			}
+
+			public function get columnCalculate():ArrayCollection
+			{
+				return _columnCalculate;
+			}
+
+			public function set columnCalculate(value:ArrayCollection):void
+			{
+				_columnCalculate = value;
+			}
+
+			override public function set data(value:Object):void
+			{
+				super.data = value;
+				var dataProvice:ArrayCollection = getDataProvider();
+				if(isCalculate){
+					for each(var objCO7:Object in dataProvice){
+						var qty:int = parseInt(objCO7['CustomNumber0']);
+						var val:int = parseInt(objCO7['CustomCurrency4']);
+						var total:int =  val * qty;
+						objCO7[dataField] = total;
+					}
+				}
+//				subAdg.rowCount = dataProvice.length;
+				subAdg.dataProvider = dataProvice;
+				var visible:Boolean = false;
+				if(dataProvice!=null && dataProvice.length>0){
+					visible = true;
+					subAdg.rowCount = dataProvice.length;
+				}
+				subAdg.visible = visible;
+				subAdg.includeInLayout = visible;
+				super.data[RELATION] = dataProvice;
+				
+				
+			}
+			private function getDataProvider():ArrayCollection{
+				if(super.data == null) return null;
+				if(super.data.hasOwnProperty(RELATION)){
+					return super.data[RELATION] as ArrayCollection;
+				}
+				var relation:Object =Relation.getRelation(Database.customObject7Dao.entity,Database.opportunityDao.entity);;
+				
+				if(relation==null){
+					return null;
+				}
+				var dataPro:ArrayCollection = GUIUtils.getRelationList(relation, super.data);
+				return  dataPro;
+			}
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null && dataField ==null){
+					var grid:AdvancedDataGrid = value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						dataField = column.dataField;
+					}
+					
+				}
+			}
+		]]>
+	</fx:Script>
+	<mx:AdvancedDataGrid rowHeight="25" height="60" showHeaders="false" id="subAdg" width="100%" includeInLayout="true" visible="true" >
+		<mx:columns>
+			<mx:AdvancedDataGridColumn dataField="{dataField}"/>
+		</mx:columns>
+	</mx:AdvancedDataGrid>
+</s:MXAdvancedDataGridItemRenderer>

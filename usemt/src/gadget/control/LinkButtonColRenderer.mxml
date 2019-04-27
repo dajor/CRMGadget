@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.lists.List;
+			import gadget.lists.ListDetail;
+			import gadget.util.GUIUtils;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			
+			import org.purepdf.colors.RGBColor;
+
+			
+			
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid;
+			private var list:ArrayCollection ;			
+			private var _parentEntity:String;
+			private var _list:List;
+			
+			
+			public function get listDetail():List
+			{
+				return _list;
+			}
+			
+			public function set listDetail(value:List):void
+			{
+				_list = value;
+			}
+			public function get parentEntity():String
+			{
+				return _parentEntity;
+			}
+
+			public function set parentEntity(value:String):void
+			{
+				_parentEntity = value;
+			}
+
+			private function clickFunction(e:Event):void{
+				if(column!=null){
+					var entity:String = super.data.gadget_type;		
+					if(StringUtils.isEmpty(parentEntity)){
+						_list.editScreenDetail(Database.getDao(entity).findByOracleId(super.data[DAOUtils.getOracleId(entity)]),entity,null,false);		
+					}else{
+						var relation:Object = Relation.getRelation(entity,parentEntity);
+						if(relation!=null){
+							var currentItem:Object = Database.getDao(entity).findByGadgetId(super.data.gadget_id);
+							var parentId:String = currentItem[relation.keySrc];
+							_list.editScreenDetail(Database.getDao(parentEntity).findByOracleId(parentId),parentEntity,null,false);					
+							
+						}else{
+							//TODO alert missing relation
+						}
+					}
+				}
+			}	
+			
+			override public function set data(value:Object):void{		
+				super.data = value;
+				if(column!=null && value){					
+					//TODO
+					btnLink.label = value[column.dataField];					
+					
+				}
+			}
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var listGrid:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(listGrid!=null){					
+						column = grid.columns[listGrid.columnIndex];						
+					}
+					
+				}
+			}
+			
+		]]>
+		
+	</fx:Script>
+	<mx:Canvas width="100%" horizontalScrollPolicy="off">
+		<mx:LinkButton id="btnLink" click="clickFunction(event)" color="#2c79b8" textDecoration="underline" width="100%"/>
+	</mx:Canvas>
+</s:MXAdvancedDataGridItemRenderer>

@@ -1,0 +1,831 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	xmlns:ibm="http://www.ibm.com/xmlns/prod/ilog/elixir/2010"
+	resizable="false"	
+	width="800" height="600"
+	title="Synchronize"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="initButtons();initLogs();init();synWhenOpenScreen();">
+
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.rtc.core.messaging_internal;
+			import com.fellow.license.Credential;
+			import com.fellow.license.DtoMail;
+			import com.fellow.license.LicenseManager;
+			import com.fellow.license.SendMail;
+			import com.panurge.google.GoogleOAuth2;
+			import com.panurge.google.GoogleOAuth2Event;
+			import com.panurge.google.drive.events.GoogleDriveEvent;
+			import com.panurge.google.drive.model.GoogleDriveFile;
+			import com.panurge.google.drive.model.GoogleDriveParent;
+			import com.panurge.google.drive.services.GoogleDriveClient;
+			
+			import flash.net.dns.SRVRecord;
+			
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.sync.InitSyncProcess;
+			import gadget.sync.LogEvent;
+			import gadget.sync.SyncProcess;
+			import gadget.sync.incoming.CheckConflictObject;
+			import gadget.sync.task.LoginCRM;
+			import gadget.util.CacheUtils;
+			import gadget.util.DateUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.PreferenceUtils;
+			import gadget.util.SSOUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.formatters.DateFormatter;
+			import mx.utils.ObjectProxy;
+		
+		[Bindable] public var isSRSyncnow:Boolean=false;
+		[Bindable] public var records:Array;
+		[Bindable] private var localReport:ArrayCollection;
+		[Bindable] private var serverReport:ArrayCollection;
+		[Bindable] private var lastSyncDate:String;
+		[Bindable] private var license:LicenseManager = null;
+		private const MAX_LINE_REPORTED:int = 200;
+		
+		[Bindable] private var loggingMessages:ArrayCollection = new ArrayCollection();	
+			
+		public var mainWindow:MainWindow;
+		private var checkObjects:Array = null;	
+		private var dateFormatter:DateFormatter = new DateFormatter();
+		private var stageWebView:URLLoader;
+		private var driveClient:GoogleDriveClient;
+		private var oAuth:GoogleOAuth2;	
+		private var delayStageWebViewID:uint;	
+		private function init():void{
+			this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			lastSyncDate = Database.lastsyncDao.isSynced() ? " - Last Synchronize Date : " + Database.lastsyncDao.getLastSyncDate() : "";
+		}
+		private function initLogs():void {
+			
+			dateFormatter.formatString = "JJ:NN:SS";
+
+			localReport = new ArrayCollection();
+			serverReport = new ArrayCollection();	
+			if (mainWindow.syncProcess != null) {
+				if(mainWindow.syncProcess is InitSyncProcess){
+					mainWindow.syncProcess.bindFunctions(logInfo, logProgress, logCount, syncEvent,null,dosync);
+				}else{
+					mainWindow.syncProcess.bindFunctions(logInfo, logProgress, logCount, syncEvent, [mainWindow.syncEnd, initButtons], mainWindow.fieldComplete);
+				}
+//				for each (var log:LogEvent in mainWindow.syncProcess.logs) {
+//					logInfo(log);
+//				}
+				logInfos(mainWindow.syncProcess.logs);
+				logProgress(mainWindow.syncProcess.progress);
+				
+			}
+			
+		}
+		private function keyDown(evt:KeyboardEvent):void {
+		
+			if (evt.charCode == Keyboard.ESCAPE) {
+				this.close();
+			}
+		}
+		private function clearLog():void {
+			syncProgressBar.value=0;
+			loggingMessages = new ArrayCollection();
+			dgLoggingArea.validateNow();
+		}
+			
+		public function initButtons():void {
+			if (mainWindow.syncProcess == null || mainWindow.syncProcess.finished) {
+				// hide/stop spinner animation
+				toggleSpinner(false);
+				syncDataBtn.enabled = true;
+				fullSync.enabled = true;
+				fullCompare.enabled=true;
+				metadata.enabled = true;
+				btnStop.enabled = false;
+				btnClose.label = i18n._('GLOBAL_CLOSE');
+				btnClose.enabled=true;
+
+			} else {
+				// start spinner animation
+				toggleSpinner(true);
+				syncDataBtn.enabled = false;
+				fullCompare.enabled=false;
+				fullSync.enabled = false;
+				metadata.enabled = false;
+				fullCompare.selected = mainWindow.syncProcess.fullCompar;
+				fullSync.selected = mainWindow.syncProcess.full;
+				metadata.selected = mainWindow.syncProcess.metaSyn;
+				btnStop.enabled = true;
+				btnClose.label = i18n._('SYNCHRONIZE_BUTTON_RUN_IN_BACKGROUND');	
+				//accetp cannot run as background
+				if(records!=null && records.length>0){
+					btnClose.enabled=false;
+					
+					
+				}
+			}
+			if (mainWindow.syncProcess != null && mainWindow.syncProcess.hasErrors) {
+        		sendMailButton.includeInLayout = true;
+        		sendMailButton.visible = true;
+				sendDB.includeInLayout = true;
+				sendDB.visible=true;
+				mainWindow.syncBtn2.setStyle("icon", ImageUtils.synErrorIcon);
+        	} else {
+        		sendMailButton.includeInLayout = false;
+        		sendMailButton.visible = false;
+				sendDB.includeInLayout = false;
+				sendDB.visible=false;
+				mainWindow.syncBtn2.setStyle("icon", ImageUtils.synOkIcon);
+        	}
+			//syncnow cannot do full sync
+			if(isSRSyncnow){				
+				fullSync.enabled=false;		
+				metadata.enabled=false;
+				fullCompare.enabled=false;
+				syncDataBtn.enabled=false;
+			}
+			
+			
+			
+			PreferenceUtils.WindowScreenBounds(this);
+		}
+		
+		private function synWhenOpenScreen():void{
+			if(isSRSyncnow){
+				syncData();
+			}
+				
+		}
+			
+			
+	
+			
+			
+			private function testConnectionError(error:String, event:Event):void {
+				
+				logInfo(new LogEvent(LogEvent.ERROR, error));
+				if(isSRSyncnow){
+					//bug#746---mony
+					if(error.indexOf("#2032")!=-1){						
+						for each (var obj:Object in records){
+							if(obj.CustomPickList10=="ONST"){								
+								obj.local_update = new Date().getTime();
+								Database.serviceDao.updateByOracleId(obj);
+							}
+							
+						}
+						
+					}
+				}
+//				mainWindow.syncProcess.stop();		
+				mainWindow.isUpdateTransaction=false;
+				mainWindow.syncEnd();
+				mainWindow.syncProcess=null;
+				initButtons();
+			}
+			
+			private function dosync():void{
+					
+				if(mainWindow.syncProcess!=null && mainWindow.syncProcess.finished && !mainWindow.syncProcess.isStopped){
+					var full:Boolean = fullSync.selected || mainWindow.syncProcess.full;
+					var oldLogs:ArrayCollection = mainWindow.syncProcess.logs;
+					if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_CHECK_CONFLICTS,0)){
+						mainWindow.syncProcess = new SyncProcess(full,metadata.selected,fullCompare.selected,false,null,checkObjects);	
+						syncProgressBar.value=0;
+						mainWindow.syncProcess.bindFunctions(logInfo, null, logCount, syncEvent, [checkConflicts,initButtons], mainWindow.fieldComplete);											
+					}else{
+						mainWindow.syncProcess = new SyncProcess(full,metadata.selected,fullCompare.selected,false);	
+						mainWindow.syncProcess.bindFunctions(logInfo, logProgress, logCount, syncEvent, [mainWindow.syncEnd, initButtons], mainWindow.fieldComplete);
+						
+					}
+					mainWindow.syncProcess.logs = oldLogs;
+					mainWindow.syncProcess.start();
+				}else{
+					//sync has been stopped
+					mainWindow.syncEnd();
+					initButtons();
+				}
+			}
+			
+			private function testConnectionSuccess(sessionId:String):void {
+				initButtons();
+				mainWindow.syncProcess.start();
+			}
+			
+			
+			
+			private function checkConflicts():void{
+				if(mainWindow.syncProcess==null || mainWindow.syncProcess.isStopped){
+					return;
+				}
+				var conflicts:ArrayCollection=new ArrayCollection();
+				for each(var obj:CheckConflictObject in checkObjects){
+					conflicts.addAll(obj.getConflicts());
+				}
+				if(conflicts.length>0){
+					var mergeConflicts:MergeConflictsObject=new MergeConflictsObject();
+					mergeConflicts.datas=conflicts;
+					mergeConflicts.syncEnd=mainWindow.syncEnd;
+					mergeConflicts.startSyn=startSyn;
+					WindowManager.openModal(mergeConflicts);
+				}else{
+					startSyn();
+				}
+			}
+			private function startSyn():void{
+					mainWindow.syncProcess =  new SyncProcess(fullSync.selected,metadata.selected,fullCompare.selected);
+					mainWindow.syncProcess.bindFunctions(logInfo, logProgress, logCount, syncEvent, [mainWindow.syncEnd, initButtons], mainWindow.fieldComplete);
+					mainWindow.syncProcess.start();
+					initButtons();
+			}
+			
+			
+			
+			
+			
+			
+			
+		public function syncData():void {
+			var preference:Object = Database.preferencesDao.read();
+			
+			var credential:Credential = new Credential(preference.sodhost, preference.sodlogin, "CRM Gadget");
+			license = new LicenseManager(credential);
+			var window:Synchronize = this;
+			license.isValid(function(valid:Boolean):void {
+				if(valid) {
+					new CacheUtils("right").clear();
+					new CacheUtils("field").clear();
+					if (mainWindow.syncProcess == null || mainWindow.syncProcess.finished) {
+						clearLog();					
+						Database.syncNumberDao.increaseSyncNumber();
+						var logStart:LogEvent = new LogEvent(LogEvent.INFO, i18n._('SYNCHRONIZE_SYNCHRONIZATION_STARTED'));
+						logInfo(logStart);					
+						localReport = new ArrayCollection();
+						serverReport = new ArrayCollection();	
+						mainWindow.syncBtn1.visible = true;
+						mainWindow.syncBtn1.includeInLayout = true;
+						mainWindow.syncBtn2.visible = false;
+						mainWindow.syncBtn2.includeInLayout = false;				
+						checkObjects=null;
+						if(!isSRSyncnow){
+							
+							var firstSync:Boolean = Database.lastsyncDao.getLastSyncDate()==null||fullSync.selected;
+							
+							if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_CHECK_CONFLICTS,0)){
+								var enableTrans:ArrayCollection = Database.transactionDao.listEnabledTransaction();
+								checkObjects=new Array();
+								for each(var obj:Object in enableTrans){						
+									checkObjects.push(new CheckConflictObject(obj.entity));
+								}							
+							}
+							mainWindow.syncProcess =new InitSyncProcess(firstSync,metadata.selected,fullCompare.selected);
+							mainWindow.syncProcess.bindFunctions(logInfo, logProgress, logCount, syncEvent,null,dosync);
+						}else{
+							mainWindow.syncProcess = new SyncProcess(false,false,false,isSRSyncnow,records);
+							mainWindow.syncProcess.bindFunctions(logInfo, logProgress, logCount, syncEvent, [mainWindow.syncEnd, initButtons],completed);
+						}
+						mainWindow.syncProcess.logs.addItem(logStart);
+										
+						//reset session
+						SSOUtils.resetSession();
+						var login:LoginCRM = new LoginCRM(testConnectionSuccess, testConnectionError);
+						login.loginCRM(preference, false);
+						mainWindow.checkTips();
+					}
+					btnClose.label = i18n._('SYNCHRONIZE_BUTTON_RUN_IN_BACKGROUND');
+					if(isSRSyncnow) this.close(); // run synchronize window in background
+				}else {
+					var body:String = i18n._("COMPANY_NAME") + ": " + credential.company + "\n" + i18n._("URL") + ": " + credential.shorturl + "\n" + i18n._("PRODUCT_NAME") + ": " + credential.device;
+					//var dtoMail:DtoMail = new DtoMail("sales@fellow-consulting.de", i18n._("LICENSE_ACTIVATION"), body);
+					//CR #5610 CRO
+				    var errorEmail:String = Database.preferencesDao.getStrValue(PreferencesDAO.ERROR_EMAIL,"");
+					if(StringUtils.isEmpty(errorEmail)){
+						Alert.show(i18n._('NO_EMAIL_ADDRESS_FOR_SENDING_PLEASE_CONTACT_YOUR_ADMINISTRATOR'), "", Alert.OK, window);
+					}else{
+						var dtoMail:DtoMail = new DtoMail(errorEmail, i18n._("LICENSE_ACTIVATION"), body);
+						var mail:SendMail = new SendMail(dtoMail);
+						mail.send();
+					}
+					
+				}
+			});
+		}
+			
+		private function toggleSpinner(on:Boolean):void {
+			if (!on) {
+				spinner.stop();
+			} else {
+				spinner.play();
+			}
+		}
+			
+		/*private function alertHandler(event:CloseEvent):void {
+			if (event.detail == Alert.NO) {
+				fullSync.selected = false;
+				metadata.selected = false;
+			}
+		}	*/
+			
+		private function completed():void {
+			license.updateLicense();
+			mainWindow.fieldComplete();
+		}	
+			
+		private function fullSynData():void {
+			if (fullSync.selected){
+				Alert.show(i18n._('SYNCHRONIZE_ALERT_FULL_SYNCHRONIZATOIN'), i18n._('SYNCHRONIZE_ALERT_WARNING'), Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+					if (event.detail==Alert.YES){
+						metadata.selected = false;
+					}else{
+						fullSync.selected = false;
+					}
+				});
+			} 
+		}		
+		
+			
+		private function parallelProcessing():void {
+//			if (fullCompare.selected){
+//				Alert.show(i18n._('GLOBAL_MESSAGE_PARALLEL_PROECESSING_IS_RECOMMENDED_FOR_SLOW_NETWORK'), i18n._('GLOBAL_MESSAGE_PARALLEL_PROCESSING'), Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+//					if (event.detail!=Alert.YES){
+//						fullCompare.selected = false;
+//					}
+//				});
+//			} 
+		}		
+		private function synMetaData():void {
+			if(metadata.selected){
+				Alert.show(i18n._('GLOBAL_DOWNLOAD_ONLY_THE_META_DATA'), i18n._('GLOBAL_DOWNLOAD_ONLY_THE_META_DATA'), 3, this, function(event:CloseEvent):void{
+					if (event.detail==Alert.YES){
+						fullSync.selected = false;
+					}else{
+						metadata.selected = false;
+					}
+				});
+			}
+		}	
+			
+		private function stop():void {
+			//CRO 05.01.2011
+            Alert.show(i18n._('SYNCHRONIZE_ALERT_ARE_YOU_SURE_YOU_TO_STOP_SYNCHRONIZE'), i18n._('GLOBAL_SYNCHRONIZATOIN'), 3, this, function(event:CloseEvent):void{
+ 				if (event.detail==Alert.YES){
+ 					btnStop.enabled = false;
+					mainWindow.syncProcess.stop();
+					mainWindow.syncProcess = null;
+					if(license!=null){
+						license.updateLicense();
+					}
+     			}
+            });
+		}
+		
+		private function logInfos(logs:ArrayCollection):void{
+			var list:ArrayCollection = new ArrayCollection();
+			for each(var log:LogEvent in logs){
+				list.addItem(createMessage(log));
+			}
+			loggingMessages = list;
+			dgLoggingArea.validateNow();
+			dgLoggingArea.verticalScrollPosition = dgLoggingArea.maxVerticalScrollPosition;
+		}
+		
+		private function createMessage(log:LogEvent):Object{
+			var msg:Object = new Object();
+			msg.type = log.type;
+			msg.event = log.event;
+			msg.time = dateFormatter.format(log.date);
+			msg.record=log.errorRecord;
+			var text:String = dateFormatter.format(log.date) + " - ";
+			if (log.event != null) {
+				text += Utils.formatEvent(log.event) + "\n" + Utils.htmlEscape(log.text);
+				//				msg.message = Utils.formatEvent(log.event) + "\n" + Utils.htmlEscape(log.text);
+				msg.message = Utils.htmlEscape(log.text);
+			} else {
+				text += log.text;
+				msg.message = log.text;
+			}
+			return msg;
+		}
+			
+		private function logInfo(log:LogEvent):void {
+			
+			
+			//VAHI use ObjectProxy to suppress "warning: unable to bind to property"
+			loggingMessages.addItem(new ObjectProxy(createMessage(log)));
+			dgLoggingArea.validateNow();
+			dgLoggingArea.verticalScrollPosition = dgLoggingArea.maxVerticalScrollPosition;
+		}
+			
+		private function logProgress(percent:int):void {
+			if (mainWindow.syncProcess != null) {
+				syncProgressBar.value = percent;
+			}
+		}
+			
+		private function logCount(nbItems:int, entityName:String):void {
+			if (nbItems == 0) {
+				ItemSyncInfo.text = '';
+			} else {
+				var pl:String = Database.customLayoutDao.getPlural(entityName);
+				if (pl==null)
+					pl=entityName;
+				ItemSyncInfo.text = nbItems + ' ' + pl + ' ' + i18n._('SYNCHRONIZE_HAVE_BEEN_SYNCHRONIZED');
+			}
+		}
+		
+		private function syncEvent(remote:Boolean, type:String, name:String, action:String):void {
+			var reportLine:Object = new Object();
+			reportLine.type = type;
+			reportLine.name = name;
+			reportLine.action = action;
+			if (remote) {
+				//VAHI ObjectProxy removes warning: unable to bind to property 'type' on class 'Object' (class is not an IEventDispatcher)
+				serverReport.addItem(new ObjectProxy(reportLine));
+				if(serverReport.length > MAX_LINE_REPORTED){
+					serverReport.removeItemAt(0);
+				}
+			} else {
+				//VAHI ObjectProxy removes warning: unable to bind to property 'type' on class 'Object' (class is not an IEventDispatcher)
+				localReport.addItem(new ObjectProxy(reportLine));
+				if(localReport.length > MAX_LINE_REPORTED){
+					localReport.removeItemAt(0);
+				}
+			}
+		}
+		
+		private function handleErrorAction():void{
+			var d:Date = new Date();
+			var dateFormatter:DateFormatter = new DateFormatter();
+            dateFormatter.formatString = "DD/MM/YYYY JJ:NN:SS"; //VAHI I (sic!) need the time in forwarded errors
+			// Bug #195
+			//Utils.openURL(generateURL("support@crm-gadget.com","Synchronization Error - " + dateFormatter.format(d), Database.errorLoggingDao.dumpOnlyError()), "_blank");//.substr(0,5000) CRO
+			
+			//CR #5610 CRO
+			var emailAddress:String = Database.preferencesDao.getStrValue(PreferencesDAO.ERROR_EMAIL,"");
+			if(StringUtils.isEmpty(emailAddress)){
+				//Alert.show(i18n._('NO_EMAIL_ADDRESS_FOR_SENDING_PLEASE_CONTACT_YOUR_ADMINISTRATOR'), "", Alert.OK, this);
+				
+				//default email
+				emailAddress = "g2g@fellow-consulting.de";
+				
+			//}else{
+			//	Utils.openURL(generateURL(emailAddress,"Synchronization Error - " + dateFormatter.format(d), Database.errorLoggingDao.dumpOnlyError()), "_blank");//.substr(0,5000) CRO
+			}
+			Utils.openURL(generateURL(emailAddress,"Synchronization Error - " + dateFormatter.format(d), Database.errorLoggingDao.dumpOnlyError()), "_blank");//.substr(0,5000) CRO
+			
+		}
+		
+		private function generateURL(email:String, subject:String, body:String):String{	
+			// var escapeBody:String = str.replace(""," "); // encodeURI(body).replace(/\%0D/g, "%0A").substr(0,20000);
+			//body = body.replace(/</g, "&lt;");
+			//body = body.replace(/>/g, "&gt;");
+			//body = body.replace(/\n/g, "%3C%2Fp%3E"); // Decode line breaks 
+			//body = body.replace(/%2%2C0/g, "%2C%20"); // Fix bug in syntax
+			var unescapeBody:String = unescape(encodeURI(body)).substr(0,20000);
+			// unescapeBody = StringUtils.xmlUnEscape(unescapeBody);	
+			//unescapeBody = unescapeBody.replace(/'/g, "&apos;");
+			//unescapeBody = unescapeBody.replace(/''/g, "&quot;");
+			//unescapeBody = unescapeBody.replace(/& /g, "&amp;");
+			
+			return "mailto:" + email + "?subject=" + encodeURI(subject) + "&body=" + unescapeBody;
+		}	
+		
+		private function showLoggingDetail():void {
+			var loggingDetail:LoggingDetail = new LoggingDetail();
+			loggingDetail.item = dgLoggingArea.selectedItem;
+			if(loggingDetail.item.record!=null){
+				var record:Object = loggingDetail.item.record;
+				var type:String = record.gadget_type;
+				if(type.indexOf(".")!=-1){
+					type = type.substring(0,type.indexOf("."));
+					var oraId:String = DAOUtils.getOracleId(type);
+					if(record[oraId]!=null){
+						var parentRec:Object = Database.getDao(type).findByOracleId(record[oraId]);
+						if(parentRec!=null){
+							record = parentRec;
+						}
+					}
+					
+				}
+				
+				loggingDetail.list=mainWindow.getListByEntity(record.gadget_type);
+			}			
+			WindowManager.openModal(loggingDetail);
+		}
+		
+
+			protected function sendDB_clickHandler(event:MouseEvent):void
+			{
+				uploadCompleted=false;
+				oAuth = new GoogleOAuth2();
+				var window:Window = this;
+				Utils.showLoadingProgressWindow(function():void{				
+				
+					oAuth.CLIENT_ID = "267663819664-6olpjmua10ipq7gpptcrj83e3up1mo31.apps.googleusercontent.com"
+					oAuth.CLIENT_SECRET = "qaa-vKafnS-zkbxl_UwCM9l9";
+					oAuth.REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob";
+					oAuth.SCOPES = "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";					
+					// we want to delegate to the framework the management of session and tokens
+					oAuth.manageSession = true;					
+					// instantiates the Drive Client
+					driveClient = new GoogleDriveClient(oAuth);
+					driveClient.addEventListener(GoogleDriveEvent.ERROR_EVENT, onApiError);
+					driveClient.addEventListener(GoogleDriveEvent.UPLOAD_ERROR, onApiError);
+					
+					GoogleDriveClient.auto_detect_mimetype = true;
+					
+					// creates a StageWebView to host Login/Auth page prompted by Google Auth
+					stageWebView = new URLLoader();
+					//stageWebView.viewPort = new Rectangle(0,0,400,400);
+					
+					// initilize the OAth2 process
+					oAuth.stageWebView = stageWebView; // note that in this moment we don't need to display the StageWebView (see: onAuthRequestInit)
+					
+					oAuth.addEventListener(GoogleOAuth2Event.AUTH_REQUEST_INIT, onAuthRequestInit);
+					oAuth.addEventListener(GoogleOAuth2Event.AUTH_FAULT, onAuthFault);
+					oAuth.addEventListener(GoogleOAuth2Event.AUTH_SUCCESS, onAuthSuccess);
+					
+					oAuth.init();
+				
+				
+				},i18n._("UPLOADING_TILEL@Uploading..."),i18n._("SEND_DB_TITLE@Send DB"),200,function(progress:Window):void{
+					var loadTimer:Timer = new Timer(10, 0); 
+					loadTimer.addEventListener(TimerEvent.TIMER, function():void{
+						if(uploadCompleted){
+							loadTimer.stop();
+							progress.close();
+							if(!StringUtils.isEmpty(uploadMessage)){
+								Alert.show(uploadMessage,i18n._("SEND_DB_TITLE@Send DB"),4,window);
+							}
+						}
+						
+						
+					}); 
+					loadTimer.start();
+				});
+				
+			}
+			protected function onAuthFault(event:GoogleOAuth2Event):void
+			{
+				Alert.show("onAuthFault\nerror code: " + event.code + "\nerror message: " + event.message,i18n._("SEND_DB_TITLE@Send DB"),4,this);
+			}
+			
+			protected function onUploadFileComplete(event:GoogleDriveEvent):void
+			{
+				uploadCompleted = true;
+				uploadMessage = "DB was sucessfully sent!";
+				
+			}
+			
+			protected function onUploadFileError(event:GoogleDriveEvent):void
+			{
+				uploadCompleted = true;
+				uploadMessage = "Error sending Database!";
+			}
+			protected var uploadMessage:String = '';
+			protected var uploadCompleted:Boolean = false;
+			protected function onUploadingProgress(e:ProgressEvent):void{
+				//TODO later
+			}
+			protected function onAuthSuccess(event:GoogleOAuth2Event):void
+			{
+				var fileRef:File = File.applicationDirectory.resolvePath(Database.getCustomDatabasePathFromFile() + "/" + Database.ENCRYPTED_DB_NAME);
+				clearTimeout(delayStageWebViewID);
+				
+				oAuth.removeEventListener(GoogleOAuth2Event.AUTH_SUCCESS, onAuthSuccess);
+				
+				// the auth was succefull so we can dispose the stageWebView				
+				stageWebView = null;
+				
+				var ba:ByteArray = new ByteArray();
+				var fileStream:FileStream = new FileStream();
+				fileStream.open(fileRef,FileMode.READ);
+				fileStream.readBytes(ba);
+				fileStream.close();
+				//fileRef.load();
+				
+				var fileName:String = Database.allUsersDao.ownerUser().Alias + "_"+DateUtils.format(new Date(), "DDMMYYYYTJJNN")+"_gadget2gox.db";
+				driveClient.files.addEventListener(GoogleDriveEvent.FILE_INSERT, onUploadFileComplete);
+				//TODO progress
+				driveClient.files.addEventListener(GoogleDriveEvent.UPLOAD_ERROR, onUploadFileError);
+				driveClient.files.onUploadingProgress = onUploadingProgress;
+				var fileDrive:GoogleDriveFile = new GoogleDriveFile();
+				fileDrive.title = fileName;
+				fileDrive.description = "DB SYNC. ERROR";
+				// if you have erro in uploading text files, force the mimetype 
+				//fileDrive.mimeType = "application/x-shockwave-flash";
+				var parent:GoogleDriveParent = new GoogleDriveParent();
+				parent.id = "0B1HZtRGEF87cM1c1eDJ3cTA2bkE";
+				fileDrive.parents = [parent];
+				
+				driveClient.files.file_insert(fileDrive, ba);
+			}
+			
+			protected function onAuthRequestInit(GoogleOAuth2Event:Event):void
+			{
+				//cannot init cause we have token already
+				
+//				trace("onAuthRequestInit");
+//				// we have access_token, but we haven't refreshToken: 
+//				// this shouldn't happen, but anyway we can have another change to authenticate without any valid refreshToken, having a valid access_token
+//				if (oAuth.accessToken != "" && (oAuth.refreshToken == "" || oAuth.refreshToken == null)){
+//					
+//					stageWebView.addEventListener(LocationChangeEvent.LOCATION_CHANGING, onLocationChanging);
+//					stageWebView.addEventListener(LocationChangeEvent.LOCATION_CHANGE, onLocationChanging);
+//					
+//					clearTimeout(delayStageWebViewID);
+//					delayStageWebViewID = setTimeout(function():void{
+//						trace("Timeout, no URL redirect detected, we need the stageWebView, to grant the app");
+//						stageWebView.viewPort = new Rectangle(0,0,stage.stageWidth,stage.stageHeight);
+//						stageWebView.stage = stage;
+//					}, 2000); // or time you need
+//					
+//					function onLocationChanging(locationChangeEvent:LocationChangeEvent):void
+//					{
+//						if (locationChangeEvent.location.indexOf(oAuth.REDIRECT_URI) == 0)
+//						{
+//							stageWebView.removeEventListener(LocationChangeEvent.LOCATION_CHANGING, onLocationChanging);
+//							stageWebView.removeEventListener(LocationChangeEvent.LOCATION_CHANGE, onLocationChanging);
+//							
+//							trace("success in AUTH so we can cancel the stagewebview timeout");
+//							clearTimeout(delayStageWebViewID);
+//							// onAuthSuccess we'll dispose the stageWebView
+//						}
+//					}
+//				}
+//				else{
+//					// display directly the html page to let the user grant the app
+//					stageWebView.viewPort = new Rectangle(0,0,stage.stageWidth,stage.stageHeight);
+//					stageWebView.stage = stage;
+//				}
+				
+			}
+			protected function onApiError(event:GoogleDriveEvent):void
+			{
+				if (event.data){
+					if (event.data is String){
+						Alert.show("onAPIError\nerror code: " + event.data);
+					}
+					else{
+						if (event.data.code && event.data.message){
+							Alert.show("onAPIError\nerror code: " + event.data.code + "\nerror message: " + event.data.message);
+						}
+						else{
+							Alert.show("onAPIError");
+						}
+					}
+				}
+				else{
+					Alert.show("onAPIError\n: " + event.toString());
+				}
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Style source="ilog-gauges.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0"><!--CRO 05.01.2011-->
+		<control:TitleBar icon="@Embed(source='/assets/sync.png')" title="{i18n._('GLOBAL_SYNCHRONIZATOIN')}"/>
+		
+		<mx:VBox top="32" left="16" right="16" bottom="16" verticalGap="16">
+
+			<mx:Panel title="{i18n._('SYNCHRONIZE_PANEL_PROGRESS')}{lastSyncDate}" width="100%">
+				<mx:VBox width="100%" paddingLeft="8" paddingRight="8" paddingTop="8" paddingBottom="8">
+					
+					<mx:DataGrid id="dgLoggingArea" doubleClickEnabled="true" doubleClick="showLoggingDetail();" rowCount="5" dataProvider="{loggingMessages}" width="100%" height="135" variableRowHeight="true">
+						<mx:columns>
+							<mx:DataGridColumn headerText="{i18n._('SYNCHRONIZE_DATAGRID_COLUMN_TIME')}" width="100">
+								<mx:itemRenderer>
+									<mx:Component>
+										<mx:Label text="{data.time}" fontSize="10"/>
+									</mx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="{i18n._('SYNCHRONIZE_DATAGRID_COLUMN_TYPE')}" dataField="type" width="60">
+								<mx:itemRenderer>
+									<mx:Component>
+										<mx:HBox width="100%" horizontalScrollPolicy="off" horizontalAlign="center">
+											<mx:Script>
+												<![CDATA[
+													import gadget.sync.LogEvent;
+													import gadget.util.ImageUtils;
+													private function getImage(str:String):Class{
+														var typeIcon:Class;
+														switch(data.type)
+														{
+															case LogEvent.ERROR: typeIcon = ImageUtils.errorIcon; break;
+															case LogEvent.WARNING: typeIcon = ImageUtils.warningIcon; break;
+															case LogEvent.SUCCESS: typeIcon = ImageUtils.tickIcon; break;
+															default: typeIcon = ImageUtils.infoIcon;
+														}
+														return typeIcon;
+													}
+												]]>
+											</mx:Script>
+											<mx:Image source="{getImage(data.type)}"/>
+										</mx:HBox>
+									</mx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn><!--CRO 05.01.2011-->
+							<mx:DataGridColumn headerText="{i18n._('GLOBAL_MESSAGE')}" dataField="message" itemRenderer="gadget.control.SynLoggingColorRenderer"/>
+							<!--<mx:DataGridColumn headerText="{i18n._('GLOBAL_RECORD_NAME')}" dataField="recordename" width="100"/>-->
+						</mx:columns>
+					</mx:DataGrid>
+						
+					<mx:VBox width="100%" >
+						<ibm:HLinearGauge id="syncProgressBar" title="{i18n._('SYNCHRONIZE_HLINEAR_GAUGE_SYNCHRONIZATION_PROGRESS')}" width="100%" editable="false"
+									  trackMinimum="50" trackMaximum="100" snapInterval="1" orientation="ltr" maximum="100" mode="bar" styleName="horizontalSpark"/>
+						<mx:HBox width="100%">
+							<control:Spinner id="spinner" tickColor="#66aaff"/>
+							<mx:Text id="ItemSyncInfo"/>
+							<mx:HBox width="100%" horizontalAlign="right">
+								<mx:LinkButton includeInLayout="false" icon="@Embed('/assets/mail_icon.png')" label="{i18n._('SYNCHRONIZE_LINK_BUTTON_EMAIL_ERROR_REPORT')}" id="sendMailButton" visible="false" click="handleErrorAction()" />
+								<mx:LinkButton includeInLayout="false" icon="@Embed('/assets/drillup.png')" label="{i18n._('SYNCHRONIZE_SEND_DB@Send DB')}" id="sendDB" visible="false" click="sendDB_clickHandler(event)" />
+							</mx:HBox>	
+						</mx:HBox>
+					</mx:VBox>
+				</mx:VBox>
+			</mx:Panel>	
+
+			<mx:HBox width="100%" height="100%">
+				<mx:Panel title="{i18n._('SYNCHRONIZE_PANEL_LOCAL')}" titleStyleName="syncHeader" width="50%" height="100%" headerHeight="64" titleIcon="@Embed('/assets/laptop.png')">
+					<mx:DataGrid id="localList" dataProvider="{localReport}" width="100%" height="100%">
+						<mx:columns><!--CRO 05.01.2011-->
+							<mx:DataGridColumn headerText="{i18n._('GLOBAL_NAME')}">
+								<mx:itemRenderer>
+									<mx:Component>
+										<mx:HBox width="100%" horizontalScrollPolicy="off">
+											<mx:Script>
+												<![CDATA[
+													import gadget.util.ImageUtils;
+												    private function getImage(str:String):Class{
+												        return ImageUtils.getImage(str);
+												    }  
+												]]>
+											</mx:Script>
+											<mx:Image source="{getImage(data.type)}"/>
+											<mx:Label width="100%" text="{data.name}"/>
+										</mx:HBox>
+									</mx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="{i18n._('SYNCHRONIZE_DATAGRID_COLUMN_ACTION')}" dataField="action"/>
+						</mx:columns>
+					</mx:DataGrid>						
+				</mx:Panel>
+				<mx:Panel title="{i18n._('SYNCHRONIZE_PANEL_SERVER')}" titleStyleName="syncHeader" width="50%" height="100%" headerHeight="64" titleIcon="@Embed('/assets/server.png')">
+					<mx:DataGrid id="serverList" dataProvider="{serverReport}" width="100%" height="100%">
+						<mx:columns><!--CRO 05.01.2011-->
+							<mx:DataGridColumn headerText="{i18n._('GLOBAL_NAME')}">
+								<mx:itemRenderer>
+									<mx:Component>
+										<mx:HBox width="100%" horizontalScrollPolicy="off">
+											<mx:Script>
+												<![CDATA[
+													import gadget.util.ImageUtils;
+										    		
+												    private function getImage(str:String):Class{
+												        return ImageUtils.getImage(str);
+												    }  
+												]]>
+											</mx:Script>
+											<mx:Image source="{getImage(data.type)}"/>
+											<mx:Label width="100%" text="{data.name}"/>
+										</mx:HBox>
+									</mx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="{i18n._('SYNCHRONIZE_DATAGRID_COLUMN_ACTION')}" dataField="action"/>
+						</mx:columns>
+					</mx:DataGrid>						
+				</mx:Panel>		
+			</mx:HBox>
+			<mx:Canvas width="100%">
+				<mx:HBox left="0"><!--CRO 05.01.2011-->
+					<mx:Button emphasized="true" label="{i18n._('GLOBAL_SYNCHRONIZE')}" id="syncDataBtn" click="syncData()"/>	
+					<mx:CheckBox id="fullSync" label="{i18n._('SYNCHRONIZE_CHECK_BOX_PERFOM_FULL_SYNCHRONIZE')}" 
+						click="fullSynData()"/>
+					<mx:CheckBox id="metadata" label="{i18n._('GLOBAL_META_DATA_ONLY')}" click="synMetaData()" />	
+					<mx:CheckBox id="fullCompare" label="{i18n._('FULL_COMPARE@Full Compare')}" click="parallelProcessing()"/>
+				</mx:HBox>				
+			</mx:Canvas>
+			<mx:Canvas width="100%">
+			<mx:HBox right="0">
+				<mx:Button id="btnStop" label="{i18n._('SYNCHRONIZE_BUTTON_STOP')}" click="stop();"/>
+				<mx:Button id="btnClose" click="close();" right="0"/>	
+			</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

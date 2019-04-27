@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="580" height="380"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init()">
+	
+	<mx:Script>
+		<![CDATA[
+			import be.boulevart.google.ajaxapi.search.images.GoogleImageSearch;
+			import be.boulevart.google.ajaxapi.search.images.data.types.GoogleImageSafeMode;
+			import be.boulevart.google.ajaxapi.search.images.data.types.GoogleImageSize;
+			import be.boulevart.google.events.GoogleAPIErrorEvent;
+			import be.boulevart.google.events.GoogleApiEvent;
+			
+			import gadget.util.CacheUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			
+			private var google:GoogleImageSearch;
+			
+			[Bindable] private var imaProvider:ArrayCollection;
+			[Bindable] private var lnkProvider:ArrayCollection;
+			[Bindable] private var _visible:Boolean = false;
+			[Bindable] public var _upload:Function;
+			public var item:Object;
+			
+			private const NUMBER_PER_PAGE:int = 8;
+			
+			private function init():void {
+				if(item!=null && item.hasOwnProperty("ContactFullName")){
+					textSearch.text = item["ContactFullName"];
+					textSearch.setSelection(textSearch.text.length,textSearch.text.length+1);
+				} 
+				textSearch.setFocus();
+				google = new GoogleImageSearch();
+				lnkProvider = new ArrayCollection([
+									{label: "1", data: "1"},
+									{label: "2", data: "2"},
+									{label: "3", data: "3"},
+									{label: "4", data: "4"}
+								]);
+			}
+
+			private function searchImage(textSearch:String, pageStart:int):void {
+				
+				google.search(textSearch, pageStart, GoogleImageSafeMode.MODERATE, GoogleImageSize.SMALL);
+				
+				google.addEventListener(GoogleApiEvent.IMAGE_SEARCH_RESULT, function(e:GoogleApiEvent):void {
+					
+					var data:Object = (e as GoogleApiEvent).data;
+					var cache:CacheUtils = new CacheUtils("GoogleSearchImage");
+					var listImage:ArrayCollection = cache.get(textSearch + pageStart) as ArrayCollection;
+					
+					imaProvider = new ArrayCollection();
+					if(listImage != null && listImage.length > 0) {
+						imaProvider = listImage;
+					}else {
+						for each(var ima:Object in data.results) {
+							imaProvider.addItem({label: ima.title, title: ima.titleNoFormatting, icon: ima.url, width: ima.width, height: ima.height});
+							trace("title: " + ima.title + ", url: " + ima.url + ", width: " + ima.width + ", height: " + ima.height);
+						}
+					}
+					
+					if(imaProvider.length > 0) {
+						cache.put(textSearch + pageStart, imaProvider);
+						_visible = true;
+					}else {
+						_visible = false;
+					}
+					
+				});
+				
+				google.addEventListener(GoogleAPIErrorEvent.API_ERROR, function(e:GoogleAPIErrorEvent):void {
+					trace(e);
+				});
+				
+			}
+			
+			private function uploadFile(e:ListEvent):void {
+				var icon:String = e.currentTarget.selectedItem.icon;
+				var fileName:String = icon.substr(icon.lastIndexOf("/") + 1, icon.length);
+				var loader:URLLoader = new URLLoader(new URLRequest(icon));
+				loader.dataFormat = URLLoaderDataFormat.BINARY;
+				loader.addEventListener(Event.COMPLETE, function(e:Event):void {
+					var data:ByteArray = e.currentTarget.data as ByteArray;
+					_upload(fileName, data);
+				});
+				close();
+			}
+			
+			private function searchByNumPage(e:Event):void {
+				var pageStart:int = (e.currentTarget as LinkBar).selectedIndex * NUMBER_PER_PAGE;
+				searchImage(textSearch.text, pageStart);
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="580" height="380" right="0" bottom="0">
+		<control:TitleBar id="titlebar" title="Google Images" y="2" x="25"/>
+		<mx:VBox top="36" left="8" right="8" bottom="8">
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:TextInput id="textSearch" width="220" />
+				<mx:LinkButton id="button" icon="@Embed('/assets/search.png')" width="24" height="24" click="searchImage(textSearch.text, 0)" />
+			</mx:HBox>
+			<mx:VBox width="100%" height="100%" includeInLayout="{_visible}" visible="{_visible}">
+				<mx:HBox width="100%" verticalAlign="middle" paddingTop="0" paddingBottom="5">
+					<mx:Label text="Result:" paddingRight="0" />
+					<mx:LinkBar color="0x0050AA" horizontalAlign="left" width="100%" fontWeight="bold" dataProvider="{lnkProvider}" itemClick="searchByNumPage(event)" />	
+				</mx:HBox>
+				<mx:TileList id="list" dataProvider="{imaProvider}" width="100%" height="100%" cacheAsBitmap="true" itemClick="uploadFile(event)">
+					<mx:itemRenderer>
+						<mx:Component>
+							<mx:VBox horizontalScrollPolicy="off" paddingTop="12" paddingRight="12" paddingBottom="12" paddingLeft="12">
+								<mx:Script>
+									<![CDATA[
+										import gadget.util.StringUtils;
+									]]>
+								</mx:Script>
+								<mx:Image source="{data.icon}" width="64" height="64" toolTip="{data.title}" />
+							</mx:VBox>
+						</mx:Component>
+					</mx:itemRenderer>
+				</mx:TileList>
+			</mx:VBox>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

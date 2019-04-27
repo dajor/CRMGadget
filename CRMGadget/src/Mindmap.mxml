@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:sg="com.adobe.flex.extras.controls.springgraph.*" 
+	xmlns:control="gadget.control.*"
+	xmlns:local="*" 
+	layout="absolute"
+	creationComplete="onCreationComplete()"
+	title="{i18n._('MAINWINDOW_BUTTON_MINDMAP')}" 
+	showFlexChrome="false" transparent="false" systemChrome="none" width="960" height="640" 
+	>
+	
+	<mx:Style source="styles.css"/>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.flex.extras.controls.springgraph.Graph;
+			import com.rubenswieringa.interactivemindmap.Controller;
+			import com.rubenswieringa.interactivemindmap.NodeRendererShell;
+			
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+		
+		[Bindable] public var item:Object;
+			private var _entities:ArrayCollection;
+		
+			public function set entities(value:ArrayCollection):void{
+				_entities = value;
+			}
+
+		private function onCreationComplete ():void {
+			maximize();
+			springGraph.width = Screen.mainScreen.bounds.width;
+			springGraph.height = Screen.mainScreen.bounds.height;
+			var xml:XML = genXml();
+			trace(xml);
+			Controller.boot(this.springGraph, xml);
+		}
+		
+		private function genXml():XML {
+			var xml:XML =
+				<mindmap>
+				  <words>
+				    <word type="main"/>
+				  </words>
+				  <links>
+				  </links>
+				</mindmap>;
+			//var id:String = Utils.getId(item);
+			
+			
+			xml.words[0].word[0].@id = item.gadget_type + "_" + item.gadget_id;
+			xml.words[0].word[0].@value = Utils.getName(item) ;
+			
+			buildXML(xml, item, _entities);
+			
+			/*
+			var i:int = 0;
+			for each (var link:Object in Database.linkDao.linkedItems(null, item)) {
+				xml.words[0].word[0].appendChild(<word/>);
+				xml.words[0].word[0].word[i].@id = link.gadget_type + "_" + link.gadget_id;
+				
+				var child:Object = Database.getDao(link.gadget_type).findByGadgetId(link.gadget_id);
+				if (child != null) {
+					xml.words[0].word[0].word[i].@value = Utils.getName(child);
+					
+					var j:int = 0;
+					for each (var link2:Object in Database.linkDao.linkedItems(null, link)) {
+						if (link2.gadget_id != item.gadget_id) {
+							xml.words[0].word[0].word[i].appendChild(<word/>);
+							xml.words[0].word[0].word[i].word[j].@id = link2.gadget_type + "_" + link2.gadget_id;
+							var child2:Object = Database.getDao(link2.gadget_type).findByGadgetId(link2.gadget_id);
+							if (child2 != null) {
+								xml.words[0].word[0].word[i].word[j].@value = Utils.getName(child2);
+								j++;
+							}
+						}
+					}
+					
+				}
+				i++;
+			}
+			*/
+			
+			return xml;
+		}
+		
+		private function generateChild(event:MouseEvent):void{
+			var node:NodeRenderer = event.target as NodeRenderer;
+			if(node){
+				var current_id:String = (node.owner as NodeRendererShell).data["id"].toString();
+				var type_id:Array = current_id.split("_");
+				var gadget_type:String = type_id[0];
+				var id:String = type_id[1];
+				var edge_parent:String = "";
+				var tempSpringGraph:SpringGraph = event.currentTarget as SpringGraph;
+				var edges:Array = (tempSpringGraph.dataProvider as Graph).edges;
+				for each(var edge:Array in edges){
+					if(edge[0]["id"] == current_id){
+						edge_parent = edge[1]["id"];
+						break;
+					}
+					if(edge[1]["id"] == current_id){
+						edge_parent = edge[0]["id"];
+						break;
+					}
+				}
+				delete Controller.instance._model.words[0].word[0].word;
+				
+				var customEntities:ArrayCollection = null;
+				if(current_id == (item.gadget_type + "_" + item.gadget_id)){
+					customEntities = _entities;
+				}
+				
+				
+				/*
+				if(current_id != (item.gadget_type + "_" + item.gadget_id)){
+					delete Controller._instance._model.words[0].word[0].@type;
+				}else{
+					Controller._instance._model.words[0].word[0].@type = "main";
+				}
+				*/
+				Controller.instance._model.words[0].word[0].@id = current_id;
+				var record:Object = Database.getDao(gadget_type).findByGadgetId(id);
+				Controller.instance._model.words[0].word[0].@value = Utils.getName(record);
+				buildXML(Controller.instance._model, record, customEntities);
+				tempSpringGraph.empty();
+				Controller.instance.graph.empty();
+				Controller.boot(tempSpringGraph, Controller.instance._model);
+				Controller.instance.build();
+				trace(Controller.instance._model);
+				tempSpringGraph.dataProvider = Controller.instance.graph;
+				if(tempSpringGraph){
+					tempSpringGraph.removeEventListener(MouseEvent.DOUBLE_CLICK, generateChild);
+				}
+				tempSpringGraph.doubleClickEnabled = true;
+				tempSpringGraph.addEventListener(MouseEvent.DOUBLE_CLICK, generateChild);
+			}
+		}
+		
+		private function buildXML(xml:XML, item:Object, entities:ArrayCollection = null):void{
+			var i:int = 0;
+			for each (var link:Object in Database.linkDao.linkedItems(entities, item)) {
+				var child:Object = Database.getDao(link.gadget_type).findByGadgetId(link.gadget_id);
+				if (child != null) {
+					if(link.gadget_type && link.gadget_id){
+						var id:String = link.gadget_type + "_" + link.gadget_id;
+						xml.words[0].word[0].appendChild(<word id={id} value={Utils.getName(child)} />);
+					}
+				}
+				i++;
+			}
+		}
+			
+		public function closeWindow():void{
+			this.close();
+			springGraph.empty();
+			Controller.instance.graph.empty();
+			//Controller.instance._model = null;
+		}
+		
+		]]>
+	</mx:Script>
+
+	<mx:Canvas left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<mx:LinkButton fontSize="24" left="8" top="8" label="{i18n._('GLOBAL_CLOSE')}" click="closeWindow()"/>
+		<sg:SpringGraph id="springGraph" left="0" top="48" bottom="0" right="0" repulsionFactor="2"
+			dataProvider="{Controller.instance.graph}" 
+			itemRenderer="com.rubenswieringa.interactivemindmap.NodeRendererShell" />
+	</mx:Canvas>
+	
+</mx:Window>

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--CRO 05.01.2011-->
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="780" height="458"	
+	showFlexChrome="false" transparent="true" systemChrome="none" creationComplete="updateInfo(); init()">
+	
+	<mx:Script>
+		<![CDATA[
+			
+			import gadget.control.ImageTextInput;
+			import gadget.dao.DAO;
+			import gadget.dao.Database;
+			import gadget.dao.LinkDAO;
+			import gadget.i18n.i18n;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.StringUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Text;
+			
+			[Bindable] public var selectedItem:Object;
+			[Bindable] public var parentItem:Object;
+			[Bindable] public var entity:String; 
+			[Bindable] private var allItems:ArrayCollection;
+			public var action:Function;
+			public var filter:String;
+			
+			private function init():void {
+				this.title=Database.customLayoutDao.getDisplayName(entity) +' ' + i18n._('GLOBAL_FINDER');
+				searchInput.setFocus();
+				
+					doSearch();
+				
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+				optionItem.visible=(Database.contactDao.entity == entity && (parentItem!=null && (parentItem.gadget_type==Database.activityDao.entity)))
+				optionItem.includeInLayout=optionItem.visible;				
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function doSearch():void {
+				var currentFilter:String = filter;	
+				if(optionItem.visible && !chkOption.selected){
+					if(parentItem!=null && parentItem.gadget_type==Database.activityDao.entity && Database.contactDao.entity == entity && !StringUtils.isEmpty(parentItem["AccountId"])){
+						if(!StringUtils.isEmpty(currentFilter)){
+							currentFilter += " AND "
+						}else{
+							currentFilter=""
+						}
+						currentFilter+= "(AccountId=" + "'" + parentItem["AccountId"] + "')";
+					}
+				}
+				if (searchInput.text.length >= 2 || !StringUtils.isEmpty(currentFilter)) {
+					
+					allItems = Database.linkDao.allItems(new ArrayCollection([entity]), searchInput.text, currentFilter);
+				} else {
+					allItems = null;
+				}
+				updateInfo();
+			}
+			
+			private function updateInfo():void {
+				if (allItems != null && allItems.length == 1000) {
+					//CRO 05.01.2011
+					info.text = i18n._('GLOBAL_ONLY_THE_FIRST_1000_MATCHING_ITEMS_ARE_SHOWN');
+				}  else if (allItems != null) {
+					//CRO 05.01.2011
+					info.text = allItems.length + " " +i18n._('GLOBAL_ITEMS_FOUND');
+				} else if (filter == null) {
+					//CRO 05.01.2011
+					info.text = i18n._('GLOBAL_PLEASE_ENTER_AT_LEAST_TWO_CHARACTERS_FOR_SEARCH');
+				}
+			}
+			
+			private function selectItem(selected:Object):void {
+				if (selected==null) return;
+				selectedItem = Database.getDao(entity).findByGadgetId(selected.gadget_id);
+				action(selectedItem);
+				close();
+			}
+			private function getOptionDiplayName():String{
+				if(parentItem!=null && parentItem.gadget_type == Database.activityDao.entity && Database.contactDao.entity == entity){
+					return i18n._('ALL@All');
+				}
+				
+				return "";
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/search.png')" title="{GUIUtils.getItemFinderLabel(Database.customLayoutDao.getDisplayName(entity) , i18n._('GLOBAL_FINDER'))}"/>
+		<mx:VBox top="32" left="16" right="16">
+			<mx:Form width="100%" paddingBottom="8">
+				<mx:Label id="info" left="0"/><!--CRO 05.01.2011-->
+				<mx:FormItem label="{i18n._('GLOBAL_SEARCH')}">
+					<mx:TextInput width="200" id="searchInput" change="doSearch()"/>
+				</mx:FormItem><!--CRO 05.01.2011 ENTITY_FINDER_FORM_ITEM_RESULTS-->
+				<mx:FormItem label="{getOptionDiplayName()}" id="optionItem">
+					<mx:CheckBox width="200" id="chkOption" click="doSearch()" />
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._('GLOBAL_RESULTS')}" width="100%">
+					<mx:List id="resultList" width="100%" dataProvider="{allItems}" rowHeight="27" rowCount="10" click="selectItem(resultList.selectedItem)">
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox horizontalScrollPolicy="off" horizontalAlign="left" horizontalGap="0">
+									<mx:Script>
+										<![CDATA[
+											import gadget.util.ImageUtils;
+										]]>
+									</mx:Script>
+									
+									<mx:Image id="albumImage" source="{ImageUtils.getImage(data.gadget_type)}"/>
+									<mx:Label text="{data.name}" width="100%" toolTip="{data.name}"/>
+								</mx:HBox>								
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:List>
+				</mx:FormItem>
+			</mx:Form>
+			<mx:Canvas width="100%">
+				<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="this.close()" right="0"/>	
+			</mx:Canvas>		
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

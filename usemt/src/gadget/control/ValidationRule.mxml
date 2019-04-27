@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="880" height="600"
+	title="{i18n._('GLOBAL_VALIDATION_RULE')}"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init()"
+	creationComplete="window1_creationCompleteHandler(event)"
+	
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.crmgadget.eval.Evaluator;
+			import com.hurlant2.util.der.Integer;
+			
+			import flashx.textLayout.operations.PasteOperation;
+			
+			import gadget.dao.CustomFieldDAO;
+			import gadget.dao.Database;
+			import gadget.dao.ValidationRuleDAO;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.util.CacheUtils;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.LayoutUtils;
+			import gadget.util.SQLUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			import mx.controls.TextArea;
+			import mx.events.FlexEvent;
+			import mx.formatters.DateBase;
+			import mx.validators.NumberValidator;
+			import mx.validators.StringValidator;
+			import mx.validators.Validator;
+			
+			[Bindable] private var entityFeildList:ArrayCollection = new ArrayCollection();
+			[Bindable] private var sqlFeildList:ArrayCollection = new ArrayCollection();
+			public var refreshGridEntity:Function;
+			private var validate:Array = new Array();
+			private var objectEntity:Object = new Object;
+			public var entity:String = "";
+			public var ruleName:String = "";
+			public var langaugeCode:String="";
+			private function init():void {
+				cboEntitys.enabled = false;
+				changeCboEntity();
+				var stringValidator:StringValidator = new StringValidator();
+				stringValidator.property = "text";
+				stringValidator.source = txtRuleName;
+				validate.push(stringValidator);
+				
+				stringValidator = new StringValidator();
+				stringValidator.property = "text";
+				stringValidator.source = cboEntitys;
+				validate.push(stringValidator);
+				
+				var numberValidator:NumberValidator = new NumberValidator();
+				numberValidator.property = "text";
+				numberValidator.source = txtOrderNumber;
+				validate.push(numberValidator);
+				
+			}
+			
+			// =================================================================================			
+			
+			private function checkSyntax_clickHanler(event:MouseEvent):void {
+				if(checkSyntax()){
+					Alert.show(i18n._("GLOBAL_SYNTAX_IS_VALID"),this.title,Alert.OK,this);
+				}
+			}
+			
+			private function checkSyntax():Boolean {
+				var ownerUser:Object = Database.allUsersDao.ownerUser();
+				var result:String = Utils.doEvaluate(txtArFormula.text,ownerUser,entity, null, objectEntity, null);
+				if(StringUtils.isEmpty(result)){
+					Alert.show(i18n._("GLOBAL_SYNTAX_IS_INVALID"),this.title,Alert.OK,this);
+					return false;
+				}
+				return true;
+			}
+			private function isEditable():Boolean{
+				if(langaugeCode == CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+					return true;
+				}else{
+					return false;
+				}
+			}
+			// ===============================================================
+			private function insertSQLList_clickHanler(event:MouseEvent):void {
+				var sqlfield:String = CalculatedField.getComboDataField(cboSQLList);
+				if(StringUtils.isEmpty(sqlfield)){
+					Alert.show(i18n._('VALIDATIONRULE_PLEASE_SELECT_SQL_LIST_FIRST'),this.title, Alert.OK, this);
+				}else{
+					CalculatedField.replaceString(txtArFormula,"'" + sqlfield + "'");
+				}
+			}
+			
+			private function insert_clickHanler(event:MouseEvent):void {
+				var field:String = CalculatedField.getComboDataField(cboEntityFields);
+				if(StringUtils.isEmpty(field)){
+					Alert.show(i18n._('GLOBAL_PLEASE_SELECT_FIELD_FIRST'),this.title, Alert.OK, this);
+				}else{
+					CalculatedField.replaceString(txtArFormula," [<" + field + ">] ");
+				}
+			}
+				
+			private function insertFunction_clickHanler(event:MouseEvent):void {
+				var strFunction:String = CalculatedField.getComboDataField(cboFunctions);
+				if(StringUtils.isEmpty(strFunction)){
+					Alert.show(i18n._('GLOBAL_PLEASE_SELECT_FUNCTION_FIRST'), this.title, Alert.OK, this);
+				}else{
+					CalculatedField.replaceString(txtArFormula,strFunction);
+				}
+			}
+			
+			// ===================================================================================
+			private function changeOperatorAction(event:Event):void{
+				CalculatedField.replaceString(txtArFormula,CalculatedField.getComboDataField(cboOperators));
+				cboOperators.selectedIndex = 0;
+			}
+			private function changeFunctionAction(event:Event):void{
+				txtArFunctionDesc.text = CalculatedField.getComboDataField(cboFunctions,"desc");
+			}
+			private function changeSQLListAction(event:Event):void{
+				txtArFunctionDesc.text = CalculatedField.getComboDataField(cboSQLList,"label");
+			}
+			// =====================================================
+			private function update_clickHanler(event:MouseEvent):void {
+				var error:String = "";
+				for each(var objError:Object in Validator.validateAll(validate)){
+					if(objError.type=="invalid"){
+						error += objError.message;
+						break;
+					}
+				}
+				if(StringUtils.isEmpty(error)){
+					if(checkSyntax()==true){	
+						var rule:Object = new Object();
+						rule["entity"] = entity;
+						rule["ruleName"] = txtRuleName.text;
+						rule["active"] = chkActive.selected?"1":"0";
+						rule["value"] = txtArFormula.text;
+						rule["message"] = txtArMessage.text;
+						rule["errorMessage"] = txtArErrorMessage.text;
+						
+						
+						rule["orderNo"] = parseInt(txtOrderNumber.text);
+						if(Database.validationRuleDAO.checkExistingRuleName(rule) && txtRuleName.editable){
+							Alert.show(i18n._('GLOBAL_RULE_NAME') + " " + txtRuleName.text + " " + i18n._('GLOBAL_ALREADY_EXIST.'),this.title, Alert.OK, this);
+							txtRuleName.setFocus();
+							return;
+						}
+						
+						if(langaugeCode == CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+							Database.validationRuleDAO.upSert(rule);
+						}
+						
+						rule["languageCode"] = langaugeCode;
+						Database.validationRuleTranslotorDAO.updateField(rule);
+						
+						changeCboEntity();
+						refreshGridEntity();
+						close();
+					}
+				}else{
+					Alert.show(error, title, Alert.OK, this);
+				}
+				
+			}
+
+			public static function getSQLList(entity:String,item:Object):ArrayCollection {
+				var sqllist:ArrayCollection = new ArrayCollection();
+				sqllist.addItem({label:''});
+				var subtype:int = LayoutUtils.getSubtypeIndex(item);
+				var fields:ArrayCollection = Database.layoutDao.selectLayout(entity, subtype);
+				for each( var field:Object in fields ){
+					if (field.column_name.indexOf(CustomLayout.SQLLIST_CODE)>-1) {
+						sqllist.addItem({data:field.column_name,label:field.custom});
+					}
+				}
+				return sqllist;
+			}
+		
+			private function changeCboEntity():void{
+				txtRuleName.text = ruleName;
+				cboEntitys.selectedIndex = CalculatedField.getComboSelectedIndex(cboEntitys,entity);
+				entityFeildList = CalculatedField.getComboDataList(Utils.getColumns(entity),objectEntity);
+				sqlFeildList = getSQLList(entity,objectEntity);
+				
+				var rule:Object = Database.validationRuleDAO.selectByRuleName(entity,txtRuleName.text);
+				if(!rule) rule = ValidationRuleDAO.newRule();
+				else txtRuleName.editable = false;
+				txtRuleName.text = rule.ruleName;
+				txtArMessage.text = rule.message;
+				var tran:Object = Database.validationRuleTranslotorDAO.selectField(entity,rule.ruleName,langaugeCode);
+				if(tran != null && !StringUtils.isEmpty(tran['errorMessage'])){
+					txtArErrorMessage.text = tran['errorMessage'];
+				}else{
+					txtArErrorMessage.text = rule.errorMessage;
+				}
+				
+				
+				txtArFormula.text = rule.value;
+				txtOrderNumber.text = rule.orderNo;
+				chkActive.selected = rule.active=="1"?true:false;			
+			}
+			
+
+			protected function window1_creationCompleteHandler(event:FlexEvent):void
+			{
+				txtRuleName.setFocus();
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="880" height="595" right="0" bottom="0">
+		<control:TitleBar title="{i18n._('GLOBAL_VALIDATION_RULE')}" icon="@Embed(source='/assets/customize.png')" id="titlebar" y="2" x="25"/>
+		<mx:VBox top="30" left="0" right="0" bottom="0">
+			<mx:Canvas width="100%">
+				<mx:VBox>
+					<mx:Form paddingTop="5" paddingLeft="0" width="100%">	
+						<mx:FormItem>
+							<mx:VBox>
+								<mx:HBox>
+									<mx:Label text="{i18n._('GLOBAL_ENTITY')}" textAlign="right" width="100" fontWeight="bold" />
+									<mx:ComboBox id="cboEntitys" dataProvider="{FieldManagmentWindow.entityList}" labelFunction="{FieldManagmentWindow.getEntityDisplayName}" change="changeCboEntity()" width="160" />
+								</mx:HBox>
+								<mx:HBox>
+									<mx:Label text="{i18n._('GLOBAL_RULE_NAME')}" textAlign="right" width="100" fontWeight="bold" />
+									<mx:TextInput id="txtRuleName"  width="160" enabled="{isEditable()}"/>
+									<mx:Label text="{i18n._('GLOBAL_ORDER_NUMBER')}" textAlign="right" width="100" fontWeight="bold" />
+									<mx:TextInput id="txtOrderNumber" width="100" enabled="{isEditable()}" />
+								</mx:HBox>
+								<mx:HBox>
+									<mx:Label text="{i18n._('GLOBAL_ACTIVE')}" textAlign="right" width="100" fontWeight="bold" />
+									<mx:CheckBox id="chkActive" label="" height="20" fontWeight="bold" enabled="{isEditable()}"/>
+								</mx:HBox>
+								<mx:HBox>
+									<mx:Label text="{i18n._('GLOBAL_DESCRIPTION')}" textAlign="right" width="100" fontWeight="bold" />
+									<mx:TextArea id="txtArMessage" height="50" width="385" enabled="{isEditable()}" />
+								</mx:HBox>
+								<mx:HBox>
+									<mx:Label text="{i18n._('VALIDATIONRULE_THIS_MESSAGE_WILL_APPEAR')}" paddingLeft="110"/>
+								</mx:HBox>
+								<mx:HBox>
+									<mx:Label text="{i18n._('GLOBAL_ERROR_MESSAGE')}" textAlign="right" width="100" fontWeight="bold" />
+									<mx:TextArea id="txtArErrorMessage" height="50" width="385"/>
+								</mx:HBox>
+								
+							</mx:VBox>
+						</mx:FormItem>						
+						<mx:FormItem paddingTop="5" id="inputExpressionITem" >
+							<mx:HBox>
+								<mx:Label text="{i18n._('GLOBAL_FIELDS')}" textAlign="right" width="100" fontWeight="bold" />
+								<mx:ComboBox id="cboEntityFields" dataProvider="{entityFeildList}" width="160" enabled="{isEditable()}"/>
+								<mx:Button id="btnInsert" width="70" label="{i18n._('GLOBAL_INSERT')}" click="insert_clickHanler(event)" right="0" enabled="{isEditable()}"/>
+								<mx:Label text="{i18n._('GLOBAL_OPERATORS')}" textAlign="right" fontWeight="bold" />
+								<mx:ComboBox id="cboOperators" width="100" dataProvider="{CalculatedField.operatorData}" change="changeOperatorAction(event)" enabled="{isEditable()}" />
+							</mx:HBox>
+							<mx:HBox>
+								<mx:Label text="{i18n._('GLOBAL_SQL_LIST')}" textAlign="right" width="100" fontWeight="bold" />
+								<mx:ComboBox id="cboSQLList" dataProvider="{sqlFeildList}" change="changeSQLListAction(event)" width="325" enabled="{isEditable()}"/>
+								<mx:Button id="btnInsertSQLList" width="70" label="{i18n._('GLOBAL_INSERT')}" click="insertSQLList_clickHanler(event)" right="0" enabled="{isEditable()}"/>
+								<mx:Label text="{i18n._('GLOBAL_FUNCTIONS')}" fontWeight="bold" width="100" textAlign="right"/>
+								<mx:ComboBox id="cboFunctions" dataProvider="{CalculatedField.functionsData}" width="160" change="changeFunctionAction(event)" right="0" enabled="{isEditable()}"/>
+							</mx:HBox>
+						</mx:FormItem>
+						<mx:FormItem width="100%" id="expressionITem">
+								<mx:VBox>
+									<mx:HBox paddingTop="0">
+										<mx:Label textAlign="right" text="{i18n._('GLOBAL_EXPRESSION')}" height="20" width="100" fontWeight="bold"/>
+										<mx:TextArea id="txtArFormula" height="200" width="520" enabled="{isEditable()}"/>
+										<mx:VBox>
+											<mx:Button id="btnInsertfunction" label="{i18n._('GLOBAL_INSERT_SELECTED_FUNCTION')}" click="insertFunction_clickHanler(event)" right="0" enabled="{isEditable()}"/>
+											<mx:TextArea id="txtArFunctionDesc" height="175" width="185" editable="false" enabled="{isEditable()}"/>
+										</mx:VBox>
+									</mx:HBox>
+									<mx:HBox paddingTop="0" paddingLeft="120">
+										<mx:Button id="btnCheckSynTax" label="{i18n._('GLOBAL_CHECK_SYNTAX')}" click="checkSyntax_clickHanler(event)" right="0" />
+									</mx:HBox>	
+									<mx:HBox width="95%" horizontalAlign="right">
+										<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" right="0" icon="{ImageUtils.cancelIcon}"/>
+										<mx:Button id="createBtn" label="{i18n._('GLOBAL_SAVE')}" click="update_clickHanler(event)" right="0" icon="{ImageUtils.acceptIcon}"/>
+									</mx:HBox>
+								</mx:VBox>
+						</mx:FormItem>	
+					</mx:Form>
+					
+				</mx:VBox>	
+			</mx:Canvas>
+			
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

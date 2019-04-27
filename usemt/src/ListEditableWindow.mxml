@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="absolute"
+		   width="600" height="500"
+		   showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+		   creationComplete="init()" xmlns:control="gadget.control.*"
+		   >
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.net.getClassByAlias;
+			import flash.utils.flash_proxy;
+			import flash.utils.getDefinitionByName;
+			import flash.utils.getQualifiedClassName;
+			
+			import gadget.control.ImageTextInput;
+			import gadget.dao.Database;
+			import gadget.service.PicklistService;
+			import gadget.service.SupportService;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.CheckBox;
+			import mx.controls.ComboBox;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			
+			[Bindable] public var entity:String;
+			[Bindable] public var items:ArrayCollection;
+			public var fields:Array;
+			private var subtype:int = 0;
+			
+			public var arrayDefaultObject:Array;
+			
+			[Bindable] public var create:Boolean;
+			private var validators:Array = [];
+			
+//			public var functions:Object;
+			public var refreshGrid:Function;
+			
+			private function init():void {
+				setTitle();
+				initColumns();
+				bindValue();
+			}
+			
+			private function setTitle():void {
+				title = titlebar.title = Utils.getTitle(entity, subtype, null, create);
+			}
+			
+			private function bindValue():void {
+				for each(var item:Object in items){
+					bindEvaluatorValue(item);
+				}
+			}
+			
+			private function initColumns():void {
+				
+				var item:Object = new Object;
+				item.gadget_type = entity;
+				for each(var object:Object in arrayDefaultObject){
+					item[object.key] = object.value;
+				}
+				
+				var cols:Array = new Array;
+				
+				var newRow:Object = new Object();
+				for each(var field:Object in fields){
+					var col:DataGridColumn = new DataGridColumn();
+					col.dataField = field.element_name;
+					col.headerText = field.display_name;
+					newRow[field.element_name] = '';
+					
+					var functions:Object = new Object;
+					var inputField:DisplayObject = GUIUtils.getInputField(true, functions, entity, item, field, false);
+					var className:String = getQualifiedClassName( inputField );
+					var myClass:Class = getDefinitionByName( className ) as Class;
+					
+					col.itemEditor = new ClassFactory(myClass);
+					
+//					col.itemRenderer = new ClassFactory(myClass);
+//					col.rendererIsEditor = true;
+					
+					cols.push(col);
+				}
+				items.addItem(newRow); //add a blank record
+				editableGrid.columns = cols;	
+				editableGrid.dataProvider = items;
+				editableGrid.validateNow();
+			}
+			
+			private function bindEvaluatorValue(item:Object):void{
+				var fieldsManagement:Dictionary = Database.fieldManagementServiceDao.readAll(entity);
+				
+				var currentUser:Object = Database.userDao.read();
+				var userDataList:ArrayCollection=null;
+				var userData:Object = null;
+				if(currentUser!=null){
+					userDataList= Database.allUsersDao.findAll(new ArrayCollection([{element_name:"*"}]), "userSignInId = '" + currentUser.user_sign_in_id + "'");
+				}
+				
+				if (userDataList!=null && userDataList.length > 0) {
+					userData = userDataList.getItemAt(0);	
+				} 
+				
+				for each (var tmpField:Object in fields) { 
+					if (tmpField.custom == null) {
+						var fieldInfo:Object = FieldUtils.getField(entity, tmpField.element_name);
+						if(!fieldInfo) continue;
+						var fieldManagement:Object = fieldsManagement[fieldInfo.element_name];
+						if(fieldManagement!=null){
+							if(!StringUtils.isEmpty( fieldManagement.DefaultValue )){
+								var defaultValue:String = fieldManagement.DefaultValue;
+								if (defaultValue.indexOf("(") == -1 && defaultValue.indexOf("{") == -1) {
+									if( defaultValue.indexOf("CreatedDate")!=-1){
+										item[fieldInfo.element_name] =new Date();
+									}else{
+										item[fieldInfo.element_name] = defaultValue;
+									}
+									
+								} else if(create){  //evaluator do create only
+									// functions
+									var val:String = evaluateExpression(fieldInfo.element_name,item, defaultValue,userData);
+									//get Value from Id to display CRO
+									if (fieldInfo.data_type == "Picklist") {
+										val = PicklistService.getId(entity,fieldInfo.element_name,val,userData.LanguageCode);
+									}
+									if(val=='-1' && entity==Database.customObject1Dao.entity && fieldInfo.element_name=='CustomInteger0'){
+										val="";
+									}
+									item[fieldInfo.element_name] = val;
+								}
+							}
+						}
+					}
+				}	
+			}	
+			
+			private function evaluateExpression(element_name:String,item:Object, value:String,userData:Object):String{
+				return Utils.doEvaluate(value, userData, entity, element_name, item,null);
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar icon="{ImageUtils.getImage(entity)}" id="titlebar" y="2" x="25"/>
+		<mx:VBox top="36" left="8" right="8" bottom="8">	
+			<mx:DataGrid id="editableGrid" editable="true" sortableColumns="false" width="100%" height="100%"/>
+			<mx:HBox width="100%" horizontalAlign="right">
+				<mx:ButtonBar>
+					<mx:dataProvider>
+						<fx:Array>
+							<fx:String>Cancel</fx:String>
+							<fx:String>Save</fx:String>
+						</fx:Array>
+					</mx:dataProvider>
+				</mx:ButtonBar>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	horizontalScrollPolicy="off" 
+	horizontalAlign="left"
+	horizontalGap="0"
+	verticalAlign="top">
+	<mx:Script>
+		<![CDATA[
+		
+    		[Embed(source='/assets/green_circle.png')] [Bindable] public var lowImg:Class; // Low
+    		[Embed(source='/assets/yellow_circle.png')] [Bindable] public var mediumImg:Class; // Medium
+	        [Embed(source='/assets/red_circle.png')] [Bindable] public var highImg:Class; // High
+	        [Embed(source='/assets/blank_circle.png')] [Bindable] public var defaultImg:Class;
+		
+			private function getImage(type:String):Class {
+				switch (type) {
+					case '3-Low':
+					case 'Low': return lowImg;
+					case '2-Medium':
+					case 'Medium': return mediumImg;
+					case '1-High':
+					case 'High': return highImg;
+					default: return defaultImg;
+				}
+		    }  
+
+		]]>
+	</mx:Script>
+	<mx:Canvas>
+		<mx:Image top="2" source="{getImage(data.Priority)}"/>	
+	</mx:Canvas>
+	<!--Bug fixing 401 CRO-->
+	<mx:Label text="{data.PriorityValue}" width="100%"/>
+</mx:HBox>

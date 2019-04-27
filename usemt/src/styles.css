@@ -1,0 +1,76 @@
+.iconBack {
+	skin: Embed("/assets/back.png");
+	over-skin: Embed("/assets/back.png");
+}
+
+
+
+.iconClose {
+	skin: Embed("/assets/icon_close16.png");
+	over-skin: Embed("/assets/icon_close_over16.png");
+}
+
+.iconMinimize {
+	skin: Embed("/assets/icon_minimize16.png");
+	over-skin: Embed("/assets/icon_minimize_over16.png");
+}
+.iconMaximize {
+	skin: Embed("/assets/icon_maximize16.png");
+	over-skin: Embed("/assets/icon_maximize_over16.png");
+}
+.titleBar {
+	background-color:#EEEEEE;
+	corner-radius:4;
+	border-thickness:0;	
+	border-style:solid;
+	font-size: 15;
+	font-weight:bold;
+	cursor:pointer;
+}
+
+
+.main {
+	background-color:#FFFFFF;
+	corner-radius:8;
+	border-style:solid;
+	border-thickness:2;	
+}
+
+
+
+.readonly {
+	color:#4086D8;
+	border-style:none;
+}
+
+
+
+.buttonLetter {
+	padding-right:0; 
+	padding-left:0;
+	padding-top:0;
+	padding-bottom:0;	
+}
+
+
+.mainMenuBar {
+	color: #000000;
+	fill-alphas: 1.0, 1.0;
+	fill-colors: #FFFFFF, #FFFFFF;
+	background-color: #FFFFFF;
+} 
+
+.syncHeader {
+	font-size:20;
+	font-weight:bold;
+}
+
+.panelHeader {
+	font-size:18;
+}
+
+.tabBar {
+	background-color: #F3F3F3;
+}
+
+

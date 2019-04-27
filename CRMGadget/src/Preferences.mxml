@@ -1,0 +1,3370 @@
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*" 
+	xmlns:MyValidate="gadget.util.*"
+	width="{getWindowWidth()}"
+	height="{getWindowHeight()}"
+	resizable="false"
+	title="{i18n._('GLOBAL_PREFERENCES')}" 
+	creationComplete="init();"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:s="library://ns.adobe.com/flex/spark" xmlns:local="*" xmlns:components="com.shinynet.shinylib.components.*">
+	<!--CRO 12.01.2011 -->
+	<mx:Script>
+		<![CDATA[
+			import com.assessment.ComboboxColRender;
+			
+			import gadget.chatclient.CRMXAMPPConnection;
+			import gadget.control.CalculatedField;
+			import gadget.control.DisabledComboBox;
+			import gadget.dao.CustomFieldDAO;
+			import gadget.dao.CustomLayoutDAO;
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.dao.SimpleTable;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.service.LocaleService;
+			import gadget.service.PicklistService;
+			import gadget.service.RightService;
+			import gadget.service.UserService;
+			import gadget.sync.WSProps;
+			import gadget.sync.task.LoginCRM;
+			import gadget.util.CacheUtils;
+			import gadget.util.FeedUtils;
+			import gadget.util.FileBrowse;
+			import gadget.util.ImageUtils;
+			import gadget.util.MapUtils;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import ilog.calendar.google.AuthenticationService;
+			import ilog.calendar.google.CalendarService;
+			import ilog.calendar.google.GServiceEvent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.VBox;
+			import mx.controls.Alert;
+			import mx.controls.CheckBox;
+			import mx.controls.ComboBox;
+			import mx.controls.Label;
+			import mx.events.CloseEvent;
+			import mx.events.DataGridEvent;
+			import mx.utils.Base64Encoder;
+			import mx.utils.StringUtil;
+			import mx.validators.Validator;
+			
+			
+			
+			public var mainWindow:MainWindow;
+			
+			[Bindable] private var preferences:Object;
+			[Bindable] protected var user:Object;	
+			private var defaultSelected:ArrayCollection = new ArrayCollection();
+			private static const TASK_NAME:String = "gadget.sync.task::Incoming";
+			private static const TASK_NAME_INCOMMING:String = "gadget.sync.incoming::";
+			public static const RELATED_BUTTONS_DISABLE:String = "related_disable_buttons";
+			private var timerChanged:Boolean = false;
+			private var editStatus:Boolean = false;
+			private var addRemoveEntityTransaction:Boolean = false;
+			
+			private var cache:CacheUtils = new CacheUtils("right");
+			private var trxCache:CacheUtils=	new CacheUtils("Transaction_DAO")
+			private var mapconnectInfo:Object = {use_sso:"use_sso",company_sso_id:"company_sso_id",sodhost:"sodhost",sodlogin:"sodlogin",sodpass:"sodpass",
+				sync_startup:"sync_startup",syn_interval:"syn_interval",tech_username:"tech_username",tech_password:"tech_password"}
+			private var mapInterface:Object = {interface_style:"interface_style",pdf_header:"pdf_header",background_color:"background_color",pdf_Page_Size:"pdf_Page_Size"}
+			private var mapOption:Object = {editableList:"editableList",showDebug:"showDebug",predefined_filters:"predefined_filters",window_resize:"window_resize",
+				start_at_login:"start_at_login",enable_google_calendar:"enable_google_calendar",enable_feed:"enable_feed",enable_favorite:"enable_favorite",enable_important:"enable_important",
+				hide_sso_tech_user:"hide_sso_tech_user",enable_home_task:"enable_home_task",ms_exchange_enable:"ms_exchange_enable",netbreeze_tab:"netbreeze_tab",
+				usegzip:"usegzip",enable_check_conflict:"enable_check_conflict",cvs_separator:"cvs_separator",log_files:"log_files",log_fileName:"log_fileName",
+				important_length:"important_length",recent_filter:"recent_filter",enable_fuzzy:"enable_fuzzy",enable_convert_lead:"enable_convert_lead",enable_dashboard:"enable_dashboard",
+				enable_daily_agenda:"enable_daily_agenda",enable_application_update:"enable_application_update"}
+			private var mapAutoConfig:Object ={config_url:"config_url"}
+			public static var LIGHT_BLUE:String = "Light Blue";
+			public static var DARK_BLUE:String = "Dark Blue";
+			public static var YELLOW:String = "Yellow";	
+			public static var BLACK:String = "Black";
+			public static var LIGHT_GREEN:String = "Light Green";
+			public static var RED:String = "Red";
+			public static var WHITE:String = "White";
+			
+			public var mapSelectedfilter:Object = new Object();
+			[Bindable] public static var imagesComboPDF:ArrayCollection = new ArrayCollection(
+				[   {icon:ImageUtils.black,label:" ",data:BLACK},
+					{icon:ImageUtils.darkBlue,label:" ",data:DARK_BLUE},
+					{icon:ImageUtils.lightBlue,label:" ",data:LIGHT_BLUE},
+					{icon:ImageUtils.yellow,label:" ",data:YELLOW}
+				]);
+			
+			[Bindable] public static var imagesBGPDF:ArrayCollection = new ArrayCollection(
+				[   {icon:ImageUtils.lightGreen,label:" ",data:LIGHT_GREEN},
+					{icon:ImageUtils.yellow,label:" ",data:YELLOW},
+					
+				]);
+			
+			private function init():void{
+				//			var buttons:ArrayCollection = new ArrayCollection();
+				//			buttons.addItem({label: "Cancel", icon:ImageUtils.cancelIcon}); 
+				//			buttons.addItem({label: "Save changes", icon: ImageUtils.acceptIcon});
+				//			buttonbardetail.dataProvider = buttons;
+				//			buttonbardetail.addEventListener(ItemClickEvent.ITEM_CLICK, handleButtonBar);
+				
+				
+				previewAvatar();
+				
+				preferences = Database.preferencesDao.read();
+				if (!StringUtils.isEmpty(preferences.background_color))
+					winTitleBarColor.selectedColor = preferences.background_color;
+				else
+					winTitleBarColor.selectedColor = 0xEEEEEE;
+				
+				prefTitleBar.setStyle('backgroundColor',winTitleBarColor.selectedColor);
+				loadIMData();
+				sodhost.setFocus();
+				enabledTransactions();
+				enabledFeed();
+				interfaceStyle();
+				disableChildTabNavigator();
+				//CRO bug fixing 92 20.11.2011
+				pdfPageSize();
+				headerColorPDF();
+				
+				//----------------------------
+				var separator:String = preferences.cvs_separator;
+				var googleMapAddress:String = preferences.google_map_address;
+				//				var googleMapDistance:String = Database.preferencesDao.getGoolgeMapDistance();
+				if(separator== null || separator == ''){
+					separator = ',';
+				}
+				
+				distanceMap.dataProvider = getDistanceConfig();
+				
+				cboSeparator.selectedIndex = CalculatedField.getComboSelectedIndex(cboSeparator, separator);
+				cboGoogleMapAddress.selectedIndex = CalculatedField.getComboSelectedIndex(cboGoogleMapAddress, googleMapAddress==null? MapUtils.SHIPPING_ADDRESS:googleMapAddress);
+				//cboGoogleMapDistance.selectedIndex = CalculatedField.getComboSelectedIndex(cboGoogleMapDistance, googleMapDistance);
+				
+				important_length.selectedIndex = CalculatedField.getComboSelectedIndex(important_length,preferences.important_length);
+				recent_filter.selectedIndex = CalculatedField.getComboSelectedIndex(recent_filter,preferences.recent_filter);
+				
+				// hide user interface tab
+				var hide_user_interface:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.HIDE_USER_INTERFACE) as Boolean;				
+				if(hide_user_interface){
+					tabNavigator.removeChildAt(2);
+				}
+				if(chkEnableObjectCall != null){
+					chkEnableObjectCall.selected = Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_BUTTON_ACTIVITY_CREATE_CALL)==1 ? true:false;
+				}
+				if(chkEnableVisitCustomer != null){
+					chkEnableVisitCustomer.selected = Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_VISITIT_CUSTOMER)==1 ? true:false
+				}
+				// #310: Change request - Diversey sales - Prefernces - Connection Informations
+				// set diable synchronization interval
+				var disable_synchronization_interval:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_SYNCHRONIZATION_INTERVAL) as Boolean;				
+				synchronization_interval.enabled = !disable_synchronization_interval;
+				
+				// set diable crm ondemand url
+				var disable_crm_ondemand_url:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_CRM_ONDEMAND_URL) as Boolean;				
+				sodhost.enabled = !disable_crm_ondemand_url;
+				//-----340 vm init window size ---//
+				
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+				hideSSOTechUser(Database.preferencesDao.isHideSSOTechUser());
+				
+				cboFeedHistory.addEventListener(Event.CHANGE, function(e:Event):void {
+					var day:int = (e.currentTarget as ComboBox).selectedItem.data;
+					if(day != -1) {
+						Alert.show("Are you sure to delete feed history.", "", 3, getParrent(), function(e:CloseEvent):void {
+							if(e.detail == Alert.YES) {
+								Database.feedHistoryDAO.deleteFeedHistoryByDay(day);
+							}
+						});
+					}
+				});
+				//bug#11360-----lock url
+				var unLockUrl:Boolean = !Database.lastsyncDao.isSynced();
+				use_sso.enabled = unLockUrl;
+				company_sso_id.editable = unLockUrl&&use_sso.selected;
+				sodhost.editable = unLockUrl;
+				sodlogin.editable = unLockUrl;
+				
+				loadDailyAgendaHeader();
+				loadRevenueReportHeader();
+				initDataReportAdmin();
+				loadDataCalendarSettings();
+				
+			}
+			private function selectCombobox(combo:ComboBox,data:String):void{
+				var provider:ArrayCollection = combo.dataProvider as ArrayCollection;
+				if(provider != null && provider.length>0){
+					for each (var obj:Object in provider){
+						if(obj.data == data){
+							combo.selectedItem = obj;
+							break;
+						}
+					}
+				}
+			}
+			
+			private function getSelectedPickList():ArrayCollection{
+				var picklist:ArrayCollection = loadPickList();
+				
+				var selected:ArrayCollection = new ArrayCollection();
+				if(picklist != null && picklist){
+					var str:String = preferences[PreferencesDAO.HIDE_ACTIVITY_TYPE];
+					if(!StringUtils.isEmpty(str)){
+						var arr:Array = str.split(",");
+						if(arr != null && arr.length >0){
+							for each(var data:Object in arr){
+								for each (var p:Object in picklist){
+									if(p.data == data.toString()){
+										selected.addItem(p);
+										break;
+									}
+								}
+							}
+						}else{
+							for each (var p:Object in picklist){
+								if(p.data == str){
+									selected.addItem(p);
+									break;
+								}
+							}
+						}
+					}
+				}
+				
+				return selected;
+			}
+			private function endableItemListComboParentEntity(entity:String,status:Boolean):void{
+				//var vTransaction:Array = enabledTrans.getChildren();
+				for(var i:int = 1;i<parentEntity.getChildren().length;i++){
+					var cbo:ComboBox = parentEntity.getChildAt(i) as ComboBox;
+					var list:ArrayCollection = cbo.dataProvider as ArrayCollection;
+					if(list != null && list.length>0){
+						for each (var obj:Object in list ){
+							if(obj == null){
+								continue;
+							}
+							if(entity == obj.entityDest){
+								obj.enabled = status;
+								if(!status && cbo.selectedItem==obj){
+									cbo.selectedIndex=-1;//clear dependon 
+								}
+							}
+						}
+					}
+				}
+			}
+			private function removeDependOnRelation(e:Event):void{
+				var selectedCbo:DisabledComboBox = e.target as DisabledComboBox;
+				var entityParent:String = selectedCbo.selectedLabel;
+				var entity:String = selectedCbo.selectedItem.entitySrc;
+				if(!StringUtils.isEmpty(entity)){
+					var vTransaction:Array = enabledTrans.getChildren();
+					for(var i:int = 1;i<parentEntity.getChildren().length;i++){
+						var cbo:ComboBox = parentEntity.getChildAt(i) as ComboBox;
+						var relation:ArrayCollection = cbo.dataProvider as ArrayCollection;
+						var selecedLabel:String = cbo.selectedLabel;
+						var chkTran:CheckBox = vTransaction[i] as CheckBox;
+						if(cbo == null || relation==null || chkTran.data == entity){
+							continue;
+						}
+						
+						var existObject:Object = null;
+						var enable:Boolean = true;
+						if(entityParent == chkTran.data){
+							if(selecedLabel == entity){
+								cbo.selectedItem = "";
+							}
+							
+							for each(var rel:Object in relation){
+								if(rel == null){ 
+									continue;
+								}
+								if(rel.entityDest == entity){	
+									rel.enabled = enable
+									break;
+								}
+							}
+							
+						}
+						
+						
+					}
+					
+					//var listDisableTransaction:ArrayCollection = Database.transactionDao.listDisabledTransaction();
+					//disableListComboxItem(selectedCbo,listDisableTransaction);
+				}
+			}
+			private function loadDataCalendarSettings():void{
+				selectCombobox(cboTimeFormat,preferences[PreferencesDAO.TIME_FORMAT]);
+				//selectCombobox(cboActivityType,preferences[PreferencesDAO.HIDE_ACTIVITY_TYPE]);
+				selectCombobox(cboBiginOfWeek, preferences[PreferencesDAO.BEGIN_OF_WEEK]);
+				cboActivityType.selectedItems = getSelectedPickList();
+				
+			}
+			[Bindable] private var _dataProviderReportAdmin:ArrayCollection;
+			private function initDataReportAdmin():void {
+				var report:Object = Database.reportAdminDao.first();
+				if(report != null) {
+					txtType.text = report.type;
+					txtPath.text = report.report_path;
+					auditor.text = report.auditor?report.auditor:"";
+					var childReport:ArrayCollection = new ArrayCollection(Database.reportAdminChildDao.fetch());
+					_dataProviderReportAdmin = childReport.length > 0 ? childReport : new ArrayCollection([{report_name: null, report_code: null}]);
+				}else {
+					_dataProviderReportAdmin = new ArrayCollection([{report_name: null, report_code: null}]);
+				}
+			}
+			
+			private function enabledReportAdminSave():void {
+				if(UserService.getCustomerId() == UserService.DIVERSEY) {
+					var report:Object = new Object();
+					report.type = txtType.text;
+					report.report_path = txtPath.text;
+					report.auditor = auditor.text;
+					Database.begin();
+					Database.reportAdminDao.insert(report);
+					Database.reportAdminChildDao.delete_all();
+					for each(var childReport:Object in _dataProviderReportAdmin) {
+						if(!StringUtils.isEmpty(childReport.report_name) && !StringUtils.isEmpty(childReport.report_code)) {
+							Database.reportAdminChildDao.insert(childReport);
+						}
+					}
+					Database.commit();
+				}
+			}
+			
+			// Define event listener for the itemEditEnd event.
+			private function itemEditEnd(event:DataGridEvent):void {
+				
+				var itemEdit:TextInput = (event.currentTarget as DataGrid).itemEditorInstance as TextInput;				
+				if(event.rowIndex == _dataProviderReportAdmin.length - 1 && event.columnIndex == 1 && StringUtil.trim(itemEdit.text) != "") {
+					_dataProviderReportAdmin.addItem({report_name: null, report_code: null});
+				}
+				
+			}
+			
+			private function browserForOpen():void {
+				try {
+					var file:File = new File();
+					file.browseForOpen("Please, select report admin file", [new FileFilter("Execute File(*.exe)", "*.exe;")]);
+					file.addEventListener(Event.SELECT, function(event:Event):void {
+						txtPath.text = (event.target as File).nativePath;
+					});
+				} catch (err:Error) {
+					trace("Failed: ", err.message);
+				}
+			}
+			
+			private function getParrent():Preferences {
+				return this;
+			}
+			
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function disableChildTabNavigator():void {
+				/*if(tabNavigator.getChildren().length==7){
+				/*var hide_user_signature:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.HIDE_USER_SIGNATURE);
+				if(UserService.JD!=UserService.getCustomerId()) 
+				tabNavigator.removeChildAt(6);
+				else if(hide_user_signature)
+				tabNavigator.removeChildAt(6);  /**
+				// move signature from preference to MenuBar Tool/Signature.
+				// tabNavigator.removeChildAt(6);
+				}*/
+				
+				//add or delete netbreeze
+				addOrDeleteTab(Database.preferencesDao.getValue(PreferencesDAO.ENABLE_NETBREEZE, 0)== 0,netBreeze);
+				
+				//add or delete ms exchange
+				addOrDeleteTab(Database.preferencesDao.getValue("ms_exchange_enable", 0)== 0,microsoftExchange);
+				
+				
+				addOrDeleteTab(Database.preferencesDao.getValue("enable_google_calendar", 0)== 0,googleCalendar);
+				
+				addOrDeleteTab(Database.preferencesDao.getValue(PreferencesDAO.ENABLE_FEED, 0)== 0,feedSetting);
+				
+				addOrDeleteTab(UserService.getCustomerId() != UserService.DIVERSEY, recportAdmin);
+				
+				
+				
+				//			if(tabNavigator.getChildren().length>=6){
+				//				if (Database.preferencesDao.getValue("netbreeze_tab", 0) == 0) tabNavigator.removeChildAt(5);
+				//			}
+				
+				//			if(tabNavigator.contains(microsoftExchange) && Database.preferencesDao.getValue("ms_exchange_enable", 0) == 0)){
+				//				tabNavigator.removeChild(microsoftExchange);
+				//			}
+				
+				//if(tabNavigator.getChildren().length >=8){
+				//				if (Database.preferencesDao.getValue("ms_exchange_enable", 0) == 0) tabNavigator.removeChild(microsoftExchange);
+				//}
+				//			if (Database.preferencesDao.getValue("enable_google_calendar",0) == 0){
+				//				try {
+				//					tabNavigator.removeChild(googleCalendar);
+				//				}catch(err:Error){
+				//					//ignor error child has been deleted.
+				//				}
+				//			} 
+				
+			}
+			
+			
+			private function addOrDeleteTab(isDelete:Boolean, childDisplay:Canvas):void{
+				if(childDisplay==null){
+					return;
+				}
+				if (isDelete){
+					if(tabNavigator.contains(childDisplay)){
+						tabNavigator.removeChild(childDisplay);
+					}
+				}else{
+					if(!tabNavigator.contains(childDisplay)){
+						tabNavigator.addChild(childDisplay);
+					}
+				}
+				
+			}	
+			
+			private function reload():void {
+				spinnersMove.removeAllChildren();
+				parentEntity.removeAllChildren();
+				enabledTrans.removeAllChildren(); 
+				enabledFeeds.removeAllChildren();
+				filterTrans.removeAllChildren();
+				advancedFilter.removeAllChildren();
+				//syncActivities.removeAllChildren();
+				//syncAttachments.removeAllChildren();
+				readonlyEntities.removeAllChildren();
+				authorizeDeletion.removeAllChildren();
+				displayTrans.removeAllChildren(); 
+				removeIfNotInRange.removeAllChildren();
+				syncChildren.removeAllChildren();
+				init();
+				mainWindow.updateTransactions();
+				mainWindow.refreshWindowLogo();
+				mainWindow.selectList();
+			}
+			private function getWindowWidth():Number{
+				
+				if(Database.preferencesDao.getBooleanValue('window_resize')){
+					return 1024;
+				}else{
+					return Number(Database.preferencesDao.getValue('window_width'));
+				}
+				
+			}
+			private function getWindowHeight():Number{
+				if(Database.preferencesDao.getBooleanValue('window_resize')){
+					return 600;
+				}else{
+					return Number(Database.preferencesDao.getValue('window_height'));
+				}
+				
+			}
+			private function loadIMData():void {
+				//			imform.roomURL.text = preferences.im_room_url;
+				//			imform.username.text = preferences.im_user;
+				//			imform.password.text = preferences.im_password;
+				//			autoSingIn.selected = preferences.im_auto_sing_in==0 ? false : true;
+				
+				//			var currentUser:Object = Database.currentUserDAO.getCurrentUser();
+				//			var allusers:ArrayCollection = new ArrayCollection(Database.allUsersDao.selectAll());
+				//			var users:ArrayCollection = new ArrayCollection();
+				//			for each(var user:Object in allusers){
+				//				if(user.Id != currentUser.id){
+				//					users.addItem(user);
+				//				}
+				//			}
+				//			
+				//			feedCboUser.dataProvider = users;
+				//			feedCboUser.labelField = "Alias";
+				//			
+				//			feedListAddedUser.dataProvider = Database.feedUserDAO.getFeedUsers();
+				//			feedListAddedUser.labelField = "Alias";
+				//			
+				//			feedCboUserFilter();
+			}	
+			
+			//		private function feedAddUser():void {
+			//			if(feedCboUser.selectedItem == null){
+			//				Alert.show("Please select a user to add","",4,this);
+			//				return;
+			//			}
+			//			(feedListAddedUser.dataProvider as ArrayCollection).addItem(feedCboUser.selectedItem);
+			//			feedCboUserFilter();
+			//		}
+			//			
+			//		private function feedRemoveUser():void {
+			//			var index:int = feedListAddedUser.selectedIndex;
+			//			var dp:ArrayCollection = feedListAddedUser.dataProvider as ArrayCollection;
+			//			dp.removeItemAt(index);
+			//			feedCboUserFilter();
+			//		}	
+			//			
+			//		private function feedCboUserFilter():void {
+			//			var allusers:ArrayCollection = feedCboUser.dataProvider as ArrayCollection;
+			//			allusers.filterFunction = filterItem;
+			//			allusers.refresh();
+			//			feedCboUser.dataProvider = allusers;
+			//			feedCboUser.validateNow();
+			//		}	
+			//		
+			//		private function filterItem(item:Object):Boolean {
+			//			for each(var addedUser:Object in feedListAddedUser.dataProvider){
+			//				if(item.Id == addedUser.Id){
+			//					return false;
+			//				}
+			//			}
+			//			return true;
+			//		}
+			
+			/*
+			private function handleButtonBar(event:ItemClickEvent):void{
+			if(event.label == "Cancel"){
+			this.close();
+			if(refreshMainWindow){
+			mainWindow.checkTips();
+			mainWindow.updateTransactions();
+			}
+			}else if(event.label == "Save changes"){
+			if(save())
+			this.close();
+			}
+			}	*/
+			
+			private function getSelectedItem(strValue:String, data:ArrayCollection, field:String):Object{
+				for each(var object:Object in data){
+					if(object[field] == strValue)
+						return object;
+				}
+				return data.getItemAt(0);
+			}
+			private function headerColorPDF():void{
+				if(!StringUtils.isEmpty(preferences[PreferencesDAO.HEADER_COLOR_PDF]))  cboHederColorPDF.selectedItem = getSelectedItem(preferences[PreferencesDAO.HEADER_COLOR_PDF],imagesComboPDF,'data');
+			}
+			
+			
+			
+			private function pdfPageSize():void{
+				if("Landscape" == preferences.pdf_Page_Size){
+					landScapeRadio.selected = true;
+				}else{
+					portraitRadio.selected = true;
+				}
+			}		
+			
+			private function interfaceStyle():void{			
+				if("icons"==preferences.interface_style){
+					iconsRadio.selected=true;
+				}else{
+					tabsRadio.selected =true;
+				}
+			}	
+			
+			private function createMapTransaction(listTransaction:ArrayCollection):Dictionary{
+				var mapTransaction:Dictionary = new Dictionary();
+				
+				for each(var transaction:Object in listTransaction){
+					mapTransaction[transaction.entity] = transaction;
+					transaction.single_label=Database.customLayoutDao.getDisplayName(transaction.entity);
+					transaction.plural_label=Database.customLayoutDao.getPlural(transaction.entity);
+				}
+				
+				return mapTransaction;
+				
+				
+			}
+			
+			private function enabledTransactions():void{
+				var listTransaction:ArrayCollection = Database.transactionDao.listTransaction();
+				var mapTransactions:Dictionary = createMapTransaction(listTransaction);
+				//var listDisableTransaction:ArrayCollection = Database.transactionDao.listDisabledTransaction();
+				var row:int = 1;
+				//var lenght:int = listTransaction.length;
+				//var vBoxList:Array = new Array();
+				//var vBox:VBox = new VBox();
+				parentEntity.addChild(createLabel('PREFERENCES_LABEL_TEXT_PARENT_ENTITY'));	
+				enabledTrans.addChild(createLabel('PREFERENCES_LABEL_TEXT_TRANSACTIONS'));		
+				filterTrans.addChild(createLabel('PREFERENCES_LABEL_TEXT_SYNCHRONIZE_FILTER'));		
+				advancedFilter.addChild(createLabel('PREFERENCES_LABEL_TEXT_SYNCHRONIZE_AVANCEDFILTER'));
+				syncChildren.addChild(createLabel('PREFERENCES_LABEL_TEXT_SYNC_CHILDREN'));
+				
+				//syncActivities.addChild(createLabel('PREFERENCES_LABEL_TEXT_SYNC_ACTIVITIES'));			
+				//syncAttachments.addChild(createLabel('PREFERENCES_LABEL_TEXT_SYNC_ATTACHMENTS'));
+				
+				readonlyEntities.addChild(createLabel('PREFERENCES_LABEL_TEXT_READ_ONLY'));
+				authorizeDeletion.addChild(createLabel('GLOBAL_AUTHORIZE_DELETION'));
+				displayTrans.addChild(createLabel('GLOBAL_DISPLAY'));
+				removeIfNotInRange.addChild(createLabel('GLOBLE_CHECK_NOT_IN_RANG@Check Owner'));
+				spinnersMove.addChild(createLabel(" "));
+				
+				//var disable_authorize_deletion:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_AUTORIZE_DELETION);
+				//authorizeDeletion.enabled = !disable_authorize_deletion;
+				for(var i:int = 0; i < listTransaction.length; i++){
+					var transaction:Object = listTransaction[i];
+					trace(transaction.entity);
+					var spinnerEntity:Spinner = new Spinner();
+					spinnerEntity.addEventListener(MouseEvent.CLICK, spinnerEntityClick);
+					spinnerEntity.height = 25;
+					spinnersMove.addChild(spinnerEntity);
+					
+					var checkBox:CheckBox = new CheckBox();
+					checkBox.data = transaction.entity;
+					checkBox.label = transaction.single_label;
+					checkBox.selected = transaction.enabled==1;
+					// #311: hange request - Diversey sales - Prefernces
+					checkBox.enabled = !transaction.entity_disable;
+					
+					checkBox.addEventListener(MouseEvent.CLICK, onClickCheckBox);
+					checkBox.height = 25;
+					
+					//cboBox.dataProvider = Database.filterDao.listFiltersCriteria(transaction.entity);
+					// 08/07
+					//var listFilter:ArrayCollection = Database.filterDao.listFilters(transaction.entity);
+					var cboBox:ComboBox = new ComboBox();
+					var listFilter:ArrayCollection = Database.filterDao.listFiltersCriteria(transaction.entity);
+					var dataProvider:ArrayCollection = filterConjunctionAndToDisplay(listFilter, transaction);
+					cboBox.dataProvider = dataProvider;
+					cboBox.labelField = "displayName";
+					cboBox.width = 180;				
+					
+					// #311: hange request - Diversey sales - Prefernces 
+					cboBox.enabled = transaction.filter_disable == true ? false :  checkBox.selected;
+					var objSelected:Object = getSelectionObject(dataProvider, transaction.filter_id);
+					cboBox.selectedItem = objSelected;
+					cboBox.height = 25;
+					
+					
+					
+					
+					var chkDisplayTrans:CheckBox = new CheckBox();				
+					//cbodisplayTrans.dataProvider = Database.transactionDao.advancedfilter;
+					///cbodisplayTrans.labelField = "display";
+					if(checkBox.selected==true){
+						chkDisplayTrans.selected = transaction.display == 1 ;
+					}else{
+						chkDisplayTrans.selected = checkBox.selected;		
+					}
+					chkDisplayTrans.enabled = checkBox.selected && checkBox.enabled;
+					chkDisplayTrans.addEventListener(MouseEvent.CLICK, onChangeValue);
+					chkDisplayTrans.height = 25;
+					chkDisplayTrans.label = " ";
+					
+					//check in range filter
+					var chkCheckInrangeFilter:CheckBox = new CheckBox();
+					chkCheckInrangeFilter.selected = transaction.checkinrange==null?false:transaction.checkinrange;
+					chkCheckInrangeFilter.enabled = checkBox.selected && checkBox.enabled;
+					chkCheckInrangeFilter.addEventListener(MouseEvent.CLICK, onChangeValue);
+					chkCheckInrangeFilter.height = 25;
+					chkCheckInrangeFilter.label = " ";
+					// #311: hange request - Diversey sales - Prefernces 
+					//cbodisplayTrans.selectedItem = getSelectionObject(Database.transactionDao.advancedfilter, transaction.advanced_filter);;
+					
+					var cboAdvancedFilter:ComboBox = new ComboBox();		
+					var filters:ArrayCollection =Database.transactionDao.advancedfilter; 
+					cboAdvancedFilter.dataProvider = filters;
+					cboAdvancedFilter.labelField = "name";
+					cboAdvancedFilter.width = 100;				
+					
+					// #311: hange request - Diversey sales - Prefernces 
+					cboAdvancedFilter.enabled = transaction.filter_disable == true ? false :  checkBox.selected;				
+					cboAdvancedFilter.selectedItem = getSelectionObject(filters, transaction.advanced_filter);
+					cboAdvancedFilter.height = 25;
+					cboAdvancedFilter.addEventListener(Event.CHANGE,advanceFilterChanged);
+					cboAdvancedFilter.name = transaction.entity;
+					mapSelectedfilter[transaction.entity] = transaction.advanced_filter;
+					
+					var bntSynChild:Button = new Button();	
+					bntSynChild.label = i18n._("GLOBAL_EDIT");
+					bntSynChild.height = 25;
+					bntSynChild.enabled = (transaction.sync_attachments_disable == true && transaction.sync_activities_disable == true)==true ? false :  checkBox.selected;		
+					bntSynChild.toolTip = Database.customLayoutDao.getDisplayName(transaction.entity);
+					bntSynChild.data = transaction.entity;
+					bntSynChild.addEventListener(MouseEvent.CLICK,function (event:MouseEvent):void{
+						//Popup windown for sync children
+						var bnt:Button = event.currentTarget as Button;
+						var syncChildreeWin:SyncChidrenWindow = new SyncChidrenWindow();
+						syncChildreeWin.mapParentFilter = mapSelectedfilter;
+						syncChildreeWin.entity = bnt.data as String;
+						WindowManager.openModal(syncChildreeWin);
+					});
+					var subSyncList:Array = Database.subSyncDao.findByEntity(transaction.entity);
+					bntSynChild.visible = subSyncList.length > 0? true:false;
+					
+					
+					//					var chkActivities:CheckBox = new CheckBox();
+					//					chkActivities.label = " ";
+					//					chkActivities.selected = transaction.sync_activities==null || transaction.sync_activities==0? false : true;		
+					//					chkActivities.visible = SodUtils.transactionProperty(transaction.entity).ws20act;
+					//					chkActivities.height = 25;
+					//					// #311: hange request - Diversey sales - Prefernces
+					//					chkActivities.enabled = transaction.sync_activities_disable == true ? false :  checkBox.selected;
+					
+					//					var chkAttachment:CheckBox = new CheckBox();
+					//					chkAttachment.label = " ";
+					//					chkAttachment.selected = transaction.sync_attachments==null || transaction.sync_attachments==0? false : true;		
+					//					chkAttachment.visible = SodUtils.transactionProperty(transaction.entity).ws20att;
+					//					chkAttachment.height = 25;
+					//					// #311: hange request - Diversey sales - Prefernces
+					//					chkAttachment.enabled = transaction.sync_attachments_disable == true ? false :  checkBox.selected;
+					
+					var chkReadonly:CheckBox = new CheckBox();
+					chkReadonly.label = " ";
+					chkReadonly.selected = transaction.read_only == 1;
+					chkReadonly.addEventListener(MouseEvent.CLICK, onChangeValue);
+					chkReadonly.height = 25;
+					// #311: hange request - Diversey sales - Prefernces
+					chkReadonly.enabled = transaction.read_only_disable == true ? false :  checkBox.selected;		
+					
+					var chkAuthorizeDeletion:CheckBox = new CheckBox();
+					chkAuthorizeDeletion.label = " ";
+					chkAuthorizeDeletion.selected =  transaction.authorize_deletion==1;	
+					chkAuthorizeDeletion.addEventListener(MouseEvent.CLICK, onChangeValue);
+					chkAuthorizeDeletion.height = 25;
+					// #311: hange request - Diversey sales - Prefernces
+					chkAuthorizeDeletion.enabled = transaction.authorize_deletion_disable == true ? false :  checkBox.selected;		
+					
+					// put object selected to array
+					defaultSelected.addItem(objSelected);
+					
+					enabledTrans.addChild(checkBox);
+					//displayNameTrans.addChild(textField);
+					filterTrans.addChild(cboBox);
+					advancedFilter.addChild(cboAdvancedFilter);
+					syncChildren.addChild(bntSynChild);
+					
+					
+					//parent entity layout
+					
+					var cboParentEntity:DisabledComboBox = new DisabledComboBox();			
+					var relation:ArrayCollection = getListParentEntity(transaction.entity,mapTransactions);
+					cboParentEntity.dataProvider = relation;
+					cboParentEntity.labelField = "labelDest";
+					cboParentEntity.width = 170;
+					cboParentEntity.height = 25;
+					cboParentEntity.enabled = checkBox.selected;
+					//disableListComboxItem(cboParentEntity,listDisableTransaction);
+					cboParentEntity.selectedItem = getSelectionParentEntity(relation,transaction.parent_entity);
+					cboParentEntity.addEventListener(Event.CHANGE,removeDependOnRelation);
+					parentEntity.addChild(cboParentEntity);
+					
+					//syncActivities.addChild(chkActivities);
+					//syncAttachments.addChild(chkAttachment);
+					
+					readonlyEntities.addChild(chkReadonly);
+					authorizeDeletion.addChild(chkAuthorizeDeletion);
+					displayTrans.addChild(chkDisplayTrans);
+					removeIfNotInRange.addChild(chkCheckInrangeFilter);
+				}
+			}
+			//			private function disableListComboxItem(cboParentEntity:DisabledComboBox,listDisableTransaction:ArrayCollection):void{
+			//					var listEnable:ArrayCollection = cboParentEntity.dataProvider as ArrayCollection;
+			//					if(listDisableTransaction == null || listDisableTransaction.length<0){
+			//						return;
+			//					}
+			//					if(listEnable != null && listEnable.length>0){
+			//						for each (var objEnable:Object in listEnable){
+			//							if(objEnable == null) {
+			//									continue;
+			//							}
+			//							for each (var transaction:Object in listDisableTransaction){
+			//								if(objEnable.entityDest == transaction.entity){
+			//									objEnable.enabled = false;
+			//									break;
+			//								}
+			//							}
+			//						}
+			//					}
+			//			}
+			private function getListParentEntity(entity:String,mapTransaction:Dictionary):ArrayCollection{
+				var references:ArrayCollection = new ArrayCollection([{entityDest:"",enabled:true,entitySrc:"", labelDest:""}]);
+				var tempRelation:ArrayCollection =  Relation.getParentRelation(entity);
+				for each(var obj:Object in tempRelation){
+					var transaction:Object = mapTransaction[obj.entityDest];
+					if(transaction!=null){
+						var relation:Object = new Object();
+						relation.entityDest = obj.entityDest;
+						relation.enabled=transaction.enabled==1;
+						relation.entitySrc = entity;
+						relation.labelDest = transaction.plural_label;
+						references.addItem(relation);
+					}
+				}
+				return references;
+				
+			}
+			private function enabledFeed():void {
+				enabledFeeds.addChild(createLabel('PREFERENCES_LABEL_TEXT_TRANSACTIONS'));
+				var feeds:ArrayCollection = Database.feedDAO.getFeeds();
+				for each(var feed:Object in feeds){
+					var checkBox:CheckBox = new CheckBox();
+					checkBox.label = feed.entity;
+					checkBox.selected = feed.enabled == 0 ? false : true;
+					checkBox.height = 25;
+					enabledFeeds.addChild(checkBox);
+				}
+			}	
+			
+			public static function createLabel(text:String,fontWeight:String="bold"):Label{
+				var label:Label = new Label();
+				label.setStyle("fontWeight", fontWeight);
+				label.text = i18n._(text);
+				return label;
+			}	
+			
+			
+			private function getSelectionParentEntity(list:ArrayCollection, entity:String):Object{
+				if(StringUtils.isEmpty(entity) || list == null || list.length<0){
+					return "";
+				}
+				for each(var obj:Object in list){
+					if(obj.entityDest==entity)
+						return obj;
+				}
+				return "";
+			}
+			private function spinnerEntityClick(e:MouseEvent):void{
+				var targetButton:spark.components.Button = e.target as spark.components.Button;
+				var spinner:Spinner = e.currentTarget as Spinner;
+				var index:int = spinnersMove.getChildIndex(spinner);
+				var numChild:int = spinnersMove.getChildren().length;
+				if(targetButton.id == "incrementButton"){
+					if(index > 1){
+						enabledTrans.addChildAt(enabledTrans.removeChildAt(index), index - 1);
+						filterTrans.addChildAt(filterTrans.removeChildAt(index), index - 1);
+						parentEntity.addChildAt(parentEntity.removeChildAt(index), index - 1);
+						//syncActivities.addChildAt(syncActivities.removeChildAt(index), index - 1);
+						//syncAttachments.addChildAt(syncAttachments.removeChildAt(index), index - 1);
+						authorizeDeletion.addChildAt(authorizeDeletion.removeChildAt(index),index-1);
+						advancedFilter.addChildAt(advancedFilter.removeChildAt(index),index-1);
+						syncChildren.addChildAt(syncChildren.removeChildAt(index),index-1);
+						readonlyEntities.addChildAt(readonlyEntities.removeChildAt(index), index - 1);
+						displayTrans.addChildAt(displayTrans.removeChildAt(index), index - 1);
+						removeIfNotInRange.addChildAt(removeIfNotInRange.removeChildAt(index),index-1);
+						editStatus = true;
+					}
+				}else if(targetButton.id == "decrementButton"){
+					if(index < numChild - 1){
+						enabledTrans.addChildAt(enabledTrans.removeChildAt(index), index + 1);
+						filterTrans.addChildAt(filterTrans.removeChildAt(index), index + 1);
+						parentEntity.addChildAt(parentEntity.removeChildAt(index), index + 1);
+						authorizeDeletion.addChildAt(authorizeDeletion.removeChildAt(index),index+1);
+						advancedFilter.addChildAt(advancedFilter.removeChildAt(index),index+1);
+						syncChildren.addChildAt(syncChildren.removeChildAt(index),index+1);
+						//syncActivities.addChildAt(syncActivities.removeChildAt(index), index + 1);
+						//syncAttachments.addChildAt(syncAttachments.removeChildAt(index), index + 1);
+						readonlyEntities.addChildAt(readonlyEntities.removeChildAt(index), index + 1);
+						displayTrans.addChildAt(displayTrans.removeChildAt(index), index + 1);
+						removeIfNotInRange.addChildAt(removeIfNotInRange.removeChildAt(index),index+1);
+						editStatus = true;
+					}
+				}
+			}
+			
+			private function filterConjunctionAndToDisplay(list:ArrayCollection, trans:Object):ArrayCollection{
+				var collection:ArrayCollection = new ArrayCollection();				
+				for each(var obj:Object in list){
+					// || obj.id == "-2" || obj.id == "-3" || obj.id == "-4"
+					//CRO 17.01.2011
+					var filterName:String = obj.name;
+					filterName = filterName.indexOf('GLOBAL') == -1 ? filterName : i18n._(filterName);
+					obj.displayName = filterName.replace("{ENTITY}",trans.plural_label );
+					if (obj.type == 0 || obj.type == -1 || WSProps.isWS20filter(obj.type)) {
+						collection.addItem(obj);
+					}else if(obj.type>0){
+						if(Database.criteriaDao.findCriterialWithConjunctionAnd(obj.id).length>0){
+							collection.addItem(obj);
+						}
+					}
+				}
+				return collection;
+			}
+			
+			private function getSelectionObject(list:ArrayCollection, id:String):Object{
+				for each(var obj:Object in list){
+					if(obj.type==id)
+						return obj;
+				}
+				return list.length==0?null:list.getItemAt(0);
+			}
+			
+			private function saveData():void {
+				//CRO bug fixing 92 20.01.2011
+				var pdfSize:String = portraitRadio.selected ? portraitRadio.value as String : landScapeRadio.value as String ;
+				preferences.pdf_Page_Size = pdfSize;
+				//-------------------------------
+				preferences.sodhost = StringUtil.trim(sodhost.text); 
+				preferences.sodlogin = StringUtil.trim(sodlogin.text); 
+				preferences.sodpass = StringUtil.trim(sodpass.text);
+				preferences.config_url = StringUtil.trim(configurl.text);				
+				preferences.interface_style = iconsRadio.selected ? iconsRadio.value : tabsRadio.value;
+				preferences.sync_startup = startupsync.selected ? 1 : 0;
+				preferences.disable_gzip = disableGzip.selected ? 1 : 0;
+				preferences.syn_interval = syn_interval.value;
+				preferences.editableList = editableList.selected ? 1 : 0;
+				preferences.showDebug = showDebug.selected ? 1 : 0;
+				preferences.netbreeze_tab = netbreezeOpt.selected ? 1 : 0;
+				preferences.log_files = logFile.selected ? 1 : 0;
+				preferences.log_fileName=logFileName.text;
+				preferences.window_resize = windowResize.selected ? 1 : 0;
+				preferences.start_at_login = startAtLogin.selected ? 1 : 0;
+				preferences.enable_favorite = chkFavorite.selected ? 1 : 0;
+				preferences.enable_important = chkImportant.selected ? 1 : 0;
+				preferences.enable_fuzzy = chkFuzzy.selected ? 1 : 0;
+				preferences.enable_convert_lead = chkConvertLead.selected ? 1 : 0;
+				preferences.enable_home_task= chkHomeTask.selected ? 1 : 0;
+				//admin sync
+				//				preferences[PreferencesDAO.SYNC_ACCESSPROFILE] = chkSyncAccessProfile.selected ? 1 : 0;
+				//				preferences[PreferencesDAO.SYNC_ASSESSMENTSCRIPT] = chkSyncAssessmentScript.selected ? 1 : 0;
+				//				preferences[PreferencesDAO.SYNC_CASCADINGPICKLIST] = chkSyncCascadingPicklist.selected ? 1 : 0;
+				//				preferences[PreferencesDAO.SYNC_FIELD_MANAGMENT] = chkSyncFieldManagement.selected ? 1 : 0;
+				//				preferences[PreferencesDAO.SYNC_PICKLISTSERVICE] = chkSyncPicklistService.selected ? 1 : 0;
+				//				preferences[PreferencesDAO.SYNC_ROLE] = chkSyncRole.selected ? 1 : 0;
+				preferences[PreferencesDAO.FEED_URL] = txtFeedURL.text;
+				preferences[PreferencesDAO.FEED_PORT] = txtFeedPort.text;
+				preferences[PreferencesDAO.ENABLE_CUSTOM_LAYOUT] = chkCustLayout.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_LIST_LAYOUT] = chkListLayout.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_VIEW_LAYOUT] = chkViewLayout.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_FILTER] = chkFilterLayout.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_CONNECTION_INFORMATION] = chkConnection.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_TRANSACTION] = chkEnableTransaction.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_USER_INTERFACE] = chkUserInterface.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_OPTION] = chkOption.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_AUTO_CONFIGURATION] = chkAutoConfict.selected ? 1 : 0;			
+				preferences[PreferencesDAO.ENABLE_FACEBOOK] = chkFacebook.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_LINKEDIN] = chkLinkedin.selected ? 1 : 0; 
+				preferences[PreferencesDAO.ENABLE_FEED] = chkEnableFeed.selected ? 1 : 0; 
+				preferences[PreferencesDAO.ENABLE_DASHBOARD] = chkDashboard.selected ? 1 : 0;
+				// CH 24-July-2013
+				preferences[PreferencesDAO.ENABLE_DASHBOARD_REPORT] = chkDashboardReport.selected ? 1 : 0;
+				
+				preferences[PreferencesDAO.ENABLE_DAILY_AGENDA] = chkDailyAgenda.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_APPLICATION_UPDATE] = chkAppUpdate.selected ? 1 : 0;
+				
+				preferences[PreferencesDAO.DISABLE_PDF_EXPORT] = chkDisablePDFExport.selected ? 1 : 0; 
+				preferences[PreferencesDAO.DISABLE_CVS_EXPORT] = chkDisableCSVExport.selected ? 1 : 0;
+				preferences[PreferencesDAO.DISABLE_LAYOUT_MANAGER] = chkDisableLayoutManager.selected ? 1 : 0;
+				preferences[PreferencesDAO.DISABLE_LIST_LAYOUT] = chkDisableListLayout.selected ? 1 : 0;
+				preferences[PreferencesDAO.ENABLE_PDF_SIGNATURE] = chkEnablePDFSignature.selected ? 1 : 0; 
+				preferences[PreferencesDAO.ENABLE_ASSESSMENT_SCRIPT] = chkEnableAssessmentScript.selected ? 1 : 0; 
+				preferences[PreferencesDAO.ENABLE_BUTTON_ACTIVITY_CREATE_CALL] = chkEnableObjectCall.selected ? 1 : 0; 
+				preferences[PreferencesDAO.ENABLE_VISITIT_CUSTOMER] = chkEnableVisitCustomer.selected ? 1 : 0; 
+				
+				preferences[PreferencesDAO.HIDE_ACTIVITY_TYPE] = getValueActityType();
+				preferences[PreferencesDAO.BEGIN_OF_WEEK] = cboBiginOfWeek.selectedItem.data;
+				preferences[PreferencesDAO.TIME_FORMAT] = cboTimeFormat.selectedItem.data;
+				preferences.ms_url=ms_url.text;
+				preferences.ms_user=ms_user.text;
+				preferences[PreferencesDAO.HIDE_TECH_USER] = hideTechUser.selected?1:0;
+				preferences.ms_password = ms_pwd.text;
+				preferences.cvs_separator = cboSeparator.selectedItem==null?',':cboSeparator.selectedItem.data;
+				preferences.google_map_address = cboGoogleMapAddress.selectedItem==null?'':cboGoogleMapAddress.selectedItem.data;
+				//preferences[PreferencesDAO.GOOGLE_MAP_DISTANCE] = cboGoogleMapDistance.selectedItem==null?'metric':cboGoogleMapDistance.selectedItem.data;
+				preferences.tech_username = StringUtil.trim(tech_username.text);
+				preferences.tech_password = StringUtil.trim(tech_password.text);
+				preferences.important_length = important_length.selectedItem==null?'10':important_length.selectedItem.data;
+				preferences.recent_filter = recent_filter.selectedItem==null?'10':recent_filter.selectedItem.data;
+				
+				// set start application at login
+				Utils.setStartAtLogin(startAtLogin.selected);
+				
+				//Bug fixing 472 CRO
+				//Open code 748 CRO
+				preferences.use_sso = use_sso.selected ? 1 : 0;
+				preferences.company_sso_id=StringUtil.trim(company_sso_id.text);
+				preferences.usegzip=usegzip.selected? 1 : 0;
+				preferences.enable_check_conflict=enable_check_conflict.selected?1:0;
+				preferences.background_color = "0x" + winTitleBarColor.selectedColor.toString(16);
+				preferences.ms_exchange_enable = exchangeOpt.selected ? 1 : 0 ;
+				preferences.enable_google_calendar = googleOpt.selected ? 1 : 0 ;
+				if(!startupsync.selected && timerChanged){
+					mainWindow.setTimerSyncInterval(syn_interval.value);
+					
+				}
+				//				preferences.im_room_url = imform.roomURL.text;
+				//				preferences.im_protocol = "rtmfp";
+				//				preferences.im_user = imform.username.text;
+				//				preferences.im_password = imform.password.text;
+				//				preferences.im_auto_sing_in = autoSingIn.selected;
+				Utils.suppressWarning(new ArrayCollection([preferences]));
+				Database.begin();
+				try{
+					preferences[PreferencesDAO.MODERN_ICON] = Database.preferencesDao.isModernIcon()?  1 : 0;
+					Database.preferencesDao.update(preferences);
+					Database.preferencesDao.setValue(PreferencesDAO.PDF_HEADER,pdfHeaderText.text);
+					Database.preferencesDao.setValue(PreferencesDAO.PREDEFINED_FILTERS,showPredefinedFilters.selected);
+					
+					Database.preferencesDao.setValue("gmail_username",StringUtil.trim(txtGmailUsername.text));
+					Database.preferencesDao.setValue("gmail_password",(txtGmailPassword.text));
+					
+					Database.preferencesDao.setValue(PreferencesDAO.ADMIN_PASSWORD, StringUtil.trim(txtAdminPasswordInput.text));
+					Database.preferencesDao.setValue(PreferencesDAO.DATABASE_PASSWORD, StringUtil.trim(txtDatabasePasswordInput.text));
+					
+					//InitDbLocation.writeToConfigFile(Database.getCustomDatabasePathFromFile(),Utils.encryptPassword(txtDatabasePasswordInput.text));
+					
+					//Database.preferencesDao.setValue("enable_google_calendar",googleCalendarOpt.selected ? 1 : 0);
+					
+					//CRO bug fixing 92 20.01.2011
+					Database.preferencesDao.setValue(PreferencesDAO.PDF_SIZE,pdfSize);
+					//----------------------------
+					
+					Database.preferencesDao.setValue(PreferencesDAO.HEADER_COLOR_PDF,cboHederColorPDF.selectedItem.data);
+					
+					//update distance
+					if(distanceMap.dataProvider!=null){
+						for each(var c:Object in distanceMap.dataProvider){
+							Database.countryDao.update({'distance':c.distance},{'code':c.code});	
+						}
+					}
+					
+					
+					
+					Database.commit();
+				}catch(e:Error){
+					Database.rollback();
+				}
+				
+				
+				
+				mainWindow.refreshAssessmentScript();
+				mainWindow.refreshWindowLogo();
+				enabledTransactionSave();
+				enabledFeedSave();
+				enabledReportAdminSave();
+				if(editStatus || Utils.updChildSyncStatus){
+					Utils.updChildSyncStatus = false;
+					mainWindow.updateTransactions();
+					
+				}	
+				mainWindow.selectList();//refresh selected list
+				
+				mainWindow.checkTips();
+				
+				//			Database.feedUserDAO.delete_all();
+				//		 	Database.feedUserDAO.insertFeedUsers(feedListAddedUser.dataProvider as ArrayCollection);
+				FeedUtils.refreshRooms();
+				//				var child:Object = mainWindow.navigator.selectedChild;
+				//				if(child != null && "Activity" == child.name){
+				//					(child as List).loadData();
+				//				}
+				if( chkEnableFeed.selected ){
+					mainWindow.chatClientControl.initData();
+				}
+				
+				this.close();
+			}
+			
+			private function save():Boolean {
+				if(!hasSelectedTransactions()) return false;
+				if(!hasSelectedDisplayTransactions()) return false;
+				if (validate()){
+					Utils.showLoadingProgressWindow(saveData, i18n._(StringUtils.SAVING_DATA_STR), i18n._(StringUtils.SAVING_PREF_STR));
+					return false; 
+				}else{
+					//CRO.05.01.2011
+					Alert.show(i18n._('PREFERENCES_ALERT_TEXT_THE_CONNECTION_URL_IS_INVALID'), i18n._('GLOBAL_INVALID'), Alert.OK, this);
+					tabNavigator.selectedIndex = 1;
+				}
+				return false;
+			}
+			
+			private function getValueActityType():String{
+				var actType:String="";
+				var selAct:ArrayCollection = cboActivityType.selectedItems;
+				if(selAct != null && selAct.length>0){
+					var i:int = 1;
+					for each (var obj:Object in selAct){
+						if(i < selAct.length){
+							actType = actType + obj.data + ",";
+						}else{
+							actType = actType + obj.data ;
+						}
+						i++;
+					}
+				}
+				
+				return actType;
+			}
+			private function exportPref():void{
+				//need translate
+				//Utils.showLoadingProgressWindow(exportConfiguration, "Exporting Data", "Exporting Data");
+				//#4994 CRO
+				exportConfiguration();
+			}	
+			private function importFromOOD(xml:XML, popoup:ImportFiledOOD=null):void{
+				dialog = popoup;
+				importConfig(xml,preferencesXMLList,mapValueWithControls,reload)
+				
+			}
+			
+			private function importPref():void{
+				/*
+				var tmpPreferences:Object = new Object();
+				var username:String = '';
+				var passwornd:String ='';
+				if(use_sso.selected){
+				username = tech_username.text;
+				passwornd = tech_password.text;
+				}else{
+				username = sodlogin.text;
+				passwornd = sodpass.text;
+				}
+				tmpPreferences.sodhost = sodhost.text;
+				tmpPreferences.sodlogin = username;
+				tmpPreferences.sodpass = passwornd;
+				var impOOD:ImportFiledOOD = new ImportFiledOOD();
+				impOOD.importFromOOD = this.importFromOOD;
+				impOOD.importFromFile = importConfiguration;
+				impOOD.tmpPreferences = tmpPreferences;
+				WindowManager.openModal(impOOD);
+				*/
+				importConfiguration(null);
+				//importConfiguration();			
+			}	
+			private function hasSelectedDisplayTransactions():Boolean {
+				var vBoxChildList:Array = displayTrans.getChildren();
+				var vBoxChildListFilterTrans:Array = filterTrans.getChildren();
+				var childListFilterAdvanced:Array = advancedFilter.getChildren();
+				if(vBoxChildListFilterTrans.length == 0){ Alert.show(i18n._('PREFERENCES_ALERT_TEXT_YOU_HAVE_TO_CHECK_AT_LEAST_ONE_ENTITY')); return false; }		
+				for(var i:int = 1; i < vBoxChildList.length; i++){				
+					var checkBox:CheckBox =  vBoxChildList[i] as CheckBox;
+					var cboBox:ComboBox = vBoxChildListFilterTrans[i] as ComboBox;
+					if(cboBox.selectedItem == null) continue;
+					if(checkBox.selected==true){
+						return true;
+					}
+				}
+				Alert.show(i18n._('You have to check display at least one entity.'),prefTitleBar.title, Alert.OK, this); 
+				return false;
+			}
+			private function hasSelectedTransactions():Boolean {
+				var vBoxChildList:Array = enabledTrans.getChildren();
+				var vBoxChildListFilterTrans:Array = filterTrans.getChildren();
+				var childListFilterAdvanced:Array = advancedFilter.getChildren();
+				if(vBoxChildListFilterTrans.length == 0){ Alert.show(i18n._('PREFERENCES_ALERT_TEXT_YOU_HAVE_TO_CHECK_AT_LEAST_ONE_ENTITY')); return false; }		
+				for(var i:int = 1; i < vBoxChildList.length; i++){				
+					var checkBox:CheckBox =  vBoxChildList[i] as CheckBox;
+					var cboBox:ComboBox = vBoxChildListFilterTrans[i] as ComboBox;
+					if(cboBox.selectedItem == null) continue;
+					if(checkBox.selected==true){
+						return true;
+					}
+				}
+				Alert.show(i18n._('PREFERENCES_ALERT_TEXT_YOU_HAVE_TO_CHECK_AT_LEAST_ONE_ENTITY'),prefTitleBar.title, Alert.OK, this); 
+				return false;
+			}
+			
+			private function enabledTransactionSave():void {
+				
+				var transactions:Object = new Object;
+				for each(var t:Object in Database.transactionDao.listTransaction()){
+					transactions[t.entity] = t.read_only;
+				}
+				
+				var vBoxChildList:Array = enabledTrans.getChildren();
+				//var vBoxChildListDisplayName:Array = displayNameTrans.getChildren();
+				var vBoxChildListFilterTrans:Array = filterTrans.getChildren();
+				var vBoxChildListParentEntityTrans:Array = parentEntity.getChildren();
+				var childListFilterAdvanced:Array = advancedFilter.getChildren();
+				if(vBoxChildListFilterTrans.length == 0){ Alert.show(i18n._('PREFERENCES_ALERT_TEXT_YOU_HAVE_TO_CHECK_AT_LEAST_ONE_ENTITY')); return; }
+				Database.begin();
+				if(addRemoveEntityTransaction){
+					resetLastSyn_Date(TASK_NAME_INCOMMING + "FieldManagementService");
+					resetLastSyn_Date(TASK_NAME_INCOMMING + "ReadPicklist");
+					resetLastSyn_Date(TASK_NAME_INCOMMING + "PicklistService");
+					resetLastSyn_Date(TASK_NAME_INCOMMING + "ReadCascadingPicklists");
+				}
+				for(var i:int = 1; i < vBoxChildList.length; i++){				
+					var checkBox:CheckBox =  vBoxChildList[i] as CheckBox;
+					//var textField:TextInput = vBoxChildListDisplayName[i] as TextInput;
+					//var chkActivities:CheckBox = syncActivities.getChildAt(i) as CheckBox;
+					//var chkAttachment:CheckBox = syncAttachments.getChildAt(i) as CheckBox;
+					var chkReadonly:CheckBox = readonlyEntities.getChildAt(i) as CheckBox;
+					var chkCheckInrangeFilter:CheckBox = removeIfNotInRange.getChildAt(i) as CheckBox;
+					var chkAuthorizeDeletion:CheckBox = authorizeDeletion.getChildAt(i) as CheckBox;
+					var chkDisplay:CheckBox = displayTrans.getChildAt(i) as CheckBox;
+					var cboBox:ComboBox = vBoxChildListFilterTrans[i] as ComboBox;
+					var cboAdvance:ComboBox = childListFilterAdvanced[i];
+					if(cboBox.selectedItem == null) continue;
+					var enabled:int = 0;
+					var transaction:Object = new Object();
+					if(checkBox.selected==true){
+						enabled = 1;
+					}
+					var cboParentEnity:ComboBox = vBoxChildListParentEntityTrans[i]
+					transaction.entity = checkBox.data;
+					transaction.enabled = enabled;
+					//transaction.display_name = textField.text;
+					transaction.filter_id = cboBox.selectedItem.type;
+					transaction.parent_entity = cboParentEnity.selectedItem ? cboParentEnity.selectedItem["entityDest"] : "";
+					//transaction.sync_activities = chkActivities.selected;
+					//transaction.sync_attachments = chkAttachment.selected;
+					transaction.read_only = chkReadonly.selected == true? 1:0;
+					transaction.authorize_deletion = chkAuthorizeDeletion.selected == true? 1:0;
+					transaction.rank = i;
+					transaction.display = chkDisplay.selected;
+					transaction.checkinrange=chkCheckInrangeFilter.selected;
+					transaction.advanced_filter = cboAdvance.selectedItem.type;
+					changeDefaultSelectedUpdateSyn(cboBox.selectedItem);
+					Database.transactionDao.update(transaction);
+					clearRightCache(transactions, transaction.entity, transaction.read_only);
+					//clear transaction bug#319
+					clearTransactionCache(transaction.entity);
+					RightService.deleteRightsCatch(transaction.entity);
+				}
+				Database.commit();
+			}
+			
+			private function enabledFeedSave():void {
+				var vBoxChildList:Array = enabledFeeds.getChildren();
+				Database.begin();
+				for(var i:int = 1; i < vBoxChildList.length; i++){
+					var feed:Object = new Object();		
+					var enabled:int = 0;
+					var checkBox:CheckBox =  vBoxChildList[i] as CheckBox;
+					if(checkBox.selected==true){
+						enabled = 1;
+					}
+					feed.entity = checkBox.label;
+					feed.enabled = enabled;
+					feed.display_name = feed.entity;
+					Database.feedDAO.updateFeed(feed);
+				}
+				Database.commit();
+			}
+			
+			private function clearRightCache(transactions:Object, entity:String, readOnly:Boolean):void {
+				if(transactions[entity] != readOnly){
+					cache.put(entity,null);
+				}
+			}
+			
+			private function clearTransactionCache(entity:String):void{
+				trxCache.put(entity,null);
+				
+			}	
+			
+			private function changeDefaultSelectedUpdateSyn(object:Object):void{
+				if(!defaultSelected.contains(object)){
+					var obj:Object = new Object();
+					obj.task_name = TASK_NAME + object.entity
+					obj.sync_date = "01/01/1970 00:00:00";
+					obj.start_row = 0;
+					obj.start_id = "";
+					Database.lastsyncDao.update(obj);
+				}
+			}
+			
+			private function resetLastSyn_Date(taskName:String):void{
+				var obj:Object = Database.lastsyncDao.find(taskName);
+				if(obj) {
+					obj.sync_date = "01/01/1970 00:00:00";
+					Database.lastsyncDao.update(obj);
+				}
+			}			
+			
+			
+			
+			private function testConnection():void {
+				//CRO 05.01.2011
+				if(!validate()){ Alert.show(i18n._('PREFERENCES_ALERT_TEXT_THE_CONNECTION_URL_IS_INVALID'), i18n._('GLOBAL_INVALID'), Alert.OK, this); return}
+				testConnectionBtn.enabled = false;
+				waitConnectionEnable(testConnectionWait, true);
+				
+				var tmpPreferences:Object = new Object();
+				tmpPreferences.sodhost = StringUtil.trim(sodhost.text);
+				tmpPreferences.sodlogin = StringUtil.trim(sodlogin.text);
+				tmpPreferences.sodpass = StringUtil.trim(sodpass.text);
+				tmpPreferences.tech_username = StringUtil.trim(tech_username.text);
+				tmpPreferences.tech_password = StringUtil.trim(tech_password.text);
+				//Bug fixing 472 CRO
+				//Open code for fixing bug 748 CRO
+				tmpPreferences.use_sso= use_sso.selected
+				tmpPreferences.company_sso_id=company_sso_id.text	
+				var login:LoginCRM = new LoginCRM(testConnectionSuccess, testConnectionError);
+				login.loginCRM(tmpPreferences);
+				
+			}
+			
+			private function testGmailConnection():void {
+				//TODO: GMAIL TEST CONNECTION		
+				waitConnectionEnable(testGmailConnectionWait, true);
+				var calendarService:CalendarService = new CalendarService();
+				calendarService.addEventListener(GServiceEvent.SERVICE_RESULT, calendarService_serviceResultHandler);			
+				calendarService.setCredentials(StringUtil.trim(txtGmailUsername.text), StringUtil.trim(txtGmailPassword.text));
+				calendarService.authenticationService.clientLogin();
+			}
+			
+			private function calendarService_serviceResultHandler(event:GServiceEvent):void {			
+				if (event.operation == AuthenticationService.LOGIN) {
+					auth_completeHandler(event);
+				}      
+			}
+			
+			private function auth_completeHandler(event:GServiceEvent):void {				
+				if (event.httpStatus == 200) {             
+					testGmailConnectionBtn.enabled = true;
+					waitConnectionEnable(testGmailConnectionWait, false);
+					Alert.show(i18n._('PREFERENCES_ALERT_TEXT_CONNECTION_TEST_SUCCESSFUL'), i18n._('GLOBAL_TEST_CONNECTION'), Alert.OK, this);
+				} else {
+					testGmailConnectionBtn.enabled = true;
+					waitConnectionEnable(testGmailConnectionWait, false);
+					Alert.show(i18n._('PREFERENCES_ALERT_TEXT_CONNECTION_TEST_FAILED'),i18n._('GLOBAL_TEST_CONNECTION'), Alert.OK, this);
+				}         
+			}	
+			
+			private function testConnectionError(error:String, event:Event):void {
+				testConnectionBtn.enabled = true;
+				waitConnectionEnable(testConnectionWait, false);
+				//CRO 05.01.2011
+				Alert.show(i18n._('PREFERENCES_ALERT_TEXT_CONNECTION_TEST_FAILED') + "\n" + error, i18n._('GLOBAL_TEST_CONNECTION'), Alert.OK, this);
+			}
+			
+			private function testConnectionSuccess(sessionId:String):void {
+				testConnectionBtn.enabled = true;
+				waitConnectionEnable(testConnectionWait, false);
+				Alert.show(i18n._('PREFERENCES_ALERT_TEXT_CONNECTION_TEST_SUCCESSFUL'), i18n._('GLOBAL_TEST_CONNECTION'), Alert.OK, this);
+			}
+			
+			private function waitConnectionEnable(customLinkBtn:CustomLinkButton, enable:Boolean):void {
+				customLinkBtn.visible = enable;
+				customLinkBtn.includeInLayout = enable;
+			}	
+			
+			
+			private function validate():Boolean {
+				var validatorErrorArray:Array = Validator.validateAll([crmondemandURLValidator,feedPortValidator]);
+				return (validatorErrorArray.length == 0);
+			}
+			
+			private function exportConfiguration():void{
+				var applicationObject:Object = Utils.getAppInfo();
+				var appName:String = Database.preferencesDao.getValue("application_name","") as String;
+				if(appName ==""){
+					appName = applicationObject.name;
+				}
+				var configXml:XML = 
+					<configuration>
+						<application-name>{appName}</application-name>
+						<application-version>{applicationObject.version}</application-version>
+						<prefs />	
+						<related_disable_buttons/>
+						<transactions />
+						<custom_layouts />
+						<list-layouts />
+						<sublist-layouts/>
+						<view-layouts />
+						<validationRules />
+						<validation-rules_2 />
+						<validation-rules_translator />
+						<filters />
+						<access_profiles/>
+						<access_profiles_entrys/>
+						<access_profiles_trans/>
+						<role_services/>
+						<role_services_avail_tab/>
+						<role_services_layout/>
+						<role_services_page/>
+						<role_services_priv/>
+						<role_services_sel_tab/>
+						<role_services_trans/>
+						<role_services_type/>
+						<custom_records_type_trans/>
+						<field_managements/>
+						<field_translations/>
+						<territorytree/>
+						<depthstructuretree/>
+						<filter_translations/>
+						<report_admins/>
+						<assessments/>
+						<questions/>
+						<answers/>
+						<assessmentMappingColumns/>
+						<assessment_configs/>
+						<assessmentPages/>
+						<assessmentMappings/>
+						<assessmentsumfields/>
+						<assessmentspliters/>
+						<assessmentpdfheaders/>
+						<detail_layouts/>
+						<custom_fields/>
+						<custom_field_trans/>
+						<sql_filter_criterias/>
+						<conditions/>
+						<dailyAgendaLayouts/>
+						<countrys/>
+						<layoutblocks/>
+						<blockLyoutFields/>	
+						<default_field_values/>
+						<postdefault_fields/>
+					</configuration>;
+				
+				for each(var obj:Object in Database.industryDAO.getDifferenceLanguage()) {
+					var industiesXML:XML = new XML("<industries language='"+obj.language_code+"' />");
+					for each(var industry:Object in Database.industryDAO.getIndustrylists(obj.language_code)) {
+						if(industry.data && industry.label) {
+							var industryXML:XML =
+								<industry>
+									<enable>{industry.enable}</enable>
+									<display_name>{industry.data}</display_name>
+									<sic_code>{industry.sic_code}</sic_code>
+								</industry>
+							industiesXML.appendChild(industryXML);
+						}
+					}
+					configXml.insertChildAfter(configXml.child("application-version"), industiesXML);
+				}
+				
+				for each(var pref:Object in Database.preferencesDao.getPrefs(false)){
+					if(pref.key=="application_name"){
+						continue;
+					}
+					var isEnable:Boolean =true;
+					var value:String = pref.value;
+					if(pref.key != PreferencesDAO.BEGIN_OF_WEEK){
+						if(value=="0"){
+							value = "false";
+						}else if(value=="1"){
+							value = "true";
+						}
+					}
+					
+					if(value==null || value=="null") value = "";
+					var xmlPref:XML = new XML("<pref key='" + pref.key + "'>" + value + "</pref>");
+					if(mapconnectInfo[pref.key] != null){
+						if(!chkConnection.selected) isEnable = false;
+					}else if(mapInterface[pref.key] != null){
+						if(!chkUserInterface.selected) isEnable = false;
+					}else if(mapOption[pref.key] != null){
+						if(!chkOption.selected) isEnable = false;
+					}else if(mapAutoConfig[pref.key] != null){
+						if(!chkAutoConfict.selected) isEnable = false;
+					}else{
+						
+					}
+					if(isEnable) configXml.elements("prefs")[0].appendChild(xmlPref);
+					
+				}
+				
+				
+				
+				var vBoxChildList:Array = enabledTrans.getChildren();
+				//var vBoxChildListDisplayName:Array = displayNameTrans.getChildren();
+				var listTransaction:ArrayCollection = Database.transactionDao.listTransaction();
+				var vBoxChildListFilterTrans:Array = filterTrans.getChildren();
+				var childAdvanFilter:Array = advancedFilter.getChildren();
+				
+				for(var k:int = 0 ; k< listTransaction.length; k++){
+					var lstRelated:ArrayCollection = Database.relatedButtonDao.findByParent(listTransaction.getItemAt(k).entity);
+					for(var j:int = 0 ; j < lstRelated.length; j++){
+						var relatedObj:Object = lstRelated.getItemAt(j);
+						var relatedButtonXml:XML = <related_disable_button>
+														<parent_entity>{relatedObj.parent_entity}</parent_entity>
+														<entity>{relatedObj.entity}</entity>
+														<disable>{relatedObj.disable?"true":"false"}</disable>
+												   </related_disable_button>;
+						configXml.elements(RELATED_BUTTONS_DISABLE)[0].appendChild(relatedButtonXml);
+					}
+					
+				}
+				
+				for(var i:int = 0; i < listTransaction.length; i++){
+					// Preferences
+					var index:int = i + 1;
+					var checkBox:CheckBox =  vBoxChildList[index] as CheckBox;
+					var cboAdvanced:ComboBox = childAdvanFilter[index];
+					//var textField:TextInput = vBoxChildListDisplayName[i] as TextInput;
+					var cboBox:ComboBox = vBoxChildListFilterTrans[index] as ComboBox;
+					//var chkActivities:CheckBox = syncActivities.getChildAt(index) as CheckBox;
+					//var chkAttachment:CheckBox = syncAttachments.getChildAt(index) as CheckBox;
+					var chkReadonly:CheckBox = readonlyEntities.getChildAt(index) as CheckBox;
+					var chkAuthorizeDeletion:CheckBox = authorizeDeletion.getChildAt(index) as CheckBox;
+					var chkDisplay:CheckBox = displayTrans.getChildAt(index) as CheckBox;
+					var chkCheckInrangeFilter:CheckBox = removeIfNotInRange.getChildAt(index) as CheckBox;
+					var entity:String = listTransaction.getItemAt(i).entity;//should be get from db is beter
+					
+					
+					// #311: hange request - Diversey sales - Prefernces
+					if(chkEnableTransaction.selected){
+						
+						var transactionXml:XML = 
+							<transaction>
+								<id>{entity}</id>
+								<enabled>{checkBox.selected.toString()}</enabled>
+								<filter>{cboBox.selectedItem.type}</filter>
+								<advanced_filter>{cboAdvanced.selectedItem.type}</advanced_filter>
+								<filter-disable>{listTransaction.getItemAt(i).filter_disable?"true":"false"}</filter-disable>
+								<default-filter>{listTransaction.getItemAt(i).default_filter==null?"":listTransaction.getItemAt(i).default_filter}</default-filter>								
+								<hide-relation>{listTransaction.getItemAt(i).hide_relation?"true":"false"}</hide-relation>
+								<read-only>{chkReadonly.selected.toString()}</read-only>
+								<display>{chkDisplay.selected.toString()}</display>
+								<checkinrange>{chkCheckInrangeFilter.selected.toString()}</checkinrange>
+								<read-only-disable>{listTransaction.getItemAt(i).read_only_disable?"true":"false"}</read-only-disable>
+								<authorize-deletion>{chkAuthorizeDeletion.selected.toString()}</authorize-deletion>
+								<authorize-deletion-disable>{listTransaction.getItemAt(i).authorize_deletion_disable?"true":"false"}</authorize-deletion-disable>
+								<entity-disable>{listTransaction.getItemAt(i).entity_disable?"true":"false"}</entity-disable>
+								<rank>{listTransaction.getItemAt(i).rank}</rank>
+								<parent_entity>{listTransaction.getItemAt(i).parent_entity}</parent_entity>
+								<sync_order>{listTransaction.getItemAt(i).sync_order}</sync_order>
+								<sync-children/>
+							</transaction>;
+						var listChildren:Array = Database.subSyncDao.findByEntity(entity);
+						generateXML(transactionXml.elements("sync-children"),"child",listChildren);
+						configXml.elements("transactions")[0].appendChild(transactionXml);
+					} 
+					
+					//					if(chkCustLayout.selected){
+					// Custom Layouts
+					// entity, col, row, column_name, custom
+					//						var layouts:ArrayCollection = Database.customLayoutDao.read(entity);
+					//						var customLayoutXML:XML;
+					//						for each(var layout:Object in layouts) {							
+					//							customLayoutXML = 
+					//								<custom-layout>
+					//									<entity>{entity}</entity>
+					//									<subtype>{layout.subtype}</subtype>
+					//									<deletable>{layout.deletable}</deletable>
+					//									<icon>{layout.custom_layout_icon}</icon>
+					//									<color>{layout.background_color==null ? "0xEEEEEE":layout.background_color}</color>
+					//									<layout-name>{layout.layout_name == null ? entity : layout.layout_name}</layout-name>
+					//									<display-name>{layout.display_name == null ? entity : layout.display_name}</display-name>
+					//									<display-name-plural>{layout.display_name_plural == null ? entity : layout.display_name_plural}</display-name-plural>
+					//									<layout_depend_on>{layout.layout_depend_on == null ? "" : layout.layout_depend_on} </layout_depend_on>
+					//									<conditions />
+					//									<custom-layout-title>{layout.custom_layout_title}</custom-layout-title>									
+					//									<custom-fields />
+					//									<sql-filter-criterias />
+					//								</custom-layout>;						
+					//							
+					//							//var fields:ArrayCollection = Database.layoutDao.selectLayout(entity, layout.subtype);
+					//							var conditions:ArrayCollection = Database.customLayoutConditionDAO.list(entity, layout.subtype);
+					
+					//							if (fields.length>0){
+					//								for each(var field:Object in fields){
+					//									//var customField:Object = field.customField;
+					//									//if(!customField) customField = new Object();
+					//									var fieldXML:XML = 
+					//										<field>
+					//											<col>{field.col}</col>
+					//											<row>{field.row}</row>
+					//											<column-name>{field.column_name}</column-name>
+					//											<custom>{field.custom==null?"":field.custom}</custom>
+					//											<readonly>{field.readonly==null?"false":field.readonly}</readonly>
+					//											<mandatory>{field.mandatory==null?"false":field.mandatory}</mandatory>
+					//											<max_chars>{field.max_chars==null?"":field.max_chars}</max_chars>
+					//																		
+					//										</field>;
+					//									
+					//									// ---------------------------------------------
+					//									customLayoutXML.elements("fields")[0].appendChild(fieldXML);
+					//								}
+					//								// configXml.elements("custom-layouts")[0].appendChild(customLayoutXML);
+					//							}					
+					//							if (conditions.length>0){
+					//								for each(var condition:Object in conditions){
+					//									var conditionXML:XML = <condition>
+					//										<num>{condition.num}</num>
+					//										<column-name>{condition.column_name}</column-name>
+					//										<operator>{condition.operator==null?"":condition.operator}</operator>
+					//										<param>{condition.params==null?"":condition.params}</param>
+					//										</condition>;
+					//									customLayoutXML.elements("conditions")[0].appendChild(conditionXML);
+					//								}
+					//								// configXml.elements("custom-layouts")[0].appendChild(customLayoutXML);
+					//							}
+					
+					//							if (conditions.length>0){
+					//								configXml.elements("custom-layouts")[0].appendChild(customLayoutXML);
+					//							}
+					//							
+					//						}
+					
+					//						//Custom field
+					//						var customFieldList:ArrayCollection = Database.customFieldDao.allCustomField(entity);
+					//						if (customFieldList.length>0){
+					//							for each(var customField1:Object in customFieldList){
+					//								var customFieldXML:XML = <custom-field>
+					//									<column-name>{checkNullValueNoEscape(customField1.column_name)}</column-name>
+					//									<fieldName>{checkNullValueNoEscape(customField1.fieldName)}</fieldName>
+					//									<displayName>{checkNullValueNoEscape(customField1.displayName)}</displayName>
+					//									<fieldType>{checkNullValueNoEscape(customField1.fieldType)}</fieldType>
+					//									<value>{checkNullValueNoEscape(customField1.value)}</value>
+					//									<subtype>{checkNullValueNoEscape(customField1.subtype)}</subtype>
+					//									<defaultValue>{checkNullValueNoEscape(customField1.defaultValue)=="1"?true:false}</defaultValue>
+					//									<bindField>{checkNullValueNoEscape(customField1.bindField)}</bindField>
+					//									<bindValue>{checkNullValueNoEscape(customField1.bindValue)}</bindValue>
+					//									<parentPicklist>{checkNullValueNoEscape(customField1.parentPicklist)}</parentPicklist>
+					//									<entity>{checkNullValueNoEscape(customField1.entity)}</entity>
+					//									
+					//									<fieldCopy>{checkNullValueNoEscape(customField1.field_copy)}</fieldCopy>
+					//									<sumFieldName>{checkNullValueNoEscape(customField1.sum_field_name)}</sumFieldName>
+					//									<sumEntityName>{checkNullValueNoEscape(customField1.sum_entity_name)}</sumEntityName>
+					//									<relationId>{checkNullValueNoEscape(customField1.relation_id)}</relationId>
+					//							
+					//									<translators/>
+					//									<territorytree/>
+					//									<depthstructuretree/>
+					//								</custom-field>	
+					//								
+					//								var field_translators:ArrayCollection = Database.customFieldTranslatorDao.selectFields(entity,customField1.column_name);
+					//								for each(var trans:Object in field_translators){
+					//									var translatorXML:XML = <translator>
+					//										<languageCode>{checkNullValueNoEscape(trans.languageCode,"")}</languageCode>
+					//										<displayName>{checkNullValueNoEscape(trans.displayName,"")}</displayName>
+					//										<value>{checkNullValueNoEscape(trans.value,"")}</value>
+					//										<bindValue>{checkNullValueNoEscape(trans.bindValue)}</bindValue>
+					//										</translator>;
+					//									customFieldXML.elements("translators")[0].appendChild(translatorXML);
+					//								}
+					//								
+					//								customLayoutXML.elements("custom-fields")[0].appendChild(customFieldXML);
+					//							}
+					//						}
+					
+					// export sql_filter_criteria
+					// {entity_src: "", list_name: "", entity_dest: "", column_name: "", operator: "", param: "", conjunction: "", columns: "", num: ""}
+					//						var sqlFilterCriteria:ArrayCollection = new ArrayCollection(Database.sqlListDAO.fetch({entity_src: entity}));
+					//						if (sqlFilterCriteria.length > 0){
+					//							for each(var yCriteria:Object in sqlFilterCriteria){
+					//								var yCriteriaXML:XML = <sql-filter-criteria>
+					//									<entity_src>{checkNullValueNoEscape(yCriteria.entity_src)}</entity_src>
+					//									<list_name>{checkNullValueNoEscape(yCriteria.list_name)}</list_name>
+					//									<entity_dest>{checkNullValueNoEscape(yCriteria.entity_dest)}</entity_dest>
+					//									<column_name>{checkNullValueNoEscape(yCriteria.column_name)}</column_name>
+					//									<operator>{checkNullValueNoEscape(yCriteria.operator)}</operator>
+					//									<param>{checkNullValueNoEscape(yCriteria.param)}</param>
+					//									<conjunction>{checkNullValueNoEscape(yCriteria.conjunction)}</conjunction>
+					//									<columns>{checkNullValueNoEscape(yCriteria.columns)}</columns>
+					//									<num>{checkNullValueNoEscape(yCriteria.num)}</num>
+					//								</sql-filter-criteria>
+					//								
+					//								customLayoutXML.elements("sql-filter-criterias")[0].appendChild(yCriteriaXML);
+					//							}
+					//						}		
+					
+					// ----------------------------------------------
+					
+					
+					//					} // end custom layout
+					
+					if(chkListLayout.selected){
+						// List Layout
+						// entity, num, element_name				
+						var entityListLayout:XML = 
+							<list-layout>
+								<entity>{entity}</entity>
+								<fields />
+							</list-layout>;
+						var listsLayout:ArrayCollection = Database.columnsLayoutDao.fetchColumnLayouts(entity);
+						for each(var listLayout:Object in listsLayout){
+							var listLayoutXml:XML = 
+								<field>
+									<num>{listLayout.num}</num>
+									<element-name>{listLayout.element_name}</element-name>
+									<filter-type>{listLayout.filter_type}</filter-type>
+								</field>;
+							entityListLayout.elements("fields")[0].appendChild(listLayoutXml);
+						}
+						configXml.elements("list-layouts")[0].appendChild(entityListLayout);
+					}
+					
+					if(chkViewLayout.selected){
+						// View Layout
+						// entity, num, element_name				
+						var entityViewLayout:XML = 
+							<view-layout>
+								<entity>{entity}</entity>
+								<fields />
+							</view-layout>;
+						var viewsLayout:ArrayCollection = Database.viewLayoutDAO.selectAll(entity);
+						for each(var viewLayout:Object in viewsLayout){
+							var viewLayoutXml:XML = 
+								<field>
+									<num>{viewLayout.num}</num>
+									<element-name>{viewLayout.element_name}</element-name>
+								</field>;
+							entityViewLayout.elements("fields")[0].appendChild(viewLayoutXml);
+						}
+						configXml.elements("view-layouts")[0].appendChild(entityViewLayout);
+					}
+					
+					
+					
+					// Validation Rule
+					// entity, num, rule_name, field, operator, value, message
+					var entityValidatetion:XML = 
+						<validationRule>
+							<entity>{entity}</entity>
+							<fields />
+						</validationRule>
+					for each(var obj1:Object in Database.validationDao.selectEntity(entity)){
+						var validationRuleXML:XML = 
+							<field>
+								<num>{obj1.num}</num>
+								<rule-name>{obj1.rule_name}</rule-name>
+								<field>{obj1.field}</field>
+								<operator>{obj1.operator}</operator>
+								<value>{obj1.value==null?"":obj1.value}</value>
+								<message>{obj1.message}</message>
+							</field>;
+						entityValidatetion.elements("fields")[0].appendChild(validationRuleXML);
+					}
+					configXml.elements("validationRules")[0].appendChild(entityValidatetion);
+					
+					// -- valiadtion rule 2
+					var validationRule:ArrayCollection = Database.validationRuleDAO.selectAll(entity);
+					var entityValidatetion2:XML = 
+						<validation-rule>
+							<entity>{entity}</entity>
+							<rules />
+						</validation-rule>;
+					if (validationRule.length > 0){
+						for each(var objRule:Object in validationRule){
+							var validationRuleXML2:XML = <rule>
+								<ruleName>{checkNullValueNoEscape(objRule.ruleName)}</ruleName>
+								<active>{checkNullValueNoEscape(objRule.active)=="1"?"true":"false"}</active>
+								<message>{checkNullValueNoEscape(objRule.message)}</message>
+								<errorMessage>{checkNullValueNoEscape(objRule.errorMessage)}</errorMessage>
+								<value>{checkNullValueNoEscape(objRule.value)}</value>
+								<orderNo>{checkNullValueNoEscape(objRule.orderNo)}</orderNo>
+							</rule>;
+							entityValidatetion2.elements("rules")[0].appendChild(validationRuleXML2);
+						}
+					}	
+					configXml.elements("validation-rules_2")[0].appendChild(entityValidatetion2);
+					
+					//=== validator rule translator ==//
+					var validationRuleTran:ArrayCollection = Database.validationRuleTranslotorDAO.selectAll(entity);
+					var entityTran:XML = 
+						<validation-translator>
+							<entity>{entity}</entity>
+							<translators />
+						</validation-translator>;
+					for each(var tran:Object in validationRuleTran){
+						var validationTranXML:XML = <translator>
+													<ruleName>{checkNullValueNoEscape(tran.ruleName)}</ruleName>
+													<errorMessage>{checkNullValueNoEscape(tran.errorMessage)}</errorMessage>
+													<languageCode>{checkNullValueNoEscape(tran.languageCode)}</languageCode>
+												</translator>;
+						entityTran.elements("translators")[0].appendChild(validationTranXML);
+					}
+					configXml.elements("validation-rules_translator")[0].appendChild(entityTran);
+					
+					if(chkFilterLayout.selected){
+						
+						var filters:ArrayCollection = Database.filterDao.listFiltersCriteria(entity);
+						var filtersXML:XML = <filter>
+								<entity>{entity}</entity>
+							</filter>;
+						for each(var filter:Object in filters){
+							var filterFieldXML:XML = <field>
+								<name>{filter.name}</name>
+								<predefined>{filter.predefined==1?'true':'false'}</predefined>
+								<type>{filter.type}</type>
+								</field>;
+							//id, num, column_name, operator, param, conjunction
+							var filterCriterias:ArrayCollection = Database.criteriaDao.select(filter.id);
+							for each(var criteria:Object in filterCriterias){
+								
+								var criteriaXML:XML = <criteria-field>
+									<num>{criteria.num}</num>
+									<column-name>{criteria.column_name==null?"":criteria.column_name}</column-name>
+									<operator>{criteria.operator==null?"":criteria.operator}</operator>
+									<param>{criteria.param==null?"":criteria.param}</param>
+									<conjunction>{criteria.conjunction}</conjunction>							
+								</criteria-field>;
+								
+								filterFieldXML.appendChild(criteriaXML);
+							}
+							filtersXML.appendChild(filterFieldXML);	
+						}
+						configXml.elements("filters")[0].appendChild(filtersXML); 
+						
+					}	//end enable filter
+				}// end loop
+				
+				
+				//-----------------access_profile-------------------------
+				var accessProfiles:Array=Database.accessProfileServiceDao.fetch();
+				generateXML(configXml.elements("access_profiles"),"access_profile",accessProfiles);
+				//				var offset:Number=0;
+				//				while(true){
+				//					
+				//					var accesProfilesEntry:Array=Database.accessProfileServiceEntryDao.selectAll('5000',String(offset));
+				//					if(accesProfilesEntry==null || accesProfilesEntry.length<1){
+				//						break;
+				//					}
+				//					var root:XMLList=configXml.elements("access_profiles_entrys");
+				//					var tag:String="access_profiles_entrys_"+String(offset)+"_to_"+String(offset+5000);
+				//					var xmlList:XML=<{tag}/>;
+				//					root.appendChild(xmlList);
+				//					generateXML(root.elements(tag),"access_profile_entry",accesProfilesEntry);
+				//					offset=offset+5000;
+				//					
+				//				}
+				
+				generateXML(configXml.elements("access_profiles_entrys"),"access_profile_entry",Database.accessProfileServiceEntryDao.fetch());
+				
+				if(chkListLayout.selected){
+					generateXML(configXml.elements("sublist-layouts"),"sublist-layout",Database.subColumnLayoutDao.fetch());
+				}
+				var accesProfilesTrans:Array=Database.accessProfileServiceTransDao.fetch();
+				generateXML(configXml.elements("access_profiles_trans"),"access_profile_tran",accesProfilesTrans);
+				//-------------------roles_service------------------------------------------			
+				var roles:Array = Database.roleServiceDao.fetch();
+				generateXML(configXml.elements("role_services"),"role_service",roles);
+				roles = Database.roleServiceAvailableTabDao.fetch();
+				generateXML(configXml.elements("role_services_avail_tab"),"role_service_avail_tab",roles);
+				roles = Database.roleServiceLayoutDao.fetch();
+				generateXML(configXml.elements("role_services_layout"),"role_service_layout",roles);
+				roles = Database.roleServicePageLayoutDao.fetch();
+				generateXML(configXml.elements("role_services_page"),"role_service_page",roles);
+				
+				roles = Database.roleServicePrivilegeDao.fetch();
+				generateXML(configXml.elements("role_services_priv"),"role_service_priv",roles);
+				roles = Database.roleServiceSelectedTabDao.fetch();
+				generateXML(configXml.elements("role_services_sel_tab"),"role_service_sel_tab",roles);
+				roles = Database.roleServiceTransDao.fetch();
+				generateXML(configXml.elements("role_services_trans"),"role_service_trans",roles);
+				roles = Database.roleServiceRecordTypeAccessDao.fetch();
+				generateXML(configXml.elements("role_services_type"),"role_service_type",roles);
+				//----------------------Custome record type trans------------------------------
+				var custRecordType:Array=Database.customRecordTypeTranslationsDao.fetch();
+				generateXML(configXml.elements("custom_records_type_trans"),"custom_record_type_trans",custRecordType);
+				//----------------------field management-------------------------------------
+				var fieldManagement:Array=Database.fieldManagementServiceDao.fetch();
+				generateXML(configXml.elements("field_managements"),"field_management",fieldManagement);
+				//----------------------translation fields----------------------------------------
+				var fieldsTranlation:Array=Database.fieldTranslationDataDao.fetch();
+				generateXML(configXml.elements("field_translations"),"field_translation",fieldsTranlation);
+				//---------------------- Territory Tree ---------------------------------------
+				var territoryData:Array = Database.territoryTreeDAO.fetch();
+				generateXML(configXml.elements("territorytree"),"territory",territoryData);
+				//---------------------- Depthstructure Tree ----------------------------------------
+				var depthstructureData:Array = Database.depthStructureTreeDAO.fetch();
+				generateXML(configXml.elements("depthstructuretree"),"depthstructure",depthstructureData);
+				//Filter Translation
+				var filterData:Array=Database.customFilterTranslatorDao.fetch();
+				generateXML(configXml.elements("filter_translations"),"filter_translation",filterData);				
+				//---------------------- TCS Report Admin ----------------------------------------
+				exportReportAdmin(configXml);
+				
+				exportAssessmentScript(configXml);
+				
+				var blocklayout:Array = Database.blockLayoutDao.fetch();
+				generateXML(configXml.elements("layoutblocks"),"layoutblock",blocklayout);
+				var blockLayoutFields:Array = Database.blockDependField.fetch();
+				generateXML(configXml.elements("blockLyoutFields"),"blockLyoutField",blockLayoutFields);
+				var countrys:Array = Database.countryDao.fetch();
+				generateXML(configXml.elements("countrys"),"country",countrys);
+				var defaultValues:Array = Database.defaultFieldValueDao.fetch();
+				generateXML(configXml.elements("default_field_values"),"default_field_value",defaultValues);
+				var postDefaultFields:Array = Database.postDefaultFieldDao.fetch();
+				generateXML(configXml.elements("postdefault_fields"),"postdefault_field",postDefaultFields);
+				
+				//export custom layout
+				if(chkListLayout.selected){		
+					
+					generateXML(configXml.elements("custom_layouts"),"custom_layout",Database.customLayoutDao.fetch(),{background_color:'0xEEEEEE'});
+					generateXML(configXml.elements("custom_fields"),"custom_field",Database.customFieldDao.fetch());
+					generateXML(configXml.elements("detail_layouts"),"detail_layout",Database.layoutDao.fetch());	
+					generateXML(configXml.elements("custom_field_trans"),"custom_field_tran",Database.customFieldTranslatorDao.fetch());
+					generateXML(configXml.elements("sql_filter_criterias"),"sql_filter_criteria",Database.sqlListDAO.fetch());
+					generateXML(configXml.elements("conditions"),"condition",Database.customLayoutConditionDAO.fetch());
+					generateXML(configXml.elements("dailyAgendaLayouts"),"dailyAgendaLayout",	Database.dailyAgendaColumnLayoutDao.fetch());				
+					
+					
+				}
+				
+				
+				var f:File = new File();
+				buttonbardetail.enabled = false;
+				buttonsconfigure.enabled = false;
+				f.addEventListener(Event.SELECT, function (event:Event):void{
+					var file:File = event.currentTarget as File;
+					if(!file.extension) file = File.applicationStorageDirectory.resolvePath(file.nativePath + ".xml"); // Bug #543
+					var strStyle:String = "black";
+					var showText:String = i18n._('PREFERENCES_STRING_FILE_SAVED_SUCCESSFULLY');
+					if(file!=null){
+						if(file.extension != null && file.extension.toLowerCase()=="xml"){
+							var fileStream:FileStream = new FileStream();
+							fileStream.open(file, FileMode.WRITE);
+							var byteData : ByteArray = new ByteArray();
+							byteData.writeUTFBytes(configXml.toXMLString());
+							fileStream.writeBytes(byteData, 0, byteData.length);
+							fileStream.close();
+						} else {
+							
+							strStyle = "red";
+							showText = i18n._('PREFERENCES_STRING_FILE_NAME_SHOULD_HAVE_XML_EXTENSION');
+						}
+					}
+					buttonbardetail.enabled = true;
+					buttonsconfigure.enabled = true;
+					showStatus.setStyle("color", strStyle);
+					showStatus.text = showText;
+				});
+				f.addEventListener(Event.CANCEL, cancelledFile);
+				//CRO 05.01.2011
+				f.browseForSave(i18n._('GLOBAL_SAVE'));
+			}
+			
+			private function generateXML(rootElememt:XMLList,tag:String,list:Array,defaultVal:Object=null):void{
+				
+				Utils.generateXML(rootElememt,tag,list,defaultVal);
+			}	
+			
+			private function exportAssessmentScript(configXml:XML):void{
+				var assessment:Array = Database.assessmentDao.fetch();
+				generateXML(configXml.elements("assessments") , "assessment", assessment);
+				var question:Array = Database.questionDao.fetch();
+				generateXML(configXml.elements("questions") , "question", question);
+				var answer:Array = Database.answerDao.fetch();
+				generateXML(configXml.elements("answers") , "answer", answer);
+				var assessmentConfigs:Array = Database.assessmentConfigDao.fetch();
+				generateXML(configXml.elements("assessment_configs") , "assessment_config", assessmentConfigs);
+				
+				var assessmentPage:Array = Database.assessmentPageDao.fetch();
+				generateXML(configXml.elements("assessmentPages"),"assessmentPage",assessmentPage);
+				
+				var assessmentMappingColumns:Array = Database.mappingTableSettingDao.fetch();
+				generateXML(configXml.elements("assessmentMappingColumns"),"assessmentMappingColumn",assessmentMappingColumns);
+				var assessmentMapping:Array = Database.assessmentMappingDao.fetch();
+				generateXML(configXml.elements("assessmentMappings"),"assessmentMapping",assessmentMapping);	
+				
+				var assSumfields:Array = Database.sumFieldDao.fetch();
+				generateXML(configXml.elements("assessmentsumfields"),"assessmentsumfield",assSumfields);	
+				
+				var assspliter:Array = Database.assessmentSplitterDao.fetch();
+				generateXML(configXml.elements("assessmentspliters"),"assessmentspliter",assspliter);	
+				var pdfHeader:Array =Database.assessmentPDFHeaderDao.fetch();
+				generateXML(configXml.elements("assessmentpdfheaders"),"assessmentpdfheader",pdfHeader);	
+				
+			}
+			
+			private function exportReportAdmin(configXml:XML):void {
+				//---------------------- TCS Report Admin ----------------------------------------
+				if(UserService.getCustomerId() == UserService.DIVERSEY) {
+					var report:Object = Database.reportAdminDao.first();
+					if(report != null) {
+						configXml.elements("report_admins")[0].appendChild(<report_path>{report.report_path}</report_path>);
+						configXml.elements("report_admins")[0].appendChild(<type>{report.type}</type>);
+						var reportAdminChildData:Array = Database.reportAdminChildDao.fetch();
+						generateXML(configXml.elements("report_admins") , "report", reportAdminChildData);
+					}
+				}
+			}
+			
+			private function importConfiguration(impPopup:ImportFiledOOD):void{
+				var file:File = new File();
+				file.browseForOpen(i18n._('PREFERENCES_FILE_OPEN_FILE'), [new FileFilter("*.XML", "*.xml")]);
+				buttonbardetail.enabled = false;
+				buttonsconfigure.enabled = false;
+				showStatus.text = "";
+				file.addEventListener(Event.SELECT,function (event:Event):void{uploadFile(event,impPopup)});
+				file.addEventListener(Event.CANCEL, cancelledFile);
+				
+			}
+			
+			private function cancelledFile(event:Event):void{
+				buttonbardetail.enabled = true;
+				buttonsconfigure.enabled = true;
+				showStatus.text = "";
+			}
+			
+			
+			private function preferencesStatus(success:Boolean):void{
+				buttonbardetail.enabled = true;
+				buttonsconfigure.enabled = true;
+				if(success){
+					showStatus.setStyle("color", "black");
+					showStatus.text = i18n._('PREFERENCES_TEXT_CONFIGURATION_SUCCESSFULLY_UPDATED');
+				}else{
+					showStatus.setStyle("color", "red");
+					showStatus.text = i18n._('PREFERENCES_TEXT_CONFIGURATION_FILE_HAS_BAD_FORMAT');
+				}				
+			}
+			
+			private function preferencesXMLList(prefs:XMLList):void{
+				for each(var pref:XML in prefs.pref){
+					var value:String = pref.children()[0];
+					var key:String = pref.@key;
+					if(value==null || value.toString()=="null") value ="";
+					
+					if(Database.preferencesDao.fieldsCrypt[key]!=null){
+						try{
+							value = Utils.decryptPassword(value);
+						}catch(e:Error){
+							//it's old password(didn't encrypt)
+							//nothing todo
+						}
+					}
+					
+					
+					
+					
+					if(key=="sodhost"){
+						sodhost.text = value;
+					}else if(key == "sodlogin"){
+						sodlogin.text = value;
+					}else if(key == "sodpass"){
+						sodpass.text = value;
+						
+					}else if(key == "sync_startup"){
+						startupsync.selected = value=="true"? true : false;
+					}else if(key == "disable_gzip"){
+						disableGzip.selected = value=="true"? true : false;
+					}else if(key == "interface_style"){
+						if(value=="tabs"){
+							tabsRadio.selected = true;
+						}else if(value=="icon"){
+							iconsRadio.selected = true;
+						}
+					}else if(key == "config_url"){
+						configurl.text = value;
+					}else if(key == "window_resize"){
+						windowResize.selected = value=="true"?true:false;
+					}else if(key=='usegzip'){
+						usegzip.selected=value=="true"?true:false;
+					}else if(key=='enable_check_conflict'){
+						enable_check_conflict.selected=value=="true"?true:false;
+					}else if(key == "ms_exchange_enable"){
+						exchangeOpt.selected = value=="true"?true:false;
+					}
+						//Bug fixing 472 CRO 
+						//Open code for fixing bug #478 CRO
+					else if(key == "use_sso"){
+						use_sso.selected = value=="true"? true : false;
+					}else if(key == "company_sso_id"){
+						company_sso_id.text = value;
+					}else if(key == "start_at_login") {
+						startAtLogin.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_FAVORITE) {
+						chkFavorite.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_IMPORTANT) {
+						chkImportant.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_FUZZY){
+						chkFuzzy.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.HIDE_TECH_USER){
+						hideTechUser.selected =value == "true" ? true : false; 
+						hideSSOTechUser(hideTechUser.selected);
+					}else if(key == PreferencesDAO.ENABLE_CONVERT_LAED){
+						chkConvertLead.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_HOME_TASK){
+						chkHomeTask.selected = value == "true" ? true :false;
+					}else if(key == PreferencesDAO.ENABLE_CUSTOM_LAYOUT){
+						chkCustLayout.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_LIST_LAYOUT){
+						chkListLayout.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_VIEW_LAYOUT){
+						chkViewLayout.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_FILTER){
+						chkFilterLayout.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_CONNECTION_INFORMATION){
+						chkConnection.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_TRANSACTION){
+						chkEnableTransaction.selected= value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_USER_INTERFACE){
+						chkUserInterface.selected= value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_OPTION){
+						chkOption.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_AUTO_CONFIGURATION){
+						chkAutoConfict.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_FACEBOOK) {
+						chkFacebook.selected = value == "true" ? true : false;
+					} else if(key == PreferencesDAO.ENABLE_LINKEDIN) {
+						chkLinkedin.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_FEED){
+						chkEnableFeed.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_DASHBOARD){
+						chkDashboard.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_DASHBOARD_REPORT){
+						chkDashboardReport.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_APPLICATION_UPDATE){
+						chkAppUpdate.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_DAILY_AGENDA){
+						chkDailyAgenda.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_ASSESSMENT_SCRIPT){
+						chkEnableAssessmentScript.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.ENABLE_GOOGLE_CALENDAR){
+						googleOpt.selected = value == "true" ? true : false;
+					}else if(key == PreferencesDAO.PREDEFINED_FILTERS){
+						showPredefinedFilters.selected = value == "true" ? true : false;
+					}else if( key ==  PreferencesDAO.DISABLE_PDF_EXPORT){
+						chkDisablePDFExport.selected = value == "true" ? true : false;
+					}else if( key ==  PreferencesDAO.DISABLE_CVS_EXPORT){
+						chkDisableCSVExport.selected = value == "true" ? true : false;
+					}else if( key ==  PreferencesDAO.DISABLE_LAYOUT_MANAGER){
+						chkDisableLayoutManager.selected = value == "true" ? true : false;
+					}else if( key ==  PreferencesDAO.DISABLE_LIST_LAYOUT){
+						chkDisableListLayout.selected = value == "true" ? true : false;
+					}else if( key ==  PreferencesDAO.ENABLE_NETBREEZE){
+						netbreezeOpt.selected = value == "true" ? true : false;
+					}else if(key ==  PreferencesDAO.LOG_FILES){
+						logFile.selected = value == "true" ? true : false;
+					}else if(key ==  PreferencesDAO.ENABLE_PDF_SIGNATURE){
+						chkEnablePDFSignature.selected = value == "true" ? true : false;
+					}
+					//						else if(key ==  PreferencesDAO.SYNC_ACCESSPROFILE){
+					//						chkSyncAccessProfile.selected = value == "true" ? true : false;
+					//					}else if(key ==  PreferencesDAO.SYNC_ASSESSMENTSCRIPT){
+					//						chkSyncAssessmentScript.selected = value == "true" ? true : false;
+					//					}else if(key ==  PreferencesDAO.SYNC_CASCADINGPICKLIST){
+					//						chkSyncCascadingPicklist.selected = value == "true" ? true : false;
+					//					}else if(key ==  PreferencesDAO.SYNC_FIELD_MANAGMENT){
+					//						chkSyncFieldManagement.selected = value == "true" ? true : false;
+					//					}else if(key ==  PreferencesDAO.SYNC_PICKLISTSERVICE){
+					//						chkSyncPicklistService.selected = value == "true" ? true : false;
+					//					}else if(key ==  PreferencesDAO.SYNC_ROLE){
+					//						chkSyncRole.selected = value == "true" ? true : false;
+					//					}
+					
+					
+					
+					
+					
+				}
+			}	
+			private static function buttonImportClick(list:ArrayCollection,wind:Window,xmlList:XMLList,prefsXMLList:Function=null,mapValueWithControls:Function=null,reload:Function=null):void{
+				
+				var user:String = "";
+				var xmlCh:XML = new XML();
+				var i:int=0;
+				var rSelected:RadioButton=null;
+				for each(var r:RadioButton in list){
+					if(r.selected){
+						rSelected=r;
+						i = parseInt(rSelected.id);
+						break;
+					}
+				}
+				xmlCh = xmlList[i];
+				Utils.showLoadingProgressWindow(function importPref():void{importConfig(xmlCh,prefsXMLList,mapValueWithControls,reload);}, "Importing Data","Importing Data");
+				
+				
+			}
+			private function uploadFile(event:Event,importPoupScrean:ImportFiledOOD):void{
+				uploadXMLFile(event.target as File,importPoupScrean,preferencesStatus,preferencesXMLList,mapValueWithControls,reload);
+				
+			}
+			[Embed(source='/assets/preferences.png')] [Bindable] public static var ttIcon:Class;
+			private static var radioTcsUser:RadioButton = null;
+			private static var radioSalePlaning:RadioButton = null;
+			private static var dialog:Window = null;
+			
+			private static function dialogPopupSelectXML(xmlList:XMLList,prefsXMLList:Function=null,mapValueWithControls:Function=null,reload:Function=null):void{
+				
+				dialog = new Window();
+				dialog.transparent = false;
+				dialog.systemChrome = "none";
+				dialog.width = 250;
+				var wHeight:int = 60;
+				dialog.resizable = false;
+				dialog.setStyle("showFlexChrome","false");
+				
+				
+				var canvas:Canvas = new Canvas();
+				canvas.percentWidth = 100;
+				canvas.percentHeight = 100;
+				canvas.top = 0;
+				canvas.bottom = 0;
+				canvas.setStyle("styleName","main");
+				
+				var maiBox:VBox = new VBox();
+				canvas.addChild(maiBox);
+				maiBox.percentWidth = 100;
+				maiBox.percentHeight = 100;
+				
+				var titleBar:TitleBar = new TitleBar();
+				titleBar.icon = ttIcon;
+				titleBar.title ="Select Importing Data";
+				maiBox.addChild(titleBar);
+				
+				var vbox:VBox = new VBox();
+				maiBox.addChild(vbox);
+				vbox.setStyle("paddingLeft","40");
+				
+				var id:int = 0;
+				var listRadio:ArrayCollection=new ArrayCollection();
+				var alreadySelected:Boolean = false;
+				for each(var xml:XML in xmlList){
+					wHeight = wHeight + 30;
+					var name :String = xml.@name;
+					if(StringUtils.isEmpty(name)){
+						name = "Configuration " + (id+1);
+					}
+					var hbox:HBox = new HBox();
+					radioSalePlaning = new RadioButton();
+					radioSalePlaning.label=name;
+					radioSalePlaning.id = "" + id;
+					id++;
+					radioSalePlaning.groupName = "multiImport";
+					
+					if(xml.@defualt== "true" && alreadySelected == false){
+						radioSalePlaning.selected = true;
+						alreadySelected = true;
+					}
+					
+					listRadio.addItem(radioSalePlaning);
+					hbox.addChild(radioSalePlaning);
+					vbox.addChild(hbox);
+					
+				}
+				dialog.height = wHeight;
+				if(listRadio.length>0 && alreadySelected==false){
+					(listRadio.getItemAt(0) as RadioButton).selected=true;
+				}
+				
+				hbox = new HBox();
+				var buttonOk:mx.controls.Button = new mx.controls.Button();
+				buttonOk.label ="Ok";
+				buttonOk.addEventListener(MouseEvent.CLICK, function okClick():void{buttonImportClick(listRadio,dialog,xmlList,prefsXMLList,mapValueWithControls,reload);});			
+				hbox.addChild(buttonOk);
+				
+				
+				var btnCancel:mx.controls.Button = new mx.controls.Button();
+				btnCancel.label ="Cancel";
+				btnCancel.addEventListener(MouseEvent.CLICK, function okClick():void{dialog.close();;});
+				hbox.addChild(btnCancel);
+				
+				vbox.addChild(hbox);
+				
+				
+				dialog.addChild(canvas);
+				WindowManager.openModal(dialog);
+			}
+			
+			public static function uploadXMLFile(file:File,window:Window,prefsStatus:Function=null,prefsXMLList:Function=null,mapValueWithControls:Function=null,reload:Function=null):void{
+				dialog = window;
+				var stream:FileStream = new FileStream();			
+				stream.open(file, FileMode.READ);
+				var fileData:String = stream.readUTFBytes(stream.bytesAvailable);
+				//trace(fileData);
+				try{
+					var xml:XML = new XML(fileData);
+					var name:String = xml.name();
+					
+					if("configuration" == name){
+						if(reload!=null) {
+							// Mony need to translate
+							Utils.showLoadingProgressWindow(function importPref():void{importConfig(xml,prefsXMLList,mapValueWithControls,reload);}, "Importing Data","Importing Data");
+						}else {
+							// load default gadget.xml
+							importConfig(xml,prefsXMLList,mapValueWithControls,reload);
+						}
+					}else if("configurations" == name){
+						var chl:XMLList = xml.children();
+						if(chl != null && chl.length() == 1){
+							xml = chl[0] as XML;
+							if(reload!=null) {
+								// Mony need to translate
+								Utils.showLoadingProgressWindow(function importPref():void{importConfig(xml,prefsXMLList,mapValueWithControls,reload);}, "Importing Data","Importing Data");
+							}else {
+								// load default gadget.xml
+								importConfig(xml,prefsXMLList,mapValueWithControls,reload);
+							}
+						}else if(chl.length()>1){
+							if(reload!=null) {
+								dialogPopupSelectXML(chl,prefsXMLList,mapValueWithControls,reload);					
+							}else{
+								var hasDefual :Boolean = false;
+								for each (var xmlDefaule:XML in chl){
+									if(xmlDefaule.@defualt =="true"){
+										xml = xmlDefaule;
+										hasDefual = true;
+										break;
+									}
+								}
+								if(hasDefual==false){
+									xml = chl[0];
+								}
+								importConfig(xml,prefsXMLList,mapValueWithControls,reload);
+							}
+						}
+					}
+					
+					
+					
+				}catch(e:Error){
+					var messageStr:String = e.message;
+					var errorStr:String = messageStr.substr(messageStr.indexOf(':') + 1, messageStr.length);
+					Alert.show(errorStr, i18n._('PREFERENCES_ALERT_TITLE_ERROR_IMPORTING_XML_FILE'), Alert.OK, window,function():void{
+						if(prefsStatus!=null) prefsStatus(false);
+					});
+					return;
+				}
+				stream.close();
+				if(prefsStatus!=null) prefsStatus(true);			
+			}
+			
+			
+			
+			private static function importConfig(xml:XML,prefsXMLList:Function=null,mapValueWithControls:Function=null,reload:Function=null):void{
+				Utils.importConfig(xml,prefsXMLList,mapValueWithControls,reload,dialog);			
+			}
+			
+			private static function commitObjects(dao:SimpleTable,xmlList:XMLList):void{
+				Utils.commitObjects(dao,xmlList);
+			}	
+			
+			
+			
+			private static function checkNullValue(value:Object,nullValue:String=""):String{
+				return Utils.checkNullValue(value,nullValue);	
+			}	
+			
+			private static function checkNullValueNoEscape(value:Object,nullValue:String=""):String{
+				return Utils.checkNullValueNoEscape(value,nullValue);	
+			}		
+			
+			private function mapValueWithControls(transactionObject:Object):void{
+				var vBoxChildList:Array = enabledTrans.getChildren();
+				var vBoxChildListFilterTrans:Array = filterTrans.getChildren();
+				
+				for(var i:int = 1; i < vBoxChildList.length; i++){				
+					var checkBox:CheckBox =  vBoxChildList[i] as CheckBox;
+					var cboBox:ComboBox = vBoxChildListFilterTrans[i] as ComboBox;
+					//var chkActivity:CheckBox = syncActivities.getChildAt(i) as CheckBox;
+					//var chkAttachment:CheckBox = syncAttachments.getChildAt(i) as CheckBox;
+					var chkReadonly:CheckBox = readonlyEntities.getChildAt(i) as CheckBox;
+					var chkDisplay:CheckBox = displayTrans.getChildAt(i) as CheckBox;
+					var chkCheckInrangeFilter:CheckBox = removeIfNotInRange.getChildAt(i) as CheckBox;
+					// Check if tag id equal checkbox's label 
+					if(checkBox.data == transactionObject.entity){
+						checkBox.selected = transactionObject.enabled == 0? false : true;
+						cboBox.selectedItem = getSelectionObject(cboBox.dataProvider as ArrayCollection, transactionObject.filter_id);
+						//chkActivity.selected = transactionObject.sync_activities == 0? false : true;
+						//chkAttachment.selected = transactionObject.sync_attachments == 0? false : true;
+						chkReadonly.selected = transactionObject.read_only == 0? false : true;
+						chkDisplay.selected = transactionObject.display == 0? false : true;
+						chkCheckInrangeFilter.selected = transactionObject.checkinrange==0?false:true;
+						return;
+					}
+				}
+			}
+			
+			
+			private function loadConfiguration():void{
+				if(configurl.text==""){
+					//CRO 05.01.2011
+					Alert.show(i18n._('PREFERENCES_ALERT_TEXT_CONFIGURATION_URL_IS_EMPTY'), i18n._('GLOBAL_INVALID'), Alert.OK, this);
+				}else{
+					
+					var request:URLRequest = new URLRequest();
+					request.url = configurl.text;
+					request.method = URLRequestMethod.GET;
+					var loader:URLLoader = new URLLoader();
+					loader.addEventListener(Event.COMPLETE, successHandler);
+					loader.addEventListener(IOErrorEvent.IO_ERROR, errorHandler);
+					try {
+						loader.load(request);
+					} catch (e:Error) {
+						//VAHI diagnose problem with URL
+						Alert.show(e.message, i18n._('PREFERENCES_ALERT_TITLE_INVALID_CONFIGURATION_URL'), Alert.OK, this);
+					}
+				}
+			}
+			
+			private function successHandler(event:Event):void{
+				//Mony need to translate
+				//this.close();
+				// Utils.showLoadingProgressWindow(function importPrefByUrl():void{importConfig(new XML((event.currentTarget as URLLoader).data));}, "Importing Data","Importing Data");
+				//VAHI XXX HACK
+				// Added close of preference window such that user sees that something happened
+				// Also this forces an reopen of Preference window, else something can be mixed up there.
+				// Certainly the preference window shall show some clever message AND adapt to ALL(sic!) changes loaded.
+				
+				var xml:XML = new XML((event.currentTarget as URLLoader).data);
+				Utils.showLoadingProgressWindow(function importPref():void{importConfig(xml,null,null,reload);}, "Importing Data","Importing Data");
+			}
+			
+			private function errorHandler(event:IOErrorEvent):void{
+				var s:String = i18n._('PREFERENCES_STRING_ERROR') + " ";
+				var error:String = event.text;
+				var message:String = error.substr(error.indexOf(s) + s.length) + " " + i18n._('PREFERENCES_STRING_NOT_FOUND');
+				Alert.show(message, i18n._('PREFERENCES_ALERT_TITLE_INVALID_URL'),Alert.OK, this);
+			}
+			
+			private function setDefaultIcons():void {
+				updateCustomLayoutDefaultIcons();			
+			}
+			private function setOracleModernIcons():void {
+				updateCustomLayoutDefaultIcons(false,true);
+			}
+			private function setOracleIcons():void {
+				updateCustomLayoutDefaultIcons(false);
+			}
+			
+			private function setFieldLogo(fieldKey:String):void {
+				var fileBrowse:FileBrowse = new FileBrowse(uploadFieldLogo,true,fieldKey);
+				fileBrowse.show();
+			}
+			
+			private function uploadFieldLogo(fileName:String, data:Object,fieldKey:String):void {
+				var base64En:Base64Encoder = getBase64Encoder(data);
+				Database.preferencesDao.setValue(fieldKey, base64En.toString());
+				mainWindow.refreshWindowLogo();
+			}
+			
+			private function getBase64Encoder(data:Object):Base64Encoder {
+				var base64En:Base64Encoder = new Base64Encoder();
+				var bytes:ByteArray = new ByteArray();
+				data.readBytes(bytes, 0, data.length);
+				base64En.encodeBytes(bytes,0,bytes.length);
+				return base64En;
+			}
+			
+			private function onChangeValue(e:Event):void{
+				editStatus = true;
+			}
+			
+			private function onClickCheckBox(e:MouseEvent):void{
+				editStatus = true;
+				addRemoveEntityTransaction = true;
+				var checkbox:CheckBox = e.currentTarget as CheckBox;
+				var index:int = enabledTrans.getChildIndex(checkbox);
+				var status:Boolean = checkbox.selected;
+				
+				var cboParentEntity:ComboBox = parentEntity.getChildAt(index) as ComboBox;
+				cboParentEntity.enabled = status;
+				// #311: hange request - Diversey sales - Prefernces
+				var cache:CacheUtils = new CacheUtils("Transaction_DAO");
+				cache.unset(checkbox.data.toString());
+				var trans:Object = Database.transactionDao.find(checkbox.data.toString());
+				
+				var cboBox:ComboBox = filterTrans.getChildAt(index) as ComboBox;
+				var cboAdvancedFilter:ComboBox = advancedFilter.getChildAt(index) as ComboBox;
+				cboBox.enabled = trans.filter_disable ? false : status;
+				cboAdvancedFilter.enabled = trans.filter_disable ? false : status;
+				var bntSyncChildren:Button = syncChildren.getChildAt(index) as Button;
+				bntSyncChildren.enabled = trans.sync_activities_disable ? false : status;
+				
+				//var chkAct:CheckBox = syncActivities.getChildAt(index) as CheckBox;
+				//chkAct.enabled = trans.sync_activities_disable ? false : status;
+				//var chkAttachment:CheckBox = syncAttachments.getChildAt(index) as CheckBox;
+				//chkAttachment.enabled = trans.sync_attachments_disable ? false : status;
+				
+				var dis:CheckBox = displayTrans.getChildAt(index) as CheckBox;
+				dis.selected = status;
+				dis.enabled = cboBox.enabled;
+				
+				var chkCheckInrangeFilter:CheckBox = removeIfNotInRange.getChildAt(index) as CheckBox;
+				chkCheckInrangeFilter.selected = status;
+				chkCheckInrangeFilter.enabled = cboBox.enabled;
+				
+				var chkReadonly:CheckBox = readonlyEntities.getChildAt(index) as CheckBox;
+				chkReadonly.enabled = trans.read_only_disable ? false : status;
+				endableItemListComboParentEntity(checkbox.data.toString(),status);
+			}
+			private function advanceFilterChanged(e:Event):void{
+				var cbo:ComboBox = e.target as ComboBox;
+				
+				mapSelectedfilter[cbo.name] =cbo.selectedItem.type;
+			}
+			private function updateCustomLayoutDefaultIcons(bDefault:Boolean = true,modernIcon:Boolean = false):void {
+				for each( var customLayout:Object in Database.customLayoutDao.readAll() ){
+					if(customLayout.entity == "Activity"){
+						switch(customLayout.subtype){
+							case 0: customLayout.custom_layout_icon = bDefault ? 'activity' : (modernIcon?'mod_calendar_25':'activityTaskDefault'); break;
+							case 1: customLayout.custom_layout_icon = bDefault ? 'activity' : (modernIcon?'mod_calendar_25':'activityAppointmentDefault'); break;
+						}
+					}else{
+						if(customLayout.subtype == 0){
+							
+							var entity:String = customLayout.entity;
+							entity = entity.toLocaleLowerCase();
+							entity	= entity.replace(/ /g,"");
+							var defaulticon:String = entity.replace("object","");
+							var defaultModerm:String = entity;
+							if(StringUtils.startsWith(entity,'customobject')){
+								defaultModerm= "customobject";
+							}
+							customLayout.custom_layout_icon = bDefault ? defaulticon: (modernIcon?'mod_'+defaultModerm+'_25':defaulticon+'Default');
+							
+							
+							//							switch(customLayout.entity){
+							//								case "Account" : customLayout.custom_layout_icon = bDefault ? 'account' : (modernIcon?'mod_account_25':'accountDefault'); break;
+							//								case "Asset" : customLayout.custom_layout_icon = bDefault ? 'asset' : (modernIcon?'mod_assets_25':'assetDefault'); break;
+							//								case "Contact" : customLayout.custom_layout_icon = bDefault ? 'contact' : (modernIcon?'mod_contact_25':'contactDefault'); break;
+							//								case "Opportunity" : customLayout.custom_layout_icon = bDefault ? 'opportunity' : (modernIcon?'mod_opportunity_25':'opportunityDefault'); break;
+							//								case "Product" : customLayout.custom_layout_icon = bDefault ? 'product' : (modernIcon?'mod_product_25':'productDefault'); break;
+							//								case "Service Request" : customLayout.custom_layout_icon = bDefault ? 'service' : (modernIcon?'mod_servicerequest_25':'serviceDefault'); break;
+							//								case "Campaign" : customLayout.custom_layout_icon = bDefault ? 'campaign' : (modernIcon?'mod_campaign_25':'campaignDefault'); break;
+							//								case "Custom Object 1" : customLayout.custom_layout_icon = bDefault ? 'custom' : (modernIcon?'mod_customobject_25':'customDefault'); break;
+							//								case "Lead" : customLayout.custom_layout_icon = bDefault ? 'lead' : (modernIcon?'mod_lead_25':'leadDefault'); break;
+							//								case "Custom Object 2" : customLayout.custom_layout_icon = bDefault ? 'custom2' : (modernIcon?'mod_customobject_25':'custom2Default'); break;
+							//								case "Custom Object 3" : customLayout.custom_layout_icon = bDefault ? 'custom3' : (modernIcon?'mod_customobject_25':'custom3Default'); break;
+							//								case "CustomObject7" : customLayout.custom_layout_icon = bDefault ? 'custom7' : (modernIcon?'mod_customobject_25':'custom7Default'); break;
+							//								case "CustomObject14" : customLayout.custom_layout_icon = bDefault ? 'custom14' : (modernIcon?'mod_customobject_25':'custom14Default'); break;
+							//								case "Territory" : customLayout.custom_layout_icon = bDefault ? 'territory' : (modernIcon?'mod_territory_25':'territoryDefault'); break;
+							//							}
+						}
+					}
+					Database.customLayoutDao.update(customLayout);
+				}
+				Database.preferencesDao.setValue(PreferencesDAO.MODERN_ICON,modernIcon?1:0);
+				Database.customLayoutDao.clearIconCache();
+				mainWindow.navigator.removeAllChildren();
+				mainWindow.updateTransactions();
+			}
+			
+			private function onChangeSyncInterval(event:Event):void{
+				var textInput:TextInput = event.currentTarget as TextInput;
+				if(textInput.text!=""){
+					syn_interval.value = int(textInput.text);
+					timerChanged = true;
+				}
+			}
+			
+			private function loadPickList():ArrayCollection{
+				//get picklist, entity = actitvity , fieldName = Type
+				
+				var picklist:ArrayCollection = PicklistService.getPicklist("Activity", "Type",false,true,true);
+				if(picklist != null){
+					Utils.suppressWarning(picklist);
+				}
+				
+				return picklist;
+			}
+			
+			private function hideSSOTechUser(isHide:Boolean):void{
+				var show:Boolean = 	!isHide && use_sso.selected;
+				lblTechUser.visible=show;
+				lblTechUser.includeInLayout =show;
+				techPwd.visible = show;
+				techPwd.includeInLayout =show;
+				techUser.visible = show;
+				techUser.includeInLayout =show;
+				ssoRule.visible = show;
+				ssoRule.includeInLayout =show;
+			}
+			
+			protected function createNetbreeze_clickHandler(event:MouseEvent):void
+			{
+				var user: Object = Database.userDao.read();
+				//attention
+				if(!user)
+				{   //05.01.2011
+					Alert.show(i18n._('PREFERENCES_ALERT_TEXT_SYNC_BEFORE_NETBREEZE'), i18n._('GLOBAL_INVALID'), Alert.OK, this);
+					return;
+				}
+				var netbreezeUser: Object = {id: user.id, user_sign_in_id: user.user_sign_in_id, full_name: user.full_name, netbreeze_id:NetbreezeUserId.text};
+				if(Database.netbreezeDao.findByUserId(netbreezeUser) != null)
+				{
+					Database.netbreezeDao.update(netbreezeUser);
+				}else
+					Database.netbreezeDao.insert(netbreezeUser)
+				
+			}
+			[Bindable] public static var dataGoogleMapAddress:ArrayCollection = new ArrayCollection([
+				{label:i18n._('SHIPPING_ADDRESS'),data:MapUtils.SHIPPING_ADDRESS},
+				{label:i18n._('BILLING_ADDRESS'),data:MapUtils.BILLING_ADDRESS}
+			]);
+			[Bindable] public static var dataGoogleMapDistance:ArrayCollection = new ArrayCollection([
+				{label:i18n._('KILOMETER@km'),data:"metric"},
+				{label:i18n._('MILES@miles'),data:"imperial"}
+			]);
+			
+			
+			protected function getDistanceDisplayName(data:Object,col:AdvancedDataGridColumn=null):String{
+				if(data is String){
+					if(data=='metric'){
+						return i18n._('KILOMETER@km')
+					}
+				}else{
+					if(data.distance=='metric'){
+						return i18n._('KILOMETER@km')
+					}
+				}
+				
+				return i18n._('MILES@miles');
+			}
+			
+			protected function getDistanceConfig():ArrayCollection{
+				var countryMap:Array = Database.countryDao.fetch();
+				if(countryMap!=null){
+					var listType:ArrayCollection = new ArrayCollection(['metric','imperial']);
+					for each(var rec:Object  in countryMap){
+						rec.listfields001 = listType;
+					}
+				}
+				return new ArrayCollection(countryMap);
+			}
+			
+			[Bindable] public static var dataSeparator:ArrayCollection = new ArrayCollection([
+				{label:",",data:","},
+				{label:";",data:";"},
+				{label:"Tab",data:"tab"}
+			]);
+			[Bindable] public static var dataImportant:ArrayCollection = new ArrayCollection([
+				{label:"10",data:"10"},
+				{label:"20",data:"20"},
+				{label:"100",data:"100"},
+				{label:"Unlimited",data:"unlimited"}
+			]);
+			[Bindable] public static var dataRecentFilter:ArrayCollection = new ArrayCollection([
+				{label:"5",data:"5"},
+				{label:"14",data:"14"},
+				{label:"30",data:"30"}
+			]);
+			[Bindable] public static var dataFeedHistory:ArrayCollection = new ArrayCollection([
+				{label:"",data:-1},
+				{label:"All",data:0},
+				{label:"1 day",data:1},
+				{label:"1 Week",data:7},
+				{label:"1 Month",data:30}
+			]);
+			private function initializeNewDB_clickHandler():void {
+				var encrypt_DB_file:File = File.applicationDirectory.resolvePath(Database.getCustomDatabasePathFromFile() + "/" + Database.ENCRYPTED_DB_NAME);
+				var db_file:File = File.applicationDirectory.resolvePath(Database.getCustomDatabasePathFromFile() + "/" + Database.DB_NAME);
+				var current_db_file:File = encrypt_DB_file.exists? encrypt_DB_file:db_file;
+				if(current_db_file.exists){
+					Alert.show('Are you sure you want to initialize new database? \nYou will loose your local data.'," Delete Database", Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+						if (event.detail==Alert.YES){
+							close();
+							mainWindow.crmGadget.initializeNewDB(current_db_file,mainWindow);
+						}    	 
+					});	
+				}		
+			}
+			
+			protected function btnSetAvatar_clickHandler(event:MouseEvent):void {
+				var fileBrowse:FileBrowse = new FileBrowse(uploadAvatar,true, null, true);
+				fileBrowse.show();
+			}
+			
+			private function uploadAvatar(fileName:String, data:Object, imageType:String):void {
+				var base64En:Base64Encoder = getBase64Encoder(data);
+				var strEncoder:String = base64En.toString();
+				CRMXAMPPConnection.getInstance().setAvatar(strEncoder, imageType);
+				var currentUser:Object = Database.userDao.read();
+				Database.userDao.update( {'Avatar':strEncoder}, {'id': currentUser.id} );
+				previewAvatar();
+				mainWindow.chatClientControl.reloadCurrentUser();
+			}
+			
+			private function previewAvatar():void {
+				var result:Array = Database.userDao.fetch();
+				if( result.length > 0 ){
+					var currentUser:Object = result[0];
+					if( currentUser.Avatar ){
+						var byteArray:ByteArray = ImageUtils.getByteArray(currentUser.Avatar);
+						imgPreviewAvatar.source = byteArray;
+					}else{
+						imgPreviewAvatar.source = ImageUtils.noPhoto;
+					}
+				}
+			}
+			
+			protected function btnGetAvatar_clickHandler(event:MouseEvent):void {
+				var followings:Array = Database.feedUserDAO.fetch();
+				for each(var following:Object in followings){
+					CRMXAMPPConnection.getInstance().getAvatar(following.Id, mainWindow.chatClientControl );
+				}
+			}
+			protected function checkPassword(pwd:String):Boolean {
+				var admin_password:String = Database.preferencesDao.getStrValue(PreferencesDAO.ADMIN_PASSWORD, "");
+				if(!StringUtils.isEmpty(pwd) && pwd == admin_password){
+					lblAccessAdminMessage.setVisible(false);
+					optionTab_detail_layout.setVisible(true);
+					optionTab_detail_layout.includeInLayout = true;
+					transPasswordLayout.setVisible(false);
+					transPasswordLayout.includeInLayout = false;
+					enabledTransTab.setVisible(true);
+					enabledTransTab.includeInLayout = true;
+					optionTab_password_layout.setVisible(false);
+					optionTab_password_layout.includeInLayout = false;
+					googleDistanceConfig.visible = true;
+					googleDistanceConfig.includeInLayout = true;
+					return true;
+				}else{
+					return false;
+					
+				}
+			}
+			protected function btnTransPWD_clickHandler(event:MouseEvent):void {
+				lblAccessTransPWDMessage.setVisible(!checkPassword(txtTransPwd.text));
+				lblAccessTransPWDMessage.text = i18n._('GLOBAL_INVALID_PASSWORD');
+			}
+			protected function btnShowOptionTab_clickHandler(event:MouseEvent):void {
+				lblAccessAdminMessage.setVisible(!checkPassword(txtAdminPassword.text));
+				lblAccessAdminMessage.text = i18n._('GLOBAL_INVALID_PASSWORD');
+			}
+			
+			private function timeDataProvider(is24:Boolean=false):ArrayCollection{
+				var data:ArrayCollection = new ArrayCollection();
+				var max:int = 13;
+				var s:int = 1;
+				if(is24){
+					s=0;
+					max = 24;
+				}
+				for(var i:int = s ;i<max;i++){
+					data.addItem({label:i+":00",data:i+":00"});
+					data.addItem({label:i+":30",data:i+":30"});
+				}
+				
+				return data;
+			}
+			
+			private function onTimeFormatChange():void
+			{
+				/*
+				if(cboTimeFormat.selectedItem.data=="shortFormat"){
+				cboEndTime.dataProvider = timeDataProvider(false);
+				cboStartTime.dataProvider = timeDataProvider(false);
+				}else{
+				cboEndTime.dataProvider = timeDataProvider(true);
+				cboStartTime.dataProvider = timeDataProvider(true);
+				}
+				*/
+			}
+			
+			
+			protected function txtWidth_focusOutHandler(event:FocusEvent):void{
+				setDimension("width", event);
+			}
+			
+			private function setDimension(property:String, event:FocusEvent):void{
+				var txt:TextInput = event.currentTarget as TextInput;
+				var maxValue:int = 1300;
+				var minValue:int = 600;
+				if(parseInt(txt.text) >= minValue && parseInt(txt.text) <= maxValue){
+					Database.preferencesDao.setValue("window_" + property, parseInt(txt.text));
+				}else{
+					var message = property == "width" ? i18n._("PREFERENCE_WIDTH@Width") : i18n._("PREFERENCE_HEIGHT@Height");
+					Alert.show(message + " should be between " + minValue + " and " + maxValue + ".", "", 4, this, function(e:CloseEvent):void{
+						txt.text = Database.preferencesDao.getValue("window_" + property).toString();
+					});
+				}
+			}
+			private var listFieldTranslate:Object = new Object();
+			
+			public static var subtype:int = 0;
+			public static var DAILY_AGENDA:int = 0;
+			public static var REVENUE_REPORT:int = 1;
+			public static var PRE_ENTITY:String = "preferent";
+			public static function getColumnName(i:int):String{
+				if(i==0){
+					return "#preferent_daily_agenda_header";
+				}
+				return "#preferent_revenue_report_header";
+			}
+			private function loadDailyAgendaHeader():void{
+				var objFieldTranslate:Object = getCustomTranslate(DAILY_AGENDA);
+				listFieldTranslate[DAILY_AGENDA] = objFieldTranslate;
+				dailyAgendaHeaderText.text = CustomLayoutDetail.getHeaderValue(PRE_ENTITY,subtype,getColumnName(DAILY_AGENDA));
+			}
+			private function loadRevenueReportHeader():void{
+				var objRevenueReport:Object = getCustomTranslate(REVENUE_REPORT);
+				listFieldTranslate[REVENUE_REPORT] = objRevenueReport;
+				revenueReportHeaderText.text = CustomLayoutDetail.getHeaderValue(PRE_ENTITY,subtype,getColumnName(REVENUE_REPORT));
+			}
+			
+			private function getCustomValue(i:int):String{			
+				var objCustomField:Object = listFieldTranslate[i]?listFieldTranslate[i].customField:null;
+				if(objCustomField==null){
+					//try to get it from db
+					objCustomField  = Database.customFieldDao.selectCustomFieldWithSubType(PRE_ENTITY,getColumnName(i) ,subtype,LocaleService.getLanguageInfo().LanguageCode);
+				}
+				if(objCustomField!=null && objCustomField.value){
+					var headerValue:String = CustomFieldDAO.getHeaderValue(objCustomField.value);				
+					if(!StringUtils.isEmpty(headerValue)){
+						return headerValue;
+					}		
+				}
+				return "";
+			}
+			
+			protected function getCustomTranslate(i:int):Object{
+				
+				var obj:Object = new Object();
+				obj.column_name = getColumnName(i);
+				obj.entity="preferent";
+				obj.custom=getCustomValue(i);
+				obj.languageCode=LocaleService.getLanguageInfo().LanguageCode;
+				var objCustomField:Object = Database.customFieldDao.selectCustomFieldWithSubType(PRE_ENTITY,getColumnName(i) ,subtype,obj.languageCode);			
+				obj["customField"] = objCustomField;
+				
+				return obj;
+			}
+			
+			protected function txtHeight_focusOutHandler(event:FocusEvent):void{
+				setDimension("height", event);
+			}
+			private function onTextDoubleClick(event:Event,i:int):void{
+				
+				var calculatedField:CalculatedField = new CalculatedField();
+				var objCusField:Object = listFieldTranslate[i]
+				calculatedField.dataField = objCusField;
+				calculatedField.postSave =function(newLbl:String):void{
+					if(objCusField != null && objCusField["customField"] != null){
+						var objCusTrans:Object = objCusField["customField"];
+						objCusTrans.subtype= subtype;
+						Database.customFieldDao.delete_({entity:PRE_ENTITY, subtype:subtype, column_name:getColumnName(i)});
+						Database.customFieldDao.insert(objCusTrans);
+					}
+					event.target.text = newLbl;
+					editStatus = true;
+				};
+				calculatedField.tempHeaderVal = event.target.text;
+				WindowManager.openModal(calculatedField);
+				
+				
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0"><!--CRO 05.01.2011 PREFERENCES_TITLEBAR_TITLE_PREFERENCES = GLOBAL_PREFERENCES -->
+		<control:TitleBar id="prefTitleBar" icon="@Embed(source='/assets/preferences.png')" title="{i18n._('GLOBAL_PREFERENCES')}"/>
+		<mx:VBox top="40" left="16" right="16" bottom="16">
+			<mx:TabNavigator id="tabNavigator" width="100%" height="100%" creationPolicy="all">
+				
+				<mx:Canvas width="100%" label="{i18n._('PREFERENCES_CANVAS_LABEL_CONNECTION_INFORMATION')}">
+					
+					<!--
+					<mx:Accordion id="accordion" color="0x323232" left="10" right="10" borderStyle="none">
+					<mx:VBox label="CRM OnDemand Setup">-->
+					<mx:VBox width="100%">
+						<mx:Form width="100%">
+							<!--Bug fixing 472 CRO -->
+							<!--Open code for fixing bug 748 CRO-->
+							<mx:FormItem label="{i18n._('USE_SSO')}" id="chkUseSSO">
+								<mx:CheckBox id="use_sso" selected="{Database.preferencesDao.getValue('use_sso')==1? true:false}" change="{editStatus = true;company_sso_id.enabled=use_sso.selected;company_sso_id.editable=use_sso.selected}" click="hideSSOTechUser(hideTechUser.selected)" />									
+							</mx:FormItem>
+							<mx:FormItem label="{i18n._('COMPANY_SSO_ID')}" id="ssocompId">
+								<mx:TextInput id="company_sso_id" width="360" enabled="{use_sso.selected}" text="{Database.preferencesDao.getValue('company_sso_id')}" />
+							</mx:FormItem> 
+							<mx:FormItem label="{i18n._('PREFERENCES_FORMITEM_LABEL_CRM_ONDEMAND_URL')}">
+								<mx:TextInput id="sodhost" width="360" text="{preferences.sodhost}"/>
+							</mx:FormItem><!--CRO 05.01.2011-->
+							<mx:FormItem label="{i18n._('GLOBAL_LOGIN')}">
+								<mx:TextInput id="sodlogin" width="360" text="{preferences.sodlogin}"/>
+							</mx:FormItem><!--CRO 05.01.2011-->
+							<mx:FormItem label="{i18n._('GLOBAL_PASSWORD')}">
+								<mx:TextInput displayAsPassword="true" id="sodpass" width="360" text="{preferences.sodpass}"/>
+							</mx:FormItem>
+							<mx:FormItem label="{i18n._('TECHNICAL_USER')}" id="lblTechUser" fontWeight="bold"  includeInLayout="true"/>
+							<mx:HRule width="100%" id="ssoRule"  includeInLayout="true" />
+							<mx:FormItem label="{i18n._('TECH_USER_NAME')}" id="techUser"  includeInLayout="true">
+								<mx:TextInput id="tech_username" enabled="{preferences.enabled_technical_user==null? true : preferences.enabled_technical_user == 1? true : false}" width="360" text="{preferences.tech_username}" />
+							</mx:FormItem>
+							<mx:FormItem label="{i18n._('TECH_PASSWORD')}" id="techPwd"  includeInLayout="true">
+								<mx:TextInput id="tech_password" enabled="{preferences.enabled_technical_user==null? true : preferences.enabled_technical_user == 1? true : false}" displayAsPassword="true" width="360" text="{preferences.tech_password}" />
+							</mx:FormItem>
+						</mx:Form>
+						<!--
+						<mx:Canvas width="100%">
+						<mx:Button left="240" bottom="10" id="testConnectionBtn" label="{i18n._('PREFERENCES_TEST_CONNECTION')}" click="testConnection()"/>
+						<mx:Button left="240" bottom="10" id="testCIconBtn" label="" icon="@Embed('/assets/preferences.png')"/>
+						</mx:Canvas>
+						-->
+						
+						<mx:HBox width="100%" horizontalAlign="center">
+							<!--CRO 05.01.2011-->
+							<mx:Button id="testConnectionBtn" label="{i18n._('GLOBAL_TEST_CONNECTION')}" click="testConnection()"/>
+							<control:CustomLinkButton id="testConnectionWait" icon="{ImageUtils.synOkIcon}" label="" visible="false" includeInLayout="false"/>
+						</mx:HBox>
+						<mx:Canvas width="100%">
+							<mx:VBox  left="16">
+								<mx:CheckBox id="startupsync" label="{i18n._('PREFERENCES_CHECKBOX_LABEL_SYNCHRONIZE_ON_STARTUP')}" selected="{preferences.sync_startup==0?false:true}" />
+								<mx:CheckBox id="disableGzip" label="{i18n._('PREFERENCES_CHECKBOX_LABEL_USE_COMPRESSION')}" selected="{preferences.disable_gzip==0?false:true}"  visible="false"/>
+								<mx:HBox>
+									<mx:Label text="{i18n._('PREFERENCES_LABEL_TEXT_SYNCHRONIZATION_INTERVAL')}" />
+									<mx:HBox id="synchronization_interval" paddingLeft="0" paddingRight="0" horizontalGap="0" paddingBottom="10">
+										<s:Spinner id="syn_interval" maximum="60" minimum="0" value="{preferences.syn_interval}" click="{timerChanged = true;}" />
+										<mx:TextInput text="{syn_interval.value}" width="40" height="23" maxChars="2" restrict="0-9" change="onChangeSyncInterval(event);" />
+									</mx:HBox>
+								</mx:HBox>
+							</mx:VBox>
+						</mx:Canvas>							
+					</mx:VBox>
+					
+					<!--
+					<mx:VBox label="IM Setup">
+					<control:IMForm id="imform" paddingTop="20"/>
+					<mx:CheckBox paddingLeft="16" id="autoSingIn" label="Sing in on startup"/>
+					</mx:VBox>
+					</mx:Accordion>
+					-->
+					
+				</mx:Canvas>
+				
+				<mx:Canvas label="{i18n._('PREFERENCES_CANVAS_LABEL_ENABLED_TRANSACTION')}" width="100%" height="100%">
+					<!--<mx:Tile left="16" id="enabledTransTile"/>-->
+					<mx:HBox paddingLeft="16" id="transPasswordLayout"
+							 visible="{!StringUtils.isEmpty(preferences.admin_password)}"
+							 includeInLayout="{!StringUtils.isEmpty(preferences.admin_password)}">	
+						<mx:Label text="{i18n._('ADMIN_PASSWORD')}"/>
+						<mx:VBox>
+							<mx:TextInput id="txtTransPwd" text="" displayAsPassword="true" />
+							<mx:Label id="lblAccessTransPWDMessage" text="{i18n._('GLOBAL_INVALID_PASSWORD')}" color="#FF0000" visible="false"/>
+						</mx:VBox>	
+						<mx:Button label="{i18n._('GLOBAL_OK')}" click="btnTransPWD_clickHandler(event)"/>
+						
+					</mx:HBox>	
+					<mx:HBox left="16" id="enabledTransTab" visible="{StringUtils.isEmpty(preferences.admin_password)}" includeInLayout="{StringUtils.isEmpty(preferences.admin_password)}">
+						<mx:VBox id="spinnersMove" horizontalAlign="center" />
+						<mx:VBox id="enabledTrans" /> 
+						<mx:VBox id="parentEntity" /> 
+						<mx:VBox id="filterTrans" />
+						<mx:VBox id="advancedFilter" />
+						<mx:VBox id="syncChildren" horizontalAlign="center"/>
+						<!--
+						<mx:VBox id="syncActivities" horizontalAlign="center"/>						
+						<mx:VBox id="syncAttachments" horizontalAlign="center"/>
+						-->
+						<mx:VBox id="readonlyEntities" horizontalAlign="center"/>
+						<mx:VBox id="authorizeDeletion" horizontalAlign="center"/>
+						<mx:VBox id="displayTrans" horizontalAlign="center"/>
+						<mx:VBox id="removeIfNotInRange" horizontalAlign="center"/>
+					</mx:HBox>
+				</mx:Canvas>
+				<mx:Canvas label="{i18n._('PREFERENCES_CANVAS_LABEL_USER_INTERFACE')}" width="100%" height="100%">
+					<!--<mx:Tile left="16" id="enabledTransTile"/>-->
+					<mx:VBox left="16" width="100%">						
+						<mx:VBox paddingTop="0" paddingBottom="0">
+							<mx:HBox>
+								<mx:Label width="150" text="{i18n._('PREFERENCES_LABEL_TEXT_SCREEN_LAYOUT')}" fontWeight="bold" fontSize="14"/>
+								<mx:RadioButton id="iconsRadio" value="icons" label="{i18n._('PREFERENCES_RADIOBUTTON_LABEL_ICONS')}" groupName="userinterface" change="onChangeValue(event);" />
+							</mx:HBox>	
+							<mx:HBox paddingLeft="158">
+								<mx:RadioButton id="tabsRadio" value="tabs" label="{i18n._('PREFERENCES_RADIOBUTTON_LABEL_TABS')}" groupName="userinterface" change="onChangeValue(event);" />
+							</mx:HBox>	
+						</mx:VBox>
+						<mx:HRule width="100%"/>
+						<mx:VBox paddingTop="7" paddingBottom="8">							
+							<mx:HBox>
+								<mx:Label width="150" text="{i18n._('PREFERENCES_LABEL_TEXT_ICONS_SET')}" fontWeight="bold" fontSize="14"/>
+								<mx:Button label="{i18n._('PREFERENCES_BUTTON_LABEL_SET_DEFAULT_ICONS')}" click="setDefaultIcons()"/>
+								<mx:Button label="{i18n._('PREFERENCES_BUTTON_LABEL_SET_ORACLE_ICONS')}" click="setOracleIcons()"/>
+								<mx:Button label="{i18n._('PREFERENCES_BUTTON_LABEL_SET_ORACLE_MODERN_ICONS')}" click="setOracleModernIcons()"/>
+							</mx:HBox>
+						</mx:VBox>
+						<mx:HRule visible="{Database.preferencesDao.isEnableRevenueReport()}" width="100%" includeInLayout="{Database.preferencesDao.isEnableRevenueReport()}"/>
+						<mx:VBox visible="{Database.preferencesDao.isEnableRevenueReport()}" paddingTop="7" paddingBottom="10">
+							<mx:HBox paddingBottom="8">
+								<mx:Label width="150" text="{i18n._('GLOBAL_REVENUE_REPORT_HEADER')}" includeInLayout="{Database.preferencesDao.isEnableRevenueReport()}" fontWeight="bold" fontSize="14"/>
+								<mx:Label text="{i18n._('PREFERENCES_LABEL_TEXT_HEADER_TEXT')}"/>
+								<mx:TextInput id="revenueReportHeaderText" doubleClick="onTextDoubleClick(event,REVENUE_REPORT)" editable="false" doubleClickEnabled="true"/>
+							</mx:HBox>
+						</mx:VBox>
+						<mx:HRule width="100%"/>
+						<mx:VBox paddingTop="7" paddingBottom="10">
+							<mx:HBox paddingBottom="8">
+								<mx:Label width="150" text="{i18n._('GLOBAL_DAILY_AGENDA_HEADER')}" fontWeight="bold" fontSize="14"/>
+								<mx:Label text="{i18n._('PREFERENCES_LABEL_TEXT_HEADER_TEXT')}"/>
+								<mx:TextInput id="dailyAgendaHeaderText" doubleClick="onTextDoubleClick(event,DAILY_AGENDA)" editable="false" doubleClickEnabled="true"/>
+							</mx:HBox>
+						</mx:VBox>
+						<mx:HRule width="100%"/>
+						<mx:VBox paddingTop="7" paddingBottom="10">
+							<mx:HBox paddingBottom="8">
+								<mx:Label width="150" text="{i18n._('PREFERENCES_LABEL_TEXT_PDF_HEADER')}" fontWeight="bold" fontSize="14"/>
+								<mx:Label text="{i18n._('PREFERENCES_LABEL_TEXT_HEADER_TEXT')}"/>
+								<mx:TextInput id="pdfHeaderText" text="{Database.preferencesDao.getValue(PreferencesDAO.PDF_HEADER)}"/>
+								<mx:Label text="{i18n._('IamgeThemePDF')}" textAlign="right" fontWeight="bold" />
+								<control:IconComboBox id="cboHederColorPDF" width="60" dataProvider="{imagesComboPDF}" />
+								
+								
+								
+							</mx:HBox>
+							<mx:HBox paddingLeft="158">
+								<mx:Button label="{i18n._('PREFERENCES_BUTTON_LABEL_SET_A_LOGO')}" click="setFieldLogo(PreferencesDAO.PDF_LOGO)"/>
+								<mx:Button label="{i18n._('PREFERENCES_BUTTON_LABEL_REMOVE_LOGO')}" click="{Database.preferencesDao.setValue(PreferencesDAO.PDF_LOGO,null)}"/>
+							</mx:HBox>
+						</mx:VBox>
+						<mx:HRule width="100%"/>
+						<mx:VBox paddingTop="7" paddingBottom="10">
+							<mx:HBox>
+								<mx:Label width="150" text="{i18n._('PREFERENCES_LABEL_TEXT_WINDOW_TITLE')}" fontWeight="bold" fontSize="14"/>
+								<mx:Button label="{i18n._('PREFERENCES_BUTTON_LABEL_SET_A_LOGO')}" click="setFieldLogo(PreferencesDAO.WINDOW_LOGO)"/>
+								<mx:Button label="{i18n._('PREFERENCES_BUTTON_LABEL_REMOVE_LOGO')}" click="{Database.preferencesDao.setValue(PreferencesDAO.WINDOW_LOGO,null);mainWindow.refreshWindowLogo();}"/>
+								<mx:Label width="180" text="{i18n._('PREFERENCES_LABEL_TEXT_BACKGROUND_COLOR')}" textAlign="right"/>
+								<mx:ColorPicker id="winTitleBarColor" showTextField="true" />
+							</mx:HBox>
+						</mx:VBox>
+						<mx:HRule width="100%"/>
+						<mx:VBox paddingTop="7" paddingBottom="10">
+							<mx:HBox left="16" width="100%">
+								<mx:Label  width="150" text="{i18n._('GLOBAL_REPORT_FORMAT')}" fontWeight="bold" fontSize="14"/>
+								<mx:RadioButton id="portraitRadio" value="Portrait" label="{i18n._('GLOBAL_PORTRAIT')}" groupName="pdfSize" />
+								<mx:RadioButton id="landScapeRadio" value="Landscape" label="{i18n._('GLOBAL_LANDSCAPE')}" groupName="pdfSize" />
+							</mx:HBox>
+						</mx:VBox>
+					</mx:VBox>
+				</mx:Canvas>	
+				<mx:Canvas width="100%"  label="{i18n._('PREFERENCES_LABEL_TEXT_OPTIONS')}">
+					<mx:VBox left="16" width="100%">
+						<mx:HBox id="optionTab_password_layout"
+								 visible="{!StringUtils.isEmpty(preferences.admin_password)}"
+								 includeInLayout="{!StringUtils.isEmpty(preferences.admin_password)}">	
+							<mx:Label text="{i18n._('ADMIN_PASSWORD')}"/>
+							<mx:VBox>
+								<mx:TextInput id="txtAdminPassword" text="" displayAsPassword="true" />
+								<mx:Label id="lblAccessAdminMessage" text="{i18n._('GLOBAL_INVALID_PASSWORD')}" color="#FF0000" visible="false"/>
+							</mx:VBox>	
+							<mx:Button id="btnAccessOptionTab" label="{i18n._('SHOW_OPTIONS')}" click="btnShowOptionTab_clickHandler(event)"/>
+							
+						</mx:HBox>	
+						<mx:HBox id="optionTab_detail_layout" 
+								 visible="{StringUtils.isEmpty(preferences.admin_password)}" includeInLayout="{StringUtils.isEmpty(preferences.admin_password)}">	
+							<mx:VBox paddingTop="10" width="100%">
+								<components:FieldSet width="320" height="157" gap="6" paddingLeft="10" cornerRadius="8" legend="{i18n._('GLOBAL_ADMIN_SECTION@Admin Section')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+									<mx:VBox width="100%" height="100%" paddingLeft="10" paddingTop="20">
+										<mx:HBox width="100%">
+											<mx:Label  text="{i18n._('ADMIN_PASSWORD')}"/>
+											<mx:TextInput displayAsPassword="true"  id="txtAdminPasswordInput" width="160" text="{preferences.admin_password}"/>
+										</mx:HBox>
+										<mx:HBox width="100%">
+											<mx:CheckBox id="logFile" label="{i18n._('PREFERENCES_CHECKBOX_LOG_FILE')}" selected="{Database.preferencesDao.getValue(PreferencesDAO.LOG_FILES)==1? true:false}" change="{editStatus = true;logFileName.enabled=logFile.selected}" />
+											<!--CRO 05.01.2011 PREFERENCES_TEXT_INPUT_FILE_NAME = GLOBAL_FILENAME-->
+											<mx:TextInput id="logFileName" toolTip="{i18n._('GLOBAL_FILENAME')}" enabled="{logFile.selected}" text="{Database.preferencesDao.getValue('log_fileName')}"/>
+										</mx:HBox>
+										<mx:HBox width="100%">
+											<mx:Button label="{i18n._('INITIALIZE_NEW_DB')}" click="{initializeNewDB_clickHandler()}"/>
+										</mx:HBox>	
+										<mx:HBox width="100%">
+											<mx:Label text="{i18n._('GLOBAL_DATABASE_PASSWORD')}"/>
+											<mx:TextInput id="txtDatabasePasswordInput" width="160" text="{preferences.database_password}"/>
+										</mx:HBox>	
+										<!--<mx:CheckBox paddingBottom="0" paddingTop="0" id="chkSyncFieldManagement" label="{i18n._('SYNC_FIELD_MANAGMENT@Sync. field management')}" selected="{Database.preferencesDao.isSync_field_managment()}" change="{editStatus = true;}" />
+										<mx:CheckBox paddingBottom="0" paddingTop="0" id="chkSyncAssessmentScript" label="{i18n._('SYNC_ASSESSMENTSCRIPT@Sync. assessment script')}" selected="{Database.preferencesDao.isSync_assessmentscript()}" change="{editStatus = true;}" />
+										<mx:CheckBox paddingBottom="0" paddingTop="0" id="chkSyncAccessProfile" label="{i18n._('SYNC_ACCESSPROFILE@Sync. accessprofile')}" selected="{Database.preferencesDao.isSync_accessprofile()}" change="{editStatus = true;}" />
+										<mx:CheckBox paddingBottom="0" paddingTop="0" id="chkSyncRole" label="{i18n._('SYNC_ROLE@Sync. role')}" selected="{Database.preferencesDao.isSync_role()}" change="{editStatus = true;}" />
+										<mx:CheckBox paddingBottom="0" paddingTop="0" id="chkSyncCascadingPicklist" label="{i18n._('SYNC_CASCADINGPICKLIST@Sync. cascading picklist')}" selected="{Database.preferencesDao.isSync_cascadingpicklist()}" change="{editStatus = true;}" />
+										<mx:CheckBox paddingBottom="0" paddingTop="0" id="chkSyncPicklistService" label="{i18n._('SYNC_PICKLISTSERVICE@Sync. picklist service')}" selected="{Database.preferencesDao.isSync_picklistservice()}" change="{editStatus = true;}" />
+										-->
+									</mx:VBox>
+								</components:FieldSet>
+								<components:FieldSet width="320" height="157" gap="6" paddingLeft="10" cornerRadius="8" legend="{i18n._('GLOBAL_TECHNICAL_STUFF_SECTION@Technical Stuff Section')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+									<mx:VBox width="100%" height="100%" paddingLeft="10" paddingTop="15">
+										<mx:CheckBox id="exchangeOpt" label="{i18n._('ENABLE_MICROSOFT_EXCHANGE')}" selected="{Database.preferencesDao.getBooleanValue('ms_exchange_enable')}" change="{editStatus = true;}" />
+										<mx:CheckBox id="netbreezeOpt" label="{i18n._('PREFERENCES_CHECKBOX_LABEL_ENABLE_NETBREEZE')}" selected="{Database.preferencesDao.getValue(PreferencesDAO.ENABLE_NETBREEZE)==1? true:false}" change="{editStatus = true;}" />
+										<mx:CheckBox id="usegzip" label="{i18n._('USE_HTTP_COMPRESSION')}" selected="{Database.preferencesDao.getBooleanValue('usegzip')}" change="{editStatus = true;}" />
+										<mx:CheckBox id="enable_check_conflict" label="{i18n._('ENABLE_CHECK_CONFLICT')}" selected="{Database.preferencesDao.getBooleanValue('enable_check_conflict')}" change="{editStatus = true;}" />
+									</mx:VBox>
+								</components:FieldSet>
+								<components:FieldSet width="320" height="157" gap="6" paddingLeft="10" cornerRadius="8" legend="{i18n._('GLOBAL_USER_RIGHTS@User Rights')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+									<mx:VBox width="100%" height="100%" paddingLeft="10" paddingTop="15">
+										<mx:CheckBox id="chkDisablePDFExport" label="{i18n._('DISABLE_PDF_EXPORT')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_PDF_EXPORT)==1 ? true:false}" change="{editStatus = true;}" />
+										<mx:CheckBox id="chkDisableCSVExport" label="{i18n._('DISABLE_CVS_EXPORT')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_CVS_EXPORT)==1? true:false}" change="{editStatus=true}"/>
+										<mx:CheckBox id="chkDisableLayoutManager" label="{i18n._('DISABLE_LAYOUT_MANAGER')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_LAYOUT_MANAGER)==1? true:false}" change="{editStatus=true}"/>
+										<mx:CheckBox id="chkDisableListLayout" label="{i18n._('DISABLE_LIST_LAYOUT')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_LIST_LAYOUT)==1? true:false}" change="{editStatus=true}"/>
+									</mx:VBox>
+								</components:FieldSet>
+							</mx:VBox>
+							<mx:VBox paddingTop="10" width="100%" paddingLeft="10">
+								<components:FieldSet width="550" height="482" gap="6" paddingLeft="10" cornerRadius="8" legend="{i18n._('GLOBAL_FEATURES@Features')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+									<mx:HBox width="100%" height="100%" paddingLeft="10" paddingTop="20" paddingRight="10">
+										<mx:VBox width="100%" height="100%">
+											<mx:CheckBox id="editableList" label="{i18n._('PREFERENCES_CHECKBOX_LABEL_ENABLE_LIST_EDITION')}" selected="{preferences.editableList==1? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="showDebug" label="{i18n._('PREFERENCES_CHECKBOX_LABEL_SHOW_DEBUG_WINDOW')}" selected="{preferences.showDebug==1? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="showPredefinedFilters" label="{i18n._('PREFERENCES_CHECKBOX_LABEL_SHOW_PREDEFINED_FILTERS')}" selected="{Database.preferencesDao.getValue(PreferencesDAO.PREDEFINED_FILTERS)==1? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="windowResize" label="{i18n._('WINDOW_RESIZE')}" selected="{Database.preferencesDao.getBooleanValue('window_resize')}" change="{editStatus = true;}" />								
+											<mx:CheckBox id="startAtLogin" label="{i18n._('START_AT_LOGIN')}" selected="{Database.preferencesDao.getBooleanValue('start_at_login')}" change="{editStatus = true;}" />
+											<mx:CheckBox id="googleOpt" label="{i18n._('ENABLE_GOOGLE')}" selected="{Database.preferencesDao.getBooleanValue('enable_google_calendar')==1 ? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="chkEnableFeed" label="{i18n._('ENABLE_FEED')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_FEED)==1 ? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="chkFavorite" label="{i18n._('ENABLE_FAVORITE_FILTER')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_FAVORITE)==1 ? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="hideTechUser" label="{i18n._('HIDE_SS0_TECH_USER')}" selected="{Database.preferencesDao.isHideSSOTechUser()}" change="{editStatus = true;}" click="hideSSOTechUser(hideTechUser.selected)" />
+											<mx:CheckBox id="chkHomeTask" label="{i18n._('GLOBAL_ENABLE_HOME_TASK')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_HOME_TASK)==1 ? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="chkFacebook" label="{i18n._('ENABLE_FACEBOOK')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_FACEBOOK)==1?true:false}" change="{editStatus=true}"/>
+											<mx:CheckBox id="chkLinkedin" label="{i18n._('ENABLE_LINKEDIN')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_LINKEDIN)==1?true:false}" change="{editStatus=true}"/>
+											<mx:CheckBox id="chkAppUpdate" label="{i18n._('ENABLE_APPLICATION_UPDATE')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_APPLICATION_UPDATE)==1?true:false}" change="{editStatus=true}"/>
+											<mx:CheckBox id="chkImportant" label="{i18n._('ENABLE_IMPORTANT_FILTER')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_IMPORTANT)==1 ? true:false}" change="{editStatus = true;}" />
+											<mx:HBox width="100%">
+												<mx:ComboBox id="important_length" enabled="{chkImportant.selected}" dataProvider="{dataImportant}" width="100"/>
+											</mx:HBox>
+											
+										</mx:VBox>
+										<mx:VBox width="100%" height="100%">
+											<mx:HBox width="100%">
+												<mx:Label  text="{i18n._('CSV_SEPARATOR')}"/>
+												<mx:ComboBox id="cboSeparator" dataProvider="{dataSeparator}" width="60"/>
+											</mx:HBox>
+											<mx:HBox width="100%">
+												<mx:Label  text="{i18n._('GOOGLE_MAP_ADDRESS')}"/>
+												<mx:ComboBox id="cboGoogleMapAddress" dataProvider="{dataGoogleMapAddress}" width="150"/>
+											</mx:HBox>
+											<!--<mx:HBox width="100%">
+											<mx:Label  text="{i18n._('GOOGLE_MAP_DISTANCE@Google Map Distance')}"/>
+											<mx:ComboBox id="cboGoogleMapDistance" dataProvider="{dataGoogleMapDistance}" width="150"/>
+											</mx:HBox>-->
+											
+											<mx:HBox width="100%">
+												<mx:Label  text="{i18n._('RECENT_FILTER_IN_DAYS')}"/>
+												<mx:ComboBox id="recent_filter"  dataProvider="{dataRecentFilter}" width="60"/>
+											</mx:HBox>
+											<mx:CheckBox id="chkFuzzy" label="{i18n._('GLOBAL_ENABLE_FUZZY')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_FUZZY)==1 ? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="chkConvertLead" label="{i18n._('GLOBAL_ENABLE_CONVERT_LEAD')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_CONVERT_LAED)==1 ? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="chkDashboard" label="{i18n._('GLOBAL_ENABLE_DASHBOARD')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_DASHBOARD)==1 ? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="chkDailyAgenda" label="{StringUtils.isEmpty(Database.preferencesDao.getStrValue(PreferencesDAO.DAILY_AGENDA_NAME)) ? i18n._('GLOBAL_ENABLE_DAILY_AGENDA') :  i18n._('GLOBAL_ENABLE') + ' ' +Database.preferencesDao.getStrValue(PreferencesDAO.DAILY_AGENDA_NAME)}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_DAILY_AGENDA)==1 ? true:false}" change="{editStatus = true;}" />
+											
+											<mx:CheckBox id="chkEnableAssessmentScript" label="{i18n._('GLOBAL_ENABLE_ASSESSMENT_SCRIPT')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_ASSESSMENT_SCRIPT)==1? true:false}" change="{editStatus=true}"/>
+											<mx:CheckBox id="chkEnablePDFSignature" label="{i18n._('ENABLE_PDF_SIGNATURE')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_PDF_SIGNATURE)==1 ? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="chkEnableObjectCall" label="{i18n._('ENABLE_OBJECT_CALL@Enable Object Call')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_BUTTON_ACTIVITY_CREATE_CALL)==1 ? true:false}" change="{editStatus = true;}" />
+											
+											<mx:CheckBox id="chkDashboardReport" label="{i18n._('GLOBAL_DASHBOARD_SEGMENT_TARGET')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_DASHBOARD_REPORT)==1 ? true:false}" change="{editStatus = true;}" />
+											<mx:CheckBox id="chkEnableVisitCustomer" label="{i18n._('GLOBAL_ENABLE_VISITIT_CUSTOMER@Enable Visit Customer')}" selected="{Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_VISITIT_CUSTOMER)==1 ? true:false}" change="{editStatus = true;}" />
+											<components:FieldSet width="240" height="50" gap="6" cornerRadius="8" legend="{i18n._('PREFERENCE_DIMENSION@Dimension')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+												<mx:HBox width="100%" paddingLeft="5" paddingTop="15">
+													<mx:Label text="{i18n._('PREFERENCE_WIDTH@Width')}" />
+													<mx:TextInput restrict="0-9" width="60" id="txtWidth" maxChars="4" text="{getWindowWidth()}" focusOut="txtWidth_focusOutHandler(event)" />
+													<mx:Label text="{i18n._('PREFERENCE_HEIGHT@Height')}" />
+													<mx:TextInput restrict="0-9" width="60" id="txtHeight" maxChars="4" text="{getWindowHeight()}" focusOut="txtHeight_focusOutHandler(event)" />
+												</mx:HBox>
+											</components:FieldSet>
+										</mx:VBox>
+										
+										
+									</mx:HBox>
+								</components:FieldSet>
+								
+							</mx:VBox>
+							
+							
+						</mx:HBox>
+					</mx:VBox>
+				</mx:Canvas>
+				
+				<mx:Canvas width="100%" label="{i18n._('PREFERENCES_CANVAS_LABEL_AUTO_CONFIGURATION')}">
+					<mx:VBox width="100%">
+						<mx:Form width="100%">
+							<mx:FormItem label="{i18n._('PREFERENCES_FORMITEM_LABEL_CONFIGURATION_URL')}">
+								<mx:TextInput id="configurl" width="360" text="{preferences.config_url}"/>
+							</mx:FormItem>
+						</mx:Form>
+						<mx:Canvas width="100%">
+							<mx:Button left="240" bottom="16" id="loadConfigurationBtn" label="{i18n._('PREFERENCES_BUTTON_LABEL_LOAD_CONFIGURATION')}" click="loadConfiguration();"/>
+							
+						</mx:Canvas>
+					</mx:VBox>
+					
+				</mx:Canvas>
+				
+				<!-- idex 5,6  to 6,7  -->
+				<mx:Canvas label="{i18n._('PREFERENCES_CANVAS_LABEL_NETBREEZE')}" width="100%" height="100%" id="netBreeze">
+					<mx:VBox width="100%">
+						<mx:Form width="100%">
+							<!--CRO 05.01.2011-->
+							<mx:FormItem label="{i18n._('GLOBAL_LOGIN')}">
+								<mx:TextInput id="sodloginNetbreeze" width="360" text="{preferences.sodlogin}"/>
+							</mx:FormItem>
+							<mx:FormItem label="{i18n._('PREFERENCES_FORMITEM_LABEL_NETBREEZE_USERID')}">
+								<mx:TextInput id="NetbreezeUserId" width="360" editable="false" text="188_dynamics_t1"/>
+							</mx:FormItem>
+						</mx:Form>
+						<mx:Canvas width="100%">
+							<mx:Button left="240" bottom="16" id="createNetbreeze" label="{i18n._('PREFERENCES_BUTTON_LABEL_CREATE_NETBREEZE_ACCOUNT')}" click="createNetbreeze_clickHandler(event)"/>
+						</mx:Canvas>
+					</mx:VBox>
+				</mx:Canvas>
+				<!--
+				<mx:Canvas width="100%" label="User Sign">
+				<control:EpadSign id="epadPanel" height="200" width="380"
+				/>
+				</mx:Canvas>
+				-->
+				<!--GMAIL LOGIN FORM-->
+				<mx:Canvas id="googleCalendar" width="100%" label="{i18n._('Google Calendar')}">
+					<mx:VBox width="100%">
+						<mx:Form width="100%">
+							<mx:FormItem label="{i18n._('Username')}">
+								<mx:TextInput id="txtGmailUsername" width="360" text="{preferences.gmail_username}"/>
+							</mx:FormItem>
+							<mx:FormItem label="{i18n._('Password')}">
+								<mx:TextInput displayAsPassword="true" id="txtGmailPassword" width="360" text="{preferences.gmail_password}"/>
+							</mx:FormItem>
+						</mx:Form>
+						<mx:HBox width="100%" horizontalAlign="center">
+							<mx:Button id="testGmailConnectionBtn" label="{i18n._('TEST_CONNECTION')}" click="testGmailConnection()"/>
+							<control:CustomLinkButton id="testGmailConnectionWait" icon="{ImageUtils.synOkIcon}" label="" visible="false" includeInLayout="false"/>
+						</mx:HBox>
+					</mx:VBox>
+				</mx:Canvas>			
+				
+				<!--Feed Setting-->
+				<mx:Canvas id="feedSetting" width="100%" label="{i18n._('FEED_SETTING')}">
+					<mx:HBox width="90%" left="16">						
+						<mx:VBox width="45%" id="enabledFeeds"/>
+						
+						<mx:VRule height="100%"/>
+						
+						<mx:VBox width="45%" left="16">
+							<mx:Label text="{i18n._('FEED_SERVER_SETUP')}" fontWeight="bold"/>
+							<mx:Form width="100%">
+								<mx:FormItem label="{i18n._('SERVER_URL')}">
+									<mx:TextInput id="txtFeedURL" width="280" text="{preferences.feed_url}"/>
+								</mx:FormItem> 
+								<mx:FormItem label="{i18n._('SERVER_PORT')}">
+									<mx:TextInput id="txtFeedPort" width="280" text="{preferences.feed_port}"/>
+								</mx:FormItem>
+							</mx:Form>
+							
+							<mx:Image id="imgPreviewAvatar" width="50" height="50"/>
+							<mx:HBox horizontalGap="20">
+								<mx:Button id="btnSetAvatar" label="Set user's avatar" click="btnSetAvatar_clickHandler(event)"/>
+								<mx:Button id="btnGetAvatar" label="Refresh following's avatar" click="btnGetAvatar_clickHandler(event)"/>
+							</mx:HBox>
+							<mx:HBox width="100%">
+								<mx:Label text="{i18n._('DELETE_FEED_HISTORY')}"/>
+								<mx:ComboBox id="cboFeedHistory" dataProvider="{dataFeedHistory}" width="85"/>
+							</mx:HBox>
+							
+						</mx:VBox>
+						
+					</mx:HBox>
+				</mx:Canvas>
+				
+				<!-- (vm) Tab Microsoft Exchange -->
+				<mx:Canvas id="microsoftExchange" label="{i18n._('EXCHANGE_SERVER')}" width="100%" height="100%">
+					<mx:VBox width="100%">
+						<mx:Form width="100%">
+							<!--vm 03.05.2011-->
+							<mx:FormItem label="{i18n._('URL')}">
+								<mx:TextInput id="ms_url" width="360" text="{preferences.ms_url}"/>
+							</mx:FormItem>
+							<mx:FormItem label="{i18n._('GLOBAL_LOGIN')}">
+								<mx:TextInput id="ms_user" width="360" text="{preferences.ms_user}"/>
+							</mx:FormItem>
+							<mx:FormItem label="{i18n._('GLOBAL_PASSWORD')}">
+								<mx:TextInput displayAsPassword="true" id="ms_pwd" width="360" text="{preferences.ms_password}"/>
+							</mx:FormItem>
+						</mx:Form>
+						
+					</mx:VBox>
+				</mx:Canvas>
+				<mx:Canvas width="100%" label="{i18n._('CUSTOM_SETTING_EXPORT')}">
+					<mx:Label text="{i18n._('SETTING_EXPORT')}" top="30" left="50" fontWeight="bold" fontSize="16"/>
+					<mx:VBox width="100%" height="100%" top="90" left="100">
+						<mx:Label text="{i18n._('LAYOUT_EXPORT')}" top="80" left="50" fontWeight="bold"/>
+						<mx:CheckBox id="chkCustLayout"  label="{i18n._('CUSTOM_LAYOUT')}" selected="{preferences.enable_custom_layout==1? true:false}"/>
+						<mx:CheckBox id="chkListLayout" label="{i18n._('LIST_LAYOUT')}" selected="{preferences.enable_list_layout==1? true:false}"/>
+						<mx:CheckBox id="chkViewLayout" label="{i18n._('VIEW_LAYOUT')}" selected="{preferences.enable_view_layout==1? true:false}"/>
+						<mx:CheckBox id="chkFilterLayout" label="{i18n._('FILTER')}" selected="{preferences.enable_filter==1? true:false}"/>
+						<mx:Label text="{i18n._('PREFERENCES_EXPORT')}" top="80" left="50" fontWeight="bold" />
+						<mx:CheckBox id="chkConnection"  label="{i18n._('CONNECTION_INFORMATIONS')}" selected="{preferences.enable_connection_information==1? true:false}"/>
+						<mx:CheckBox id="chkEnableTransaction" label="{i18n._('ENABLE_TRNSACTION')}" selected="{preferences.enable_transaction==1? true:false}"/>
+						<mx:CheckBox id="chkUserInterface" label="{i18n._('USER_INTERFACE')}" selected="{preferences.enable_user_interface==1? true:false}"/>
+						<mx:CheckBox id="chkOption" label="{i18n._('OPTION')}" selected="{preferences.enable_option==1? true:false}"/>
+						<mx:CheckBox id="chkAutoConfict" label="{i18n._('AUTO_CONFIGURATION')}" selected="{preferences.enable_auto_configuration==1? true:false}"/>
+					</mx:VBox>
+					
+				</mx:Canvas>
+				
+				<mx:Canvas id="recportAdmin" width="100%" height="100%" label="{i18n._('TCS_REPORT_ADMIN')}">
+					<mx:Form width="100%" height="100%">
+						<mx:FormItem label="{i18n._('REPORT_TO_PATH')}">
+							<mx:HBox id="browser">
+								<mx:TextInput id="txtPath" width="365" click="browserForOpen()"/>
+								<mx:Button label="..." click="browserForOpen()" />
+							</mx:HBox>
+						</mx:FormItem> 
+						<mx:FormItem label="{i18n._('AUDITOR')}">
+							<mx:TextInput id="auditor" width="365" text=""/>
+						</mx:FormItem>
+						<mx:FormItem label="{i18n._('TYPE')}">
+							<mx:TextInput id="txtType" width="365" text=""/>
+						</mx:FormItem>
+						<mx:FormItem label="{i18n._('FROM')}" width="100%" height="100%">
+							<mx:VBox width="100%" height="100%">								
+								<mx:DataGrid width="100%" height="100%" itemEditEnd="itemEditEnd(event);" dataProvider="{_dataProviderReportAdmin}" editable="true">
+									<mx:columns>
+										<mx:DataGridColumn dataField="report_name" headerText="Report Name" />
+										<mx:DataGridColumn dataField="report_code" headerText="Report Code" />
+									</mx:columns> 
+								</mx:DataGrid>
+							</mx:VBox>
+						</mx:FormItem>
+					</mx:Form>
+				</mx:Canvas>
+				
+				<!-- Tab Settings -->
+				<mx:Canvas label="{i18n._('GLOBAL_CALENDAR_ACTIVITY_SETTINGS@Calendar/Activity Settings')}" width="100%" height="100%" id="tabSetting">
+					<mx:VBox width="100%">
+						<mx:Form width="100%">
+							
+							<mx:FormItem label="{i18n._('GLOBAL_TIME_FORMAT@Time Format')}">
+								<mx:ComboBox id="cboTimeFormat" change="onTimeFormatChange()" >
+									<s:ArrayCollection>
+										<mx:Object label="1:00 PM" data="12"/>
+										<mx:Object label="13:00" data="24"/>
+									</s:ArrayCollection>
+								</mx:ComboBox>
+							</mx:FormItem>
+							
+							<mx:FormItem label="{i18n._('GLOBAL_BEGIN_OF_WEEK@Begin Of Week')}">
+								<mx:ComboBox id="cboBiginOfWeek">
+									<s:ArrayCollection>
+										<mx:Object label="{i18n._('GLOBAL_SATURDAY')}" data="6"/> 
+										<mx:Object label="{i18n._('GLOBAL_SUNDAY')}" data="0"/>
+										<mx:Object label="{i18n._('GLOBAL_MONDAY')}" data="1"/>
+										
+									</s:ArrayCollection>
+								</mx:ComboBox>
+							</mx:FormItem>
+							<!--
+							<mx:FormItem label="{i18n._('GLOBAL_WORKING_TIME@Working Time')}">
+							<mx:HBox>
+							<mx:CheckBox label="Mo" id="chkModay"/>
+							<mx:CheckBox label="Tu" id="chkTuesday"/>
+							<mx:CheckBox label="We" id="chkWednesday"/>
+							<mx:CheckBox label="Thu" id="chkThurday"/>
+							<mx:CheckBox label="Fri" id="chkFriday"/>
+							<mx:CheckBox label="Sa" id="chkSaturday"/>
+							<mx:CheckBox label="Su" id="chkSunday"/>
+							</mx:HBox>
+							<mx:HBox>
+							<mx:ComboBox id="cboStartTime" dataProvider="{timeDataProvider()}" />
+							<mx:Label text="To"/>
+							<mx:ComboBox id="cboEndTime" dataProvider="{timeDataProvider()}" />
+							</mx:HBox>
+							</mx:FormItem>
+							-->
+							<mx:FormItem label="{i18n._('GLOBAL_HIDE_ACTIVITY_Type@Hide Activity Type')}">
+								<local:MultiSelect availableItems="{loadPickList()}" id="cboActivityType" labelField="label"/>
+								<!--<mx:ComboBox  id="cboActivityType" dataProvider="{dataProviderPicklist()}"/>-->
+							</mx:FormItem>
+						</mx:Form>
+						<mx:HBox paddingLeft="20"  width="100%" top="10" horizontalScrollPolicy="off"  paddingRight="10" id="googleDistanceConfig" includeInLayout="{StringUtils.isEmpty(preferences.admin_password)}" visible="{StringUtils.isEmpty(preferences.admin_password)}">
+							<components:FieldSet width="543" height="180" gap="6" paddingLeft="10" cornerRadius="8" legend="{i18n._('GOOGLE_MAP_DISTANCE@Google Map Distance')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+								<mx:HBox width="100%" height="100%" paddingLeft="10" paddingTop="20" paddingRight="10">
+									<mx:AdvancedDataGrid editable="true" sortExpertMode="true" height="150"  id="distanceMap" top="0" width="100%" doubleClickEnabled="true">
+										<mx:columns>
+											<mx:AdvancedDataGridColumn resizable="false" editable="false" width="340" dataField="displayname" headerText="{i18n._('COUNTRY@Country')}"/>
+											<mx:AdvancedDataGridColumn resizable="false" width="150" dataField="distance" labelFunction="{getDistanceDisplayName}" headerText="{i18n._('GLOBAL_TYPE@Type')}" itemEditor="{new ClassFactory(ComboboxColRender)}" editorDataField="selectedItem"/>
+										</mx:columns>
+									</mx:AdvancedDataGrid>
+								</mx:HBox>
+								
+							</components:FieldSet>	
+						</mx:HBox>
+					</mx:VBox>
+				</mx:Canvas>
+				
+			</mx:TabNavigator>
+			<mx:HBox width="100%">
+				<mx:HBox width="100%" height="100%" paddingTop="8" id="buttonsconfigure">
+					<mx:LinkButton icon="@Embed(source='/assets/save_config.png')" toolTip="{i18n._('PREFERENCES_LINKBUTTON_TOOLTIP_EXPORT_CONFIGURATION')}" click="exportPref()" />
+					<mx:LinkButton icon="@Embed(source='/assets/upload_config.png')" toolTip="{i18n._('PREFERENCES_LINKBUTTON_TOOLTIP_IMPORT_CONFIGURATION')}" click="importPref()" />
+					<mx:Label text="" id="showStatus" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<!--<mx:ButtonBar id="buttonbardetail" />-->
+					<control:DetailButtonBar id="buttonbardetail" buttonLabel="PREFERENCES_DETAILBUTTONBAR_BUTTONLABEL_SAVE_CHANGES" action="save"/>
+				</mx:HBox>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+	<MyValidate:URLValidator id="crmondemandURLValidator" required="true" source="{sodhost}" property="text"/>
+	
+	<mx:NumberValidator id="feedPortValidator" source="{txtFeedPort}" property="text" integerError="Enter Integer value" domain="int"/> 
+	
+</mx:Window>

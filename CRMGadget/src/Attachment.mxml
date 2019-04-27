@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--CRO 05.01.2011-->
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	title="{i18n._('GLOBAL_ATTACHMENTS')}"
+	width="350" height="290" verticalAlign="middle"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init();">
+	<mx:Script>
+		<![CDATA[
+			import gadget.control.BrowseLocalFileDialog;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.FileBrowse;
+			import gadget.util.ImageUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.binding.utils.BindingUtils;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.ButtonBar;
+			import mx.events.ItemClickEvent;
+			import mx.managers.DragManager;
+			
+			[Bindable] public var detail:Detail;
+			
+			private const CLOSE_STR:String = i18n._('GLOBAL_CLOSE');
+			private const ADD_STR:String = i18n._('GLOBAL_ADD');
+			private const DELETE_STR:String = i18n._('GLOBAL_DELETE');
+			
+			
+			private function init():void{
+				initButton();
+				refreshList();
+				initDragDropDataGrid();
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function initButton():void{
+				actionButton.removeAllChildren();
+				var buttonBar:ButtonBar = new ButtonBar();
+				buttonBar.setStyle("right", "0");
+				var obj:Object = null;
+				var buttons:ArrayCollection = new ArrayCollection();
+				
+				buttons.addItem({label: CLOSE_STR, icon:ImageUtils.cancelIcon}); 
+				buttons.addItem({label: ADD_STR, icon: ImageUtils.acceptIcon});
+				buttons.addItem({label: DELETE_STR, icon: ImageUtils.deleteIcon});
+				
+				buttonBar.dataProvider = buttons;
+				buttonBar.addEventListener(ItemClickEvent.ITEM_CLICK, handleButtonBar);
+				
+				actionButton.addChild(buttonBar);
+			}
+			
+			private function handleButtonBar(event:ItemClickEvent):void{
+				if(event.label == CLOSE_STR){
+					this.close();
+				}else if(event.label == DELETE_STR){
+					deleteFile();
+				}else if(event.label == ADD_STR){
+					openBrowser();
+				}
+			}
+			
+			
+			private function refreshList():void {
+				gridFile.dataProvider = Database.attachmentDao.selectAttachment(detail.entity, detail.item.gadget_id);
+				detail.displayAttachments();
+			}
+			
+			private function openBrowser():void{
+//				var dlg:BrowseLocalFileDialog = new BrowseLocalFileDialog();
+//				dlg.extensions = null;
+//				dlg.textLabel = "Choose a file :";
+//				dlg.imagePreview = false;
+//				dlg.windowTitle = "Browse File";
+//				dlg.callback = upload;
+//				WindowManager.openModal(dlg);
+				var fileBrowse:FileBrowse = new FileBrowse(upload_);
+				fileBrowse.show();
+			}
+
+
+			private function upload(file:File):void {
+//				var attachment:Object = new Object();
+//				attachment.entity = detail.entity;
+//				attachment.gadget_id = detail.item.gadget_id;
+//				attachment.data = Utils.getContentFile(file);
+//			 	attachment.filename = file.name;  
+//			 	attachment.num = gridFile.dataProvider.length + 1;
+//				Database.attachmentDao.insert(attachment);
+//				
+//				refreshList();
+				Utils.upload(file, detail.entity, detail.item.gadget_id, refreshList, modifiedLocalUpdateItem);
+			}
+			
+			private function upload_(fileName:String, data:Object):void {
+				Utils.upload_(fileName, data, detail.entity, detail.item.gadget_id, refreshList, modifiedLocalUpdateItem);		
+			}
+
+			private function modifiedLocalUpdateItem():void{
+				var item:Object = detail.item;
+				item.local_update = new Date().getTime();
+				item.deleted = 0;
+				Database.getDao(detail.entity).update(item);
+			}
+			
+			private function deleteFile():void {
+				if(gridFile.selectedItem == null){
+					//CRO 05.01.2011
+					Alert.show(i18n._('GLOBAL_ATTACHMENTS_ALERT_MSG_DELETE'),'',Alert.OK,this);
+					return;	
+				}
+				var selectedObject:Object = gridFile.selectedItem;
+				var criteria:Object = new Object();
+				criteria.entity = selectedObject.entity;
+				criteria.filename = selectedObject.filename;
+				Database.attachmentDao.delete_(criteria);
+				modifiedLocalUpdateItem();
+				refreshList();
+			}
+			
+			private function openFile():void {
+				var obj:Object = gridFile.selectedItem;
+				Utils.openFile(obj);
+			
+			}
+			
+			private function onDragIn(event:NativeDragEvent):void 
+			{
+				//check and see if files are being drug in
+				if(event.clipboard.hasFormat(ClipboardFormats.FILE_LIST_FORMAT))
+				{
+					//get the array of files
+					var files:Array = event.clipboard.getData(ClipboardFormats.FILE_LIST_FORMAT) as Array;
+					
+					//make sure only one file is dragged in (i.e. this app doesn’t support dragging in multiple files)
+					if(files.length == 1)
+					{
+						//accept the drag action
+						DragManager.acceptDragDrop(gridFile);
+					}
+				}
+			}
+			
+			//called when the user drops an item over the component
+			private function onDragDrop(event:NativeDragEvent):void
+			{
+				var arr:Array = event.clipboard.getData(ClipboardFormats.FILE_LIST_FORMAT) as Array;
+   				upload(arr[0] as File);
+			}
+			
+			private function initDragDropDataGrid():void 
+			{
+				//register for the drag enter event
+				gridFile.addEventListener(NativeDragEvent.NATIVE_DRAG_ENTER, onDragIn);
+				//register for the drag drop event
+				gridFile.addEventListener(NativeDragEvent.NATIVE_DRAG_DROP, onDragDrop);
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="350" height="290" right="0" bottom="0"><!--CRO 05.01.2011 -->
+		<control:TitleBar icon="@Embed(source='/assets/attachment.png')" title="{i18n._('GLOBAL_ATTACHMENTS')}"/>
+		<mx:VBox top="40" left="16" right="16" width="100%" height="240">
+			<mx:DataGrid id="gridFile" width="100%" doubleClickEnabled="true" doubleClick="openFile()" height="205">
+				<mx:columns>
+					<!--CRO 05.01.2011 ATTACHMENT_DATAGRIDCOLUMN_HEADERTEXT_FILE_NAME = GLOBAL_FILENAME-->
+					<mx:DataGridColumn headerText="{i18n._('GLOBAL_FILENAME')}" dataField="filename"/>
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox id="actionButton" horizontalAlign="right" width="100%"/>
+		</mx:VBox>
+			<!--
+			<mx:Canvas>
+				<mx:Button label="Delete" left="50" width="70" top="8" click="deleteFile();"/>
+				<mx:Button label="Add" left="200" width="70" top="8" click="openBrowser();"/>
+			</mx:Canvas>
+		</mx:VBox>
+		<mx:HRule id="hrule" width="100%" left="16" right="16" top="245" />
+		<mx:Button label="Close" width="70" top="255" left="260" click="close();" />
+		-->
+	</mx:Canvas>
+</mx:Window>

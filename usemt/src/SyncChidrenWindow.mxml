@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  xmlns:control="gadget.control.*"
+		  xmlns:rtc="AfcsNameSpace"
+		  width="360" 
+		  height="200"
+		  title="{i18n._('GLOBAL_SYNC_CHIDREN')}" 
+		  showStatusBar="false"
+		  showFlexChrome="false"
+		  transparent="true" 
+		  systemChrome="none"
+		  creationComplete="init()"
+		  resizable="false"
+		  >
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.containers.VBox;
+			import mx.controls.CheckBox;
+			import mx.controls.ComboBox;
+			import mx.controls.Label;
+			private const DEFAULT_HEIGHT:int=150;
+			public var mapParentFilter:Object;
+			
+			//CRO 05.01.2011
+			private const SUPPORTWINDOW_TITLEBAR_SUPPORT:String = "GLOBAL_SYNC_CHIDREN";
+			public var entity:String;
+			private function init():void {
+				var  lst:ArrayCollection = Database.transactionDao.listEnabledTransaction();
+				enableTransaction.addChild(Preferences.createLabel('PREFERENCES_LABEL_TEXT_TRANSACTIONS'));	
+				advancedFilter.addChild(Preferences.createLabel('PREFERENCES_LABEL_TEXT_SYNC_CHILDREN'));
+				if(entity){
+					var listChildren:Array = Database.subSyncDao.findByEntity(entity);// Utils.getChildObject(entity);
+					var h:int=60;
+					for each(var child:Object in listChildren){
+						var check:CheckBox = new CheckBox();
+						check.height = 25;
+						check.data = child.sub;
+						check.label = Database.customLayoutDao.getDisplayName(child.sub);
+						check.selected = child.enabled;
+						check.addEventListener(MouseEvent.CLICK, onClickCheckBox);
+						enableTransaction.addChild(check);
+						h = h+25;
+						advanceFilters(child,check,lst, child.sub);
+					}
+					if(h<DEFAULT_HEIGHT){
+						h = DEFAULT_HEIGHT;
+					}
+					if(listChildren.length==2){
+						h = h+35;
+					}
+					else if(listChildren.length==3){
+						h = h+50;
+					}
+					else if(listChildren.length>3 && listChildren.length<5){
+						h = h+70;
+					}
+					else if(listChildren.length>=5 && listChildren.length<12){
+						h = h+100;
+					}else if(listChildren.length>=12){
+						h = h+140;
+					}
+					
+					height = h;
+					
+					
+					
+				}
+			}
+			
+			private function onClickCheckBox(e:MouseEvent):void{
+				
+				var checkbox:CheckBox = e.currentTarget as CheckBox;
+				var index:int = enableTransaction.getChildIndex(checkbox);
+				var cboAdvancedFilter:ComboBox = advancedFilter.getChildAt(index) as ComboBox;
+				cboAdvancedFilter.enabled = checkbox.selected;
+				
+			}
+			private function advanceFilters(transaction:Object,checkBox:CheckBox,lstParentTrans:ArrayCollection,subEntity:String):void{
+				var cboAdvancedFilter:ComboBox = new ComboBox();				
+				cboAdvancedFilter.dataProvider = Database.transactionDao.advancedfilter;
+				cboAdvancedFilter.labelField = "name";
+				//cboAdvancedFilter.width = 100;				
+				cboAdvancedFilter.height = 25;
+				// #311: hange request - Diversey sales - Prefernces 
+				cboAdvancedFilter.enabled = transaction.filter_disable == true ? false :  checkBox.selected;
+				
+				if(mapParentFilter[subEntity] != null && parseInt(mapParentFilter[subEntity]) != 0)	{
+					cboAdvancedFilter.selectedItem = getSelectionObject(Database.transactionDao.advancedfilter, mapParentFilter[subEntity]);
+				}else{
+					cboAdvancedFilter.selectedItem = getSelectionObject(Database.transactionDao.advancedfilter, transaction.advanced_filter);
+				}
+				
+				
+				advancedFilter.addChild(cboAdvancedFilter);
+			}
+			private function getSelectionObject(list:ArrayCollection, id:String):Object{
+				for each(var obj:Object in list){
+					if(obj.type==id)
+						return obj;
+				}
+				return list.length==0?null:list.getItemAt(0);
+			}
+			private function saveChange():void{
+				var chkBoxList:Array = enableTransaction.getChildren();
+				var vBoxChildList:Array = advancedFilter.getChildren();
+				
+				for (var i:int=0;i<chkBoxList.length;i++){
+					if(chkBoxList[i] is Label) continue;
+					var checkBox:CheckBox = chkBoxList[i];
+					var cboAdvance:ComboBox = vBoxChildList[i];
+					var obj:Object = new Object();
+					var enabled:int = checkBox.selected == true? 1:0;
+					obj["entity"] = entity;
+					obj["sub"] = checkBox.data;
+					obj["enabled"] = enabled;
+					obj["advanced_filter"] = cboAdvance.selectedItem.type;
+					Database.subSyncDao.updateEnabled(obj);
+				}
+				
+				
+				
+				Utils.updChildSyncStatus = true;
+				this.close();
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar  title="{i18n._(SUPPORTWINDOW_TITLEBAR_SUPPORT)}"/>
+		<mx:VBox  left="30" top="30" bottom="5" width="100%" right="30">
+			<mx:HBox width="100%" >
+				<mx:VBox id="enableTransaction" width="70%"/>
+				<mx:VBox id="advancedFilter"   width="30%"/>
+			</mx:HBox>
+			<mx:HBox horizontalAlign="right" width="100%">
+				<control:DetailButtonBar id="buttonbardetail" buttonLabel="PREFERENCES_DETAILBUTTONBAR_BUTTONLABEL_SAVE_CHANGES" action="saveChange"/>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

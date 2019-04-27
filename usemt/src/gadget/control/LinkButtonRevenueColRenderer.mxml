@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.lists.List;
+			import gadget.lists.ListDetail;
+			import gadget.util.GUIUtils;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			
+			import org.purepdf.colors.RGBColor;
+
+			
+			
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid;
+			
+		
+			private var _list:List;
+			
+			
+			public function get list():List
+			{
+				return _list;
+			}
+
+			public function set list(value:List):void
+			{
+				_list = value;
+			}
+
+		
+
+			private function clickFunction(e:Event):void{
+				if(column!=null){
+					//var accDash:AccountDashboardRevenue = new AccountDashboardRevenue();
+					//accDash.accId = super.data[column.dataField];
+					var parEntity:String = "";
+					var extId:String = "";
+					var item:Object = null;
+					if("OpportunityName" == column.dataField){
+						parEntity = "Opportunity";
+						item = getOpportunity();
+					}else if("AccountName" == column.dataField){
+						parEntity = "Account";
+						item = getAccountOpportunity();
+						extId = super.data["AccountId"];
+					}else{
+						item = getItem();
+						extId = super.data["ShipToPrimary"];
+						parEntity = "Account";
+					}
+					
+					//_list.selectItem(item);
+					if(item != null){
+						/*if("OpportunityName" != column.dataField && "AccountName" != column.dataField){
+							item["link_from_revenue"] = true;
+						}*/
+						_list.editScreenDetail(item,parEntity);
+					}else{
+						Alert.show("E1 " + parEntity + " " + extId + " is not available in CRM, please contact your local admin for assistance.","" , Alert.OK ,this.parentApplication as MainWindow);
+					}
+					
+					/*
+				    var mainWindow:MainWindow = this.parentApplication as MainWindow;
+					var list:List = mainWindow.selectList("Account");
+					list.selectItem(item);
+					list.editScreenDetail(item,"Account");
+					*/
+				}
+			}	
+			private function getOpportunity():Object{
+				var extId:String = super.data["OpportunityId"];
+				var columns:ArrayCollection = Utils.getColumn("Opportunity");
+				var filterQuery:String ="OpportunityId='"+extId+"'";
+				var listItem:ArrayCollection =Database.opportunityDao.findAll(columns,filterQuery);
+				var item:Object = null;
+				if(listItem != null && listItem.length>0){
+					item = listItem[0];
+				}
+				
+				return item;
+			}
+			private function getAccountOpportunity():Object{
+				var accId:String = super.data["AccountId"];
+				var columns:ArrayCollection = Utils.getColumn("Account");
+				var filterQuery:String ="AccountId='"+accId+"'";
+				var listItem:ArrayCollection =Database.accountDao.findAll(columns,filterQuery);
+				var item:Object = null;
+				if(listItem != null && listItem.length>0){
+					item = listItem[0];
+				}
+				
+				return item;
+			}
+			private function getItem():Object{
+				var item:Object = null;
+				var extId:String = super.data["ShipToPrimary"];
+				if(!StringUtils.isEmpty(extId)){
+					var columns:ArrayCollection = Utils.getColumn("Account");
+					var filterQuery:String ="CustomText35='"+extId+"'";
+					var listItem:ArrayCollection =Database.accountDao.findAll(columns,filterQuery);
+					
+					if(listItem != null && listItem.length>0){
+						item = listItem[0];
+					}
+				}
+				
+				return item;
+			}
+			override public function set data(value:Object):void{		
+				super.data = value;
+				if(column !=null && value){					
+				
+					var item:Object = getItem();
+					//_list.selectItem(item);
+					btnLink.label = value[column.dataField];					
+					lbLink.text = value[column.dataField];	
+					if("OpportunityName" != column.dataField && "AccountName" != column.dataField){
+						if(item != null){
+							lbLink.visible = false;
+							btnLink.visible = true;
+						}else{
+							lbLink.visible = true;
+							btnLink.visible = false;
+						}
+					}
+					
+					
+					
+				}
+			}
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var listData:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(listData!=null){					
+						column = grid.columns[listData.columnIndex];						
+					}
+					
+				}
+			}
+			
+		]]>
+		
+	</fx:Script>
+	<mx:Canvas width="100%" horizontalScrollPolicy="off">
+		<mx:LinkButton  id="btnLink" click="clickFunction(event)" color="#2c79b8" />
+		<mx:Label paddingLeft="10" id="lbLink" visible="false" color="0xFF0000"/>
+	</mx:Canvas>
+	
+</s:MXAdvancedDataGridItemRenderer>

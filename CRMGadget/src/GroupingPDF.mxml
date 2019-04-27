@@ -1,0 +1,878 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false" height="{height1}"
+	width="{width1}" 
+	title="Grouping PDF"
+	showFlexChrome="false" systemChrome="none" xmlns:form="gadget.form.*"
+	creationComplete="loadData();init()" xmlns:s="library://ns.adobe.com/flex/spark" xmlns:local="*"
+	
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.control.CustomPurePDF;
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.service.SupportService;
+			import gadget.util.DateUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.controls.Alert;
+			import mx.utils.Base64Decoder;
+			
+			import org.purepdf.Font;
+			import org.purepdf.colors.RGBColor;
+			import org.purepdf.elements.Element;
+			import org.purepdf.elements.Paragraph;
+			import org.purepdf.elements.images.ImageElement;
+			import org.purepdf.pdf.PageSize;
+			import org.purepdf.pdf.PdfContentByte;
+			import org.purepdf.pdf.PdfDocument;
+			import org.purepdf.pdf.PdfPCell;
+			import org.purepdf.pdf.PdfPTable;
+			[Embed(source='/assets/pdficon.gif')] [Bindable] public var groupingIcon:Class;
+			[Embed(source='/assets/epadSign.png')] [Bindable] public var epadSignIcon:Class;
+			[Embed(source='/assets/preview.gif')] [Bindable] public var previewIcon:Class;
+			import mx.collections.ArrayCollection;
+			
+			private  var userOwner:Object;
+			
+			private static const colDisplayOrderAna:Array =['GLOBAL_DAMAGE_GROUP_CODE','GLOBAL_CAUSE_GROUP_CODE','GLOBAL_SOLUTION_GROUP_CODE'];
+			private static const groupingOrderAna:Array =['CustomText39','CustomPickList8','CustomPickList9','CustomText38','CustomPickList7','CustomPickList12'];
+			
+			private static const colDisplayWorking:Array =['GLOBAL_ACTUAL_WORK','GLOBAL_ACTIVITY','GLOBAL_UNIT','GLOBAL_ACCOUNTING_INDICATOR','GLOBAL_BILLING_TEXT'];
+			private static const groupingWorking:Array =['IndexedNumber0','IndexedPick0','IndexedPick1','IndexedPick2','QuickSearch1'];
+			
+			
+			private static const colDisplayMeterial:Array =['GLOBAL_MATERIAL_NR','GLOBAL_MATERIAL_DESCRIPTION','GLOBAL_QUANTITY','GLOBAL_UNIT','GLOBAL_ACCOUNTING_INDICATOR'];
+			//private static const groupingMeterial:Array =['ProductName','IndexedNumber0','CustomText32','IndexedPick0','CustomText0'];
+			
+			private var fieldNames:Array;
+			private var languageCode:String ;
+			private var fileName:String ;
+			[Bindable] private  var language:ArrayCollection =new ArrayCollection([
+				{label:"English",field:"CustomText9",languageCode:"ENG",index:0},
+				{label:"Dutch",field:"CustomText1",languageCode:"NLD",index:1},
+				{label:"German",field:"CustomText4",languageCode:"DEU",index:2},
+				{label :"Portuguese",field:"CustomText6",languageCode:"PTG",index:3},
+				{label:"French",field:"CustomText3",languageCode:"FRA",index:4},
+				{label:"Danish",field:"CustomText0",languageCode:"DAN",index:5},
+				{label:"Swedish",field:"CustomText8",languageCode:"SVE",index:6}]);
+			private var isPrinting:Boolean; // To check preview or print by grouping report
+			[Bindable] public var isPreview:Boolean; // To check preview or print by single report
+			[Bindable] public var serviceRequest:Object;
+			[Bindable] private var width1:int ;
+			[Bindable] public var refreshDetail:Function;
+			[Bindable] private var height1:int;
+					
+			private function init():void{
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			//Update field Order final status to Technical Completed when the grouping pdf has attached #935 CRO
+			private function updateComplettion(lstService:ArrayCollection):void{
+				if(serviceRequest != null){ //single report
+					var obj:Object = Database.getDao(Database.serviceDao.entity).findByGadgetId(serviceRequest.gadget_id);
+					if(obj != null){
+						//update onloy field tcs offline status
+						obj.CustomPickList5 = "Completed";
+						obj.Status = "Closed";
+						serviceRequest.CustomPickList5 = "Completed";
+						//#1118 CRO
+						serviceRequest.Status = "Closed";
+						obj.local_update = new Date().getTime();
+						Database.getDao(Database.serviceDao.entity).update(obj);
+						if(refreshDetail!=null){
+							refreshDetail();
+						}
+					}
+					
+				}else{ //Grouping report
+					Database.begin();
+					for each(var service:Object in lstService){
+						service.CustomPickList5 = "Completed";
+						//#1118 CRO
+						service.Status = "Closed";
+						Database.getDao(Database.serviceDao.entity).update(service);
+					}
+					Database.commit();
+				}
+			}
+			private function loadData():void{
+				userOwner = Database.allUsersDao.ownerUser();
+				//Change Request 681 
+				var languageCode:String = Database.allUsersDao.ownerUser().LanguageCode;
+				for each(var lang:Object in language){
+					if(lang.languageCode == languageCode){
+						languages.selectedIndex = lang.index;
+						break
+					}	
+				}
+				//Change Request 645 CRO
+				if (serviceRequest != null) {
+					serviceRequest.batchUpdate = true;
+					var sr:ArrayCollection = new ArrayCollection([serviceRequest]);
+					groupingGrid.dataProvider = sr;
+					groupingGrid.visible = false;
+					width1 = 340;
+					height1 = 180;
+					//#959 CRO
+					fileName = sr[0].IndexedShortText1 + "-" +sr[0].CustomText40+ ".pdf"; //display JDI TCS Order Number
+				
+				}else{
+					var columns:ArrayCollection = new ArrayCollection([
+						{element_name:"*"}]);
+					var data:ArrayCollection = new ArrayCollection();
+					if (checkGroupReport()){ 
+						var filter:String = "OwnerId='"+getOwnerId()+"' And GROUP_REPORT_INDICATOR='true' And gadget_id  Not In (Select gadget_id from attachment where entity='Service Request' And gadget_id is not null and filename like '%.pdf')";  // AND CustomText1='On Site'
+						data = Database.getDao(Database.serviceDao.entity).findAll(columns,filter);				
+						groupingGrid.dataProvider = data;
+					}
+					width1 = 700;
+					height1 = 450
+					groupPDFPreview.visible = true;
+					if(data.length>0){
+					fileName ="Merged Report-" +data[0].CustomText42 + "-"  +  DateUtils.format(new Date(),"DD-MM-YYYY") + ".pdf"; //Customer PO Number
+					}
+				}
+			}
+			
+			private function getOwnerId():String{
+				return Database.userDao.read().id as String;
+			}
+			
+			private function modifiedLocalUpdateItem(enitty:String="",item:Object=null):void{
+				if(!item) return;
+				item.local_update = new Date().getTime();
+				item.deleted = 0;
+				Database.getDao(enitty).update(item);
+			}
+			
+			private function refreshData(enitty:String="",item:Object=null):void{
+				
+			}
+			
+			private function upload_(file:File, entity:String='', item:Object=null):void {
+				if(item) Utils.upload(file, entity, item.gadget_id);
+			}
+			
+			private static var loader:Loader;
+			
+			private var listSelectedData:ArrayCollection=null;
+			private function startPrint(e:MouseEvent,isPrinting:Boolean):void{
+				
+				var pdfLogo:String = Database.preferencesDao.getValue(PreferencesDAO.PDF_LOGO) as String;			
+				this.isPrinting = isPrinting; 
+				listSelectedData = getListSelectedData();
+				
+				
+				
+				if(isPreview || !isPrinting ){
+					if(listSelectedData.length>0){
+						generatePDF();
+					}else{
+						Alert.show(i18n._('GLOBAL_PLEASE_SELECT_A_RECORD'), "", Alert.OK, this);
+					}
+					
+				}else{
+					for(var l:int=0;l<listSelectedData.length;l++){
+						var srObj:Object = listSelectedData[l];
+						if(srObj.CustomPickList10 != 'SUSP' && srObj.CustomPickList10 != 'AWPT' && srObj.CustomPickList11 != 'TECO'){
+							Alert.show(i18n._('GLOBAL_Service_ORDER_MESSAGE') , i18n._(''),Alert.OK ,this);
+							return;
+						}
+						
+					}
+					if(listSelectedData.length>0){
+						this.enabled = false;
+						epadPanel.generatePDF = generatePDF;
+						epadPanel.startSign_clickHandler(e);
+						epadPanel.groupingPDF=this;
+					}else{
+						Alert.show(i18n._('GLOBAL_PLEASE_SELECT_A_RECORD'), "", Alert.OK, this);
+					}
+				}
+			}
+			
+			private function getListSelectedData():ArrayCollection{
+				var data:ArrayCollection = groupingGrid.dataProvider as ArrayCollection;
+				var selectedList:ArrayCollection = new ArrayCollection();
+				for(var i:int=0;i<data.length;i++){
+					var entity:Object = data[i];
+					if(entity.batchUpdate == true){	
+						selectedList.addItem(entity);
+					}
+				}	
+				return selectedList;
+			}
+			private function getByteImage(img:String):ByteArray{
+				if(StringUtils.isEmpty(img)){
+					return null;
+				}
+				var base64Dec:Base64Decoder = new Base64Decoder();
+				base64Dec.decode(img);
+				var bytes:ByteArray  = base64Dec.toByteArray();
+				return bytes;
+			}
+			//Bug fixing #886 CRO
+			//get translation for custom field
+			private function getCustomTranslate(propertyFieldTransalte:String,entity:String,fieldName:String,languageCode:String):String{
+				var obj:Object = Database.customFieldTranslatorDao.selectByFieldName(entity,fieldName,languageCode);
+				if(obj == null || obj.displayName == null){
+					return i18n.getTextByLanguage(propertyFieldTransalte,languageCode);
+				}
+				return obj.displayName;
+			}
+			private function checkGroupReport():Boolean{
+				var obj:Object = Database.customFieldDao.selectByFieldName(Database.serviceDao.entity,"GROUP_REPORT_INDICATOR");
+				if(obj != null){
+					return true;
+				}
+				return false;
+			}
+			//Fixed bug #896 and #897
+			private  function getFormulaValue(entity:String,item:Object,formulaField:String,fieldName:String,originalField:String=""):String{
+				
+				var columns:ArrayCollection = new ArrayCollection([{element_name:"value"}]);
+				var filter:String = "entity='"+ entity + "' And fieldName='"+ formulaField +"'";
+				var obj:Object = Database.customFieldDao.selectByFieldName(entity,formulaField);
+				if(obj == null || obj.value == null){
+					return item.hasOwnProperty(originalField) ? item[originalField]:"";
+				}
+				var value:String = ""; 
+				value = Utils.doEvaluate(obj.value,userOwner,entity,null,item,null);
+				if(value == null || value == ""){
+					value = item.hasOwnProperty(originalField) ? item[originalField]:"";
+				}
+				return value;
+			}
+			private function generatePDF():void{
+				
+			
+				
+				
+				this.enabled = true;
+				
+				fieldNames  = Database.fieldTranslationDataDao.readAll(Database.serviceDao.entity);
+				languageCode = languages.selectedItem.languageCode;
+				
+				// var data:ArrayCollection = groupingGrid.dataProvider as ArrayCollection;
+				//var fileName:String = "ServiceReguest" + " exported on " +  DateUtils.getCurrentDateAsSerial() + ".pdf";
+				
+				
+				var pdfHeader:String = Database.preferencesDao.getValue(PreferencesDAO.PDF_HEADER) as String;
+				var pdfLogo:String = Database.preferencesDao.getValue(PreferencesDAO.PDF_LOGO) as String;		
+				//var bytesLogo:ByteArray = CustomPDF.getBytesImage(pdfLogo);
+				
+				var bytesLogo:ByteArray  = getByteImage(pdfLogo);
+				
+				//var pdfLogo:String = Database.preferencesDao.getValue(PreferencesDAO.PDF_LOGO) as String;
+				//bug fixing 366 remove pdfHeader to ""
+				//var pdf:CustomPDF = new CustomPDF("", null, 700, 400, Orientation.PORTRAIT, Unit.MM, Size.A4, 0);
+				// pdf.addPage();
+				
+				var purePdf:CustomPurePDF = new CustomPurePDF("");
+				var rotate:Boolean = false;
+				var pdfSize:String = Database.preferencesDao.getValue(PreferencesDAO.PDF_SIZE)as String ;
+				if(pdfSize.toLocaleUpperCase()=="LANDSCAPE"){
+					rotate = true;
+				}
+				var document:PdfDocument = purePdf.createDocument(rotate,40,40,70,50);
+				//document.setViewerPreferences( PdfViewPreferences.PageModeUseThumbs );
+				
+				
+				for(var i:int=0;i<listSelectedData.length;i++){
+					
+					
+					var entity:Object = listSelectedData[i];
+					addLogo(bytesLogo,document,100,50);
+					createHeaderSheet(document,entity);
+					createCustomerData(document,entity);
+					createOrderData(document,entity);
+					createOderAnalysis(document ,entity );
+					createWorkingHoursAndCost(document ,entity );
+					createMaterialUse(document,entity);
+					createEngineerComments(document,entity);
+					
+					createSignSheet(document);
+					pictureAttachment(document,entity);
+					
+					document.newPage();
+					//}
+				}
+				
+				
+				document.close();
+				
+				try{
+					var file:File = Utils.writeFile( fileName, purePdf.getByteArray() );
+					file.openWithDefaultApplication();
+					
+				}catch(e:Error){
+					Alert.show(i18n._(e.message + ".Please close old pdf first."),this.title, Alert.OK, this);
+				}
+				if(isPrinting && !isPreview){
+					updateComplettion(listSelectedData);
+					for(var k:int=0;k<listSelectedData.length;k++){
+						upload_(file,Database.serviceDao.entity,listSelectedData[k]);
+					}
+				}
+				this.close();
+			}
+			
+			public static function addFields(table:PdfPTable, fieldName:String, fieldValue:String,booleanLabel:Boolean=false):void {
+				
+				var font:org.purepdf.Font = null;
+				var normal:org.purepdf.Font = CustomPurePDF.getUnicodeFont(9,org.purepdf.Font.NORMAL);
+				if(booleanLabel){
+					font = CustomPurePDF.getUnicodeFont(9,org.purepdf.Font.BOLD);
+				}else{
+					font = normal;
+				}
+				if(fieldValue==null) fieldValue = "";
+				if(fieldName==null) fieldName = "";
+				var label:Paragraph = new Paragraph(fieldName,font);
+				var cellLabel:PdfPCell = new PdfPCell();
+				cellLabel.addElement(label);
+				var val:Paragraph = new Paragraph(fieldValue,normal);
+				var cellValue:PdfPCell = new PdfPCell();
+				cellValue.addElement(val);
+				cellLabel.border = 0;
+				cellValue.border = 0;
+				table.addCell(cellLabel);
+				table.addCell(cellValue);
+			}
+			public static function addSingleCell(table:PdfPTable, fieldValue:String,colspan:int=1,underline:Boolean=false,fontBold:Boolean=true,align:int=Element.ALIGN_LEFT):void {
+				var font:org.purepdf.Font =  CustomPurePDF.getUnicodeFont(9,org.purepdf.Font.NORMAL);
+				if(fieldValue==null) fieldValue = "";
+				if(underline){
+					font.style = org.purepdf.Font.UNDERLINE +org.purepdf.Font.BOLD;
+				}else if(fontBold){
+					font.style = org.purepdf.Font.BOLD;
+				}
+				var val:Paragraph = new Paragraph(fieldValue,font);
+				if(align)
+					val.alignment = align;
+				var cell:PdfPCell = new PdfPCell();
+				cell.border = 0;
+				cell.addElement(val);
+				cell.colspan = colspan;
+				table.addCell(cell);
+			}
+			private function createLine(document:PdfDocument):void{
+				var table:PdfPTable = new PdfPTable(1);
+				table.widthPercentage = 100;
+				
+				var cellBg:PdfPCell = new PdfPCell();
+				cellBg.fixedHeight = 10;
+				cellBg.border = 0;
+				table.addCell(cellBg);
+				
+				cellBg = new PdfPCell();
+				cellBg.fixedHeight = 0.6;
+				cellBg.border = 0;
+				cellBg.backgroundColor = RGBColor.LIGHT_GRAY;
+				table.addCell(cellBg);
+				
+				cellBg = new PdfPCell();
+				cellBg.fixedHeight = 10;
+				cellBg.border = 0;
+				table.addCell(cellBg);
+				document.add(table);
+			}
+			// report header
+			private function createHeaderSheet(document:PdfDocument,entity:Object):void{
+				fieldNames  = Database.fieldTranslationDataDao.readAll(Database.serviceDao.entity);
+				// pdf.setX(15);pdf.setY(240);
+				var table:PdfPTable = new PdfPTable(4);
+				table.widthPercentage = 100;
+				table.setNumberWidths( Vector.<Number>([2,3,2,3]) );
+				//entity.TCSServiceNumber = entity.hasOwnProperty('SRNumber')?entity.SRNumber:"";
+				//entity.TCSServiceNumber = getSRNumberFormula(entity);
+				entity.GeneralPhoneNumber = entity.hasOwnProperty('WorkPhone')?entity.WorkPhone:"";
+				addSingleCell(table,"",2,false,false);
+				
+				
+				addSingleCell(table,i18n.getTextByLanguage("GLOBAL_JDI_TCS_ORDER_NUMBER",languageCode)+": " + entity.IndexedShortText1 + " " + entity.CustomText40 ,2,false,true);  //Order# "Order Number:"
+				addSingleCell(table,"",2,false,false);
+				addSingleCell(table,i18n.getTextByLanguage("GLOBAL_DATE",languageCode)+":",1,false,false); 
+				addSingleCell(table,DateUtils.format(new Date,"DD/MM/YY"),1,false,false); 
+				//addFields(table,getCustomTranslate("GLOBAL_TCS_SERVICE_NUMBER",Database.serviceDao.entity,"DIVERSEY_TCS_PHONE",languageCode)+":",entity.TCSServiceNumber); 	//SRNumber		"TCS Service Number:"=Service Number
+				addFields(table,getCustomTranslate("GLOBAL_TCS_SERVICE_NUMBER",Database.serviceDao.entity,"DIVERSEY_TCS_PHONE",languageCode)+":",getFormulaValue(Database.serviceDao.entity,entity,"DIVERSEY_TCS_PHONE","SR_Number_Formula","SRNumber"),false); 	// get data and label from custom object
+				addFields(table,getTranslatedName("CustomText32",'GLOBAL_ORDER_TYPE')+":",entity.CustomText32);; // CustomText32  "Order Type:",""
+				//addFields(table,getTranslatedName("GeneralPhoneNumber","GLOBAL_GENERAL_PHONE_NUMBER")+":",entity.GeneralPhoneNumber); // Work Phone #  WorkPhone  "General Phone Number:","01604 783700"
+				addFields(table,getCustomTranslate("",Database.serviceDao.entity,"DIVERSEY_TCS_PHONE_GENERAL",languageCode)+":",getFormulaValue(Database.serviceDao.entity,entity,"DIVERSEY_TCS_PHONE_GENERAL",""),false); 	// get data and label from custom object
+				addFields(table,getTranslatedName("CustomText47","GLOBAL_CUST_REF")+":",entity.CustomText47,true);  //  "Cust. Ref:","31027474" cust. Ref
+				document.add(table);
+				createLine(document);
+			}
+			
+			public function addLogo(bytes:ByteArray,document:PdfDocument,width:int,height:int):void{
+				if(bytes != null){
+					//logo 
+					var img: org.purepdf.elements.images.ImageElement = org.purepdf.elements.images.ImageElement.getInstance( bytes );
+					var imageHeight:int = 60;
+					var imageWidth:int = width * imageHeight / height;
+					img.scaleToFit(imageWidth,imageHeight);
+					img.alignment = org.purepdf.elements.images.ImageElement.LEFT;
+					
+					var cb: PdfContentByte = document.getDirectContent();
+					cb.saveState();
+					cb.restoreState();
+					img.setAbsolutePosition(70 ,PageSize.A4.height - 100);
+					cb.addImage( img );
+				}
+			}
+			private function createSignSheet(document:PdfDocument):void{
+				var parentTable:PdfPTable = new PdfPTable(1);
+				var table:PdfPTable = new PdfPTable(4);
+				table.widthPercentage = 100;
+				var cell:PdfPCell = new PdfPCell();
+				cell.addElement(table);
+				cell.border = 0;
+				parentTable.addCell(cell);
+				parentTable.widthPercentage = 100;
+				// pdf.newLine(4);addLine(pdf); // 240		
+				var engineerSign:String = Database.preferencesDao.getValue(PreferencesDAO.USER_SIGNATURE) as String;
+				var customerSign:String = epadPanel.stringImage;
+				var bytesEgnineerSign:ByteArray = getByteImage(engineerSign);
+				var bytesCustomerSign:ByteArray = getByteImage(customerSign);
+				//pdf.newLine(4);addLine(pdf,20,pdf.getY(),180,0.8,0xB2ACAC); // 240
+				if(bytesEgnineerSign){
+					table.setNumberWidths( Vector.<Number>([1,3,1,3]) );
+					addSingleCell(table,"",1,false,true);
+					addImageToTable(table,bytesEgnineerSign,90,50);
+				}else{
+					addSingleCell(table,"",2,false,false);
+				} 	
+				if(bytesCustomerSign) {
+					addSingleCell(table,"",1,false,true,Element.ALIGN_BOTTOM);
+					addImageToTable(table,bytesCustomerSign,90,50);
+				}else{
+					addSingleCell(table,"",2,false,true,Element.ALIGN_BOTTOM);
+				}		
+				addSingleCell(table,i18n.getTextByLanguage("GLOBAL_BIG_ENGINEER",languageCode),2,false,true,Element.ALIGN_BOTTOM);
+				addSingleCell(table,i18n.getTextByLanguage("GLOBAL_CUSTOMER",languageCode),1,false,true,Element.ALIGN_RIGHT);
+				addSingleCell(table,"",1,false,true,Element.ALIGN_BOTTOM);
+				
+				table.defaultCell.paddingBottom = 0;
+				table.defaultCell.rowspan = 2;
+				
+				document.add(parentTable);
+				
+			}
+			
+			private function addImageToTable(table:PdfPTable,bytes:ByteArray,width:int,height:int):void{
+				
+				if(bytes != null){
+					//logo 
+					var cell:PdfPCell = new PdfPCell();
+					var img:org.purepdf.elements.images.ImageElement = org.purepdf.elements.images.ImageElement.getInstance(bytes);
+					var imageHeight:int = 60;
+					var imageWidth:int = width * imageHeight / height;
+					img.scaleToFit(imageWidth,imageHeight);
+					//img.alignment = ImageElement.RIGHT;
+					cell.border = 0;
+					//img.setAbsolutePosition(PageSize.A4.width - ( imageWidth + 30) ,PageSize.A4.height - 70);
+					cell.addElement(img);
+					table.addCell(cell);
+					//table.addImageCell(img);
+					//table.defaultCell.border = 0;
+					
+				}
+				
+			}
+			// body Report
+			private function createCustomerData(document:PdfDocument,entity:Object):void{
+				fieldNames  = Database.fieldTranslationDataDao.readAll(Database.serviceDao.entity);
+				var table:PdfPTable = new PdfPTable(4);
+				table.widthPercentage = 100;
+				
+				addSingleCell(table,i18n.getTextByLanguage("GLOBAL_CUSTOMER_DATA",languageCode),4,true);
+				// createLayout(pdf,entity,groupingCustomer,colDisplayCustomer,10);
+				
+				addFields(table,getTranslatedName("CustomText0",'GLOBAL_CUSTOMER') + ":",entity.CustomText0,false); 	// Customer = CustomText0
+				addFields(table,getTranslatedName("","GLOBAL_ENGINEER")+":",userOwner.FirstName +" " + userOwner.LastName,false);  // Engineer number	CustomText41 	
+				addFields(table,getTranslatedName("CustomText14",'GLOBAL_ADDRESS_LINE_TWO') + ":",entity.CustomText14,false); 	// Address Line 2 = CustomText14
+				addFields(table,getTranslatedName("CustomText35","GLOBAL_CONTACT_PERSON")+":",entity.CustomText35,false);  //  Customer Contact Name	CustomText35
+				addFields(table,getTranslatedName("CustomText1",'GLOBAL_ADDRESS') + ":",entity.CustomText1,false); 	// GLOBAL_ADDRESS  CustomText1 	
+				addFields(table,getTranslatedName("CustomPhone1",'GLOBAL_PHONE_NUMBER')+ ":",entity.CustomPhone1,false); //GLOBAL_PHONE_NUMBER  CustomPhone1 //Customer Contact No
+				addFields(table,getTranslatedName("CustomText34","GLOBAL_CITY")+":",entity.CustomText34,false); // City: GLOBAL_POSTAL_CITY  CustomText34
+				addFields(table,getTranslatedName("CustomText2",'GLOBAL_CUSTOMER_EMAIL') + ":",entity.CustomText2,false); 	// GLOBAL_CUSTOMER_EMAIL	CustomText2
+				addFields(table,getTranslatedName("CustomText33",'GLOBAL_POSTAL_CODE')+":",entity.CustomText33,false); // 	GLOBAL_POSTAL_CODE 	CustomText33
+				addFields(table,getCustomTranslate("",Database.serviceDao.entity,"DIVERSEY_ORDER_STATUS",languageCode)+":",getFormulaValue(Database.serviceDao.entity,entity,"DIVERSEY_ORDER_STATUS","customOrderStatuts"),false); 	// get data and label from custom object
+				addFields(table,getTranslatedName("CustomText42",'GLOBAL_CUSTOMER_NR') + ":",entity.CustomText42,false); 	// Customer nr = CustomText42
+				addFields(table,"",""); 	
+				document.add(table);
+				createLine(document);
+			}
+			
+			private function createOrderData(document:PdfDocument,entity:Object):void{
+				fieldNames  = Database.fieldTranslationDataDao.readAll(Database.serviceDao.entity);
+				var table:PdfPTable = new PdfPTable(4);
+				table.widthPercentage = 100;
+				
+				addSingleCell(table,i18n.getTextByLanguage('GLOBAL_ORDER_STATUS',languageCode),4,true); // addTitle(pdf,i18n._("GLOBAL_ORDER_DETAIL"));
+				
+				addSingleCell(table,getTranslatedName("CustomText36",'GLOBAL_EQUIPMENT_NUMBER')+":",1,false); // Equipment number: GLOBAL_EQUIPMENT_NUMBER  CustomText36
+				addSingleCell(table,getTranslatedName("CustomText7",'GLOBAL_MATERIAL_NUMBER')+":",1,false);  // 	Material Number: GLOBAL_MATERIAL_NUMBER CustomText7
+				addSingleCell(table,getTranslatedName("CustomText3","GLOBAL_DESCRIPTION")+":",1,false);  //	Equipment Description:	Description	Subject	 	
+				addSingleCell(table,getTranslatedName("CustomText43","GLOBAL_EQUIPMENT_SERIAL_NUMBER")+":",1,false); // Serialnumber:  GLOBAL_EQUIPMENT_SERIAL_NUMBER CustomText43
+				
+				addSingleCell(table,entity.CustomText36,1,false,false);	
+				addSingleCell(table,entity.CustomText7,1,false,false); 
+				addSingleCell(table,entity.CustomText3,1,false,false);					
+				addSingleCell(table,entity.CustomText43,1,false,false); 
+				
+				document.add(table);
+				var tableAcc:PdfPTable = new PdfPTable(2);
+				tableAcc.widthPercentage = 50;
+				tableAcc.horizontalAlignment = Element.ALIGN_LEFT;
+				//addFields(tableAcc,i18n.getTextByLanguage('GLOBAL_ACCOUNTING_INDICATOR',languageCode)+":",getValuePickList("Service Request","CustomPickList6",entity),true); // Accounting Indicator: GLOBAL_ACCOUNTING_INDICATOR CustomPickList6
+				//Closed 1085 CRO 
+				//addFields(tableAcc,i18n.getTextByLanguage('GLOBAL_ACCOUNTING_INDICATOR',languageCode)+":",PicklistService.getValue("Service Request","CustomPickList6",entity.CustomPickList6,entity),true); // Accounting Indicator: GLOBAL_ACCOUNTING_INDICATOR CustomPickList6
+				addFields(tableAcc,i18n.getTextByLanguage('GLOBAL_CONTRACT_TYPE',languageCode)+":",entity.CustomText37,true);  // Contract Type: GLOBAL_CONTRACT_TYPE CustomText37
+				document.add(tableAcc);
+				
+				// addTitle(pdf,i18n._("Counter reading")+":",false);y+=3; // Counter reading: (Label Head)
+				var tableCounting:PdfPTable = new PdfPTable(4);
+				tableCounting.widthPercentage = 50;
+				tableCounting.horizontalAlignment = Element.ALIGN_LEFT;
+				addSingleCell(tableCounting,i18n.getTextByLanguage("GLOBAL_COUNTER_READING",languageCode)+":",4,true,true); // Counter reading: (Label Head)    
+				addFields(tableCounting,getTranslatedName("CustomDate27","GLOBAL_DATE")+":",getDate(entity.CustomDate27,"DD/MM/YY"),false);  // value : Date:16/12/10 GLOBAL_DATE CustomDate27
+				addFields(tableCounting,getTranslatedName("CustomText44","GLOBAL_READING")+":",entity.CustomText44,false); // Reading: Reading	GLOBAL_READING CustomText44
+				document.add(tableCounting);
+				
+				createLine(document);
+			}
+			
+			private function createEngineerComments(document:PdfDocument,entity:Object):void{
+				fieldNames  = Database.fieldTranslationDataDao.readAll(Database.serviceDao.entity);
+				var table:PdfPTable = new PdfPTable(1);
+				table.widthPercentage = 100;
+				
+				addSingleCell(table,getTranslatedName("CustomText6","GLOBAL_ENGINEER_COMMENTS"),1,true,true);  // Engineer comments: GLOBAL_ENGINEER_COMMENTS CustomText6
+				addSingleCell(table,entity.CustomText6,1,false,false);   // replaced gasket,serviced squeegie and cleared blockage from tank feed. Tested ok
+				document.add(table);
+				createLine(document);
+			}
+			
+			private function createOderAnalysis(document:PdfDocument,entity:Object):void{
+				fieldNames  = Database.fieldTranslationDataDao.readAll(Database.serviceDao.entity);
+				var table:PdfPTable = new PdfPTable(3);
+				table.widthPercentage = 100;
+				
+				var ind:int=3;
+				addSingleCell(table,i18n.getTextByLanguage('GLOBAL_ORDER_ANALYSIS',languageCode),3,true);   
+				for(var i:int=0;i<colDisplayOrderAna.length;i++){				
+					addSingleCell(table,i18n.getTextByLanguage(colDisplayOrderAna[i],languageCode),1,false,false); 
+					if(i==0){
+						if(entity.hasOwnProperty(groupingOrderAna[i])){												
+							addSingleCell(table,entity[groupingOrderAna[i]]==null?"":entity[groupingOrderAna[i]],1,false,false); 
+						}
+						
+						if(entity.hasOwnProperty(groupingOrderAna[ind])){
+							addSingleCell(table,entity[groupingOrderAna[ind]]==null?"":entity[groupingOrderAna[ind]],1,false,false); 
+						}
+					}else{
+						if(entity.hasOwnProperty(groupingOrderAna[i])){	
+							//Bug #1454
+							//addSingleCell(table,PicklistService.getValue(Database.serviceDao.entity,groupingOrderAna[i],entity[groupingOrderAna[i]],entity),1,false,false);
+							addSingleCell(table,PicklistService.getPicklistByLanguage(Database.serviceDao.entity,groupingOrderAna[i],entity[groupingOrderAna[i]],entity,languageCode),1,false,false);
+							
+						}
+						
+						if(entity.hasOwnProperty(groupingOrderAna[ind])){
+							//Bug #1454
+							// addSingleCell(table,PicklistService.getValue(Database.serviceDao.entity,groupingOrderAna[ind],entity[groupingOrderAna[ind]],entity),1,false,false);
+							addSingleCell(table,PicklistService.getPicklistByLanguage(Database.serviceDao.entity,groupingOrderAna[ind],entity[groupingOrderAna[ind]],entity,languageCode),1,false,false);
+						}					
+					}				
+					ind++;
+					
+				}				
+				document.add(table);
+				
+			}
+			
+			private function createWorkingHoursAndCost(document:PdfDocument,entity:Object):void{
+				fieldNames  = Database.fieldTranslationDataDao.readAll(Database.customObject1Dao.entity);
+				var filter:String = "ServiceRequestId='"+entity.ServiceRequestId+"'";
+				var fields:ArrayCollection= new ArrayCollection([{element_name:'IndexedNumber0'},{element_name:'IndexedPick0'},
+					{element_name:'IndexedPick1'},{element_name:'IndexedPick2'},{element_name:'CustomPickList0'},{element_name:'QuickSearch1'},{element_name:'CustomInteger0'}]);
+				var data:ArrayCollection = Database.customObject1Dao.findAll(fields,filter);
+				//get picklist value by Id
+				for each (var record:Object in data) {
+					//record['IndexedPick0'] = PicklistService.getValue(Database.customObject1Dao.entity, "IndexedPick0",record['IndexedPick0'],record); 
+					//record['IndexedPick1'] = PicklistService.getValue(Database.customObject1Dao.entity, "IndexedPick1",record['IndexedPick1'],record);
+					//record['IndexedPick2'] = PicklistService.getValue(Database.customObject1Dao.entity, "IndexedPick2",record['IndexedPick2'],record);
+					//Bug #1454 
+					record['IndexedPick0'] = PicklistService.getPicklistByLanguage(Database.customObject1Dao.entity, "IndexedPick0",record['IndexedPick0'],record,languageCode);
+					record['IndexedPick1'] = PicklistService.getPicklistByLanguage(Database.customObject1Dao.entity, "IndexedPick1",record['IndexedPick1'],record,languageCode);
+					record['IndexedPick2'] = PicklistService.getPicklistByLanguage(Database.customObject1Dao.entity, "IndexedPick2",record['IndexedPick2'],record,languageCode);
+				}
+				var table:PdfPTable = new PdfPTable(groupingWorking.length*5);
+				table.widthPercentage = 100;
+				addSingleCell(table,i18n.getTextByLanguage('GLOBAL_WORKING_HOURS_AND_COSTS',languageCode),groupingWorking.length*5,true,true);
+				
+				addGridWorkingHours(table,groupingWorking,colDisplayWorking,data.toArray());				
+				document.add(table);
+				
+				
+			}	
+			
+			
+			
+			private function getTranslatedName(fieldName:String,fieldDisplay:String):String {
+				//get translate name from field translation 
+				for each (var tmp:Object in fieldNames) {
+					if (SupportService.match(tmp.Name, fieldName) && tmp.LanguageCode == languageCode) {
+					    
+						return tmp.DisplayName;	
+					}						
+				}
+				//if no translate name in object field translation get it from localization
+				return i18n.getTextByLanguage(fieldDisplay,languageCode);
+			}
+			//Display field Description by selected language
+			private function setMaterialUsedDescByLanguage(setProductId:String,data:ArrayCollection):void{
+				if(setProductId == null) return; 
+				var fields:ArrayCollection= new ArrayCollection([{element_name:'CustomText30'},{element_name:'ProductId'},{element_name:languages.selectedItem.field}]);
+				var products:ArrayCollection = Database.productDao.findAll(fields,setProductId);
+				for each (var material:Object in data) {
+					for each (var product:Object in products) {
+						if(material.ProductId == product.ProductId){
+							var proDescription:String =  product[languages.selectedItem.field];
+							if(proDescription != null){
+								material.ProductDescription = proDescription;	
+							}
+							var unit:String = product['CustomText30'];
+							if(unit != null){ //Bug #1002 
+								material.mat_unit = unit;
+							}
+							break;
+						}	
+					}
+				}
+			
+			}
+			private function createMaterialUse(document:PdfDocument,entity:Object):void{
+				
+				fieldNames  = Database.fieldTranslationDataDao.readAll(Database.customObject2Dao.entity);
+				var setProductId:String = "ProductId In(";
+				var material:String = entity.CustomObject2Name;
+				var filter:String = "ServiceRequestId='"+entity.ServiceRequestId+"'";
+				var fields:ArrayCollection= new ArrayCollection([{element_name:'ProductName'},{element_name:'IndexedNumber0'},
+					{element_name:'CustomText32'},{element_name:'IndexedPick0'},{element_name:'ProductId'}]);
+				var groupingMeterial:Array =['ProductName','ProductDescription','IndexedNumber0','mat_unit','IndexedPick0'];
+				var data:ArrayCollection = Database.customObject2Dao.findAll(fields,filter);
+				var hasProduct:Boolean = false;
+				//get picklist value by Id
+				for each (var record:Object in data) {
+					//Bug #1454
+					//record['IndexedPick0'] = PicklistService.getValue(Database.customObject2Dao.entity, "IndexedPick0",record['IndexedPick0'],record);
+					record['IndexedPick0'] = PicklistService.getPicklistByLanguage(Database.customObject2Dao.entity, "IndexedPick0",record['IndexedPick0'],record,languageCode);
+					if(record['ProductId'] != null){
+					setProductId = setProductId + "'" + record['ProductId']+ "',";
+					hasProduct = true;
+					}
+				}
+				if(data.length == 0 || hasProduct == false){
+					setProductId = null;
+				}else{
+					setProductId = setProductId.substring(0,setProductId.length-1) + ")";
+				}
+				setMaterialUsedDescByLanguage(setProductId,data);
+				
+				var table:PdfPTable = new PdfPTable(colDisplayMeterial.length * 3);
+				table.widthPercentage = 100;
+				addSingleCell(table,i18n.getTextByLanguage('GLOBAL_MATERIAL_USED',languageCode),colDisplayMeterial.length*3,true,true);
+				addGridMeterialUsed(table,groupingMeterial,colDisplayMeterial,data.toArray());
+				document.add(table);
+			}
+			
+			//Feature #51 18.01.2011
+			private function pictureAttachment(document:PdfDocument,entity:Object):void{
+				
+				
+				fieldNames  = Database.fieldTranslationDataDao.readAll(Database.serviceDao.entity);
+				var lstAttachment:ArrayCollection = Database.attachmentDao.selectAttachment(Database.serviceDao.entity, entity.gadget_id);
+				for each (var attch: Object in lstAttachment) {
+					if(!attch.include_in_report) continue; //CRO bug fixing 59 02.02.2011
+					document.newPage();
+					var table:PdfPTable = new PdfPTable(2);
+					
+					addFields(table,getTranslatedName("SRNumber","GLOBAL_SRNUMBER"),entity.SRNumber,true);
+					//pdf.addImageStream( attch.data, ColorSpace.DEVICE_RGB, new Resize ( Mode.FIT_TO_PAGE, Position.CENTERED ) );
+					
+					var img:org.purepdf.elements.images.ImageElement = org.purepdf.elements.images.ImageElement.getInstance(attch.data);
+					var imageHeight:int = (img.height * 60) / 100;
+					var imageWidth:int = ((img.width * img.height / img.height) * 60 ) / 100;
+					img.scaleToFit(imageWidth,imageHeight);
+					var x:int = (document.pageSize.width/2) - (imageWidth / 2);
+					var y:int = (document.pageSize.height/2) - (imageHeight / 2);
+					img.setAbsolutePosition(x , y);
+					img.alignment = Element.ALIGN_CENTER + Element.ALIGN_MIDDLE;
+					document.add( img );
+					document.add(table);
+					
+				}
+				
+			}
+			
+			
+			/*private function getValuePickList(objectName:String, field:String,entity:Object):String{
+				// we go through all the record to replace the id in groupingOrderAna[ind] with the correspond value in picklist
+				var picklist:ArrayCollection = PicklistService.getPicklist(objectName, field);
+				for each (var picklistItem:Object in picklist) {
+					
+					if (picklistItem.data == entity[field]) {
+						return picklistItem.label;
+					}		
+				}	
+				return '';
+			}*/
+			
+			
+			private static const LINE_HEIGHT:int = 6;
+			private static const TITLE_HEIGHT:int = 6;		
+			private static const CELL_HEIGHT:int = 8;
+			private var orderY:Number = 10;
+			private  function addGridWorkingHours(table:PdfPTable, columns:Array,colDis:Array, dataSource:Array):void {
+				//#1030 CRO
+				for (var i:int=0;i<colDis.length;i++){
+					if(i == 0 ){
+						addSingleCell(table,getTranslatedName(columns[i],colDis[i]),3,false,true);
+					}else if(i == 1){
+						addSingleCell(table,getTranslatedName(columns[i],colDis[i]),7,false,true);
+					}else if(i == 2){
+						addSingleCell(table,getTranslatedName(columns[i],colDis[i]),5,false,true);
+					}else if(i == 3){
+						addSingleCell(table,getTranslatedName(columns[i],colDis[i]),5,false,true);
+					}
+					
+					else{
+						addSingleCell(table,getTranslatedName(columns[i],colDis[i]),5,false,true);
+					}
+					
+				}
+				var index:int = 0;
+				for each(var obj:Object in dataSource){
+					index = 0;
+					for each(var prop:Object in columns){
+						var value:String = "";
+						if(obj[prop] != null){
+							value = obj[prop];							
+						}
+						
+						//#1030 CRO
+						if(index == 0 ){
+							addSingleCell(table,value,3,false,false);
+						}else if(index == 1){
+							addSingleCell(table,value,7,false,false);
+						}else if(index == 2){
+							addSingleCell(table,value,5,false,false);
+						}else if(index == 3){
+							addSingleCell(table,value,5,false,false);
+						}
+						else{
+							addSingleCell(table,value,5,false,false);
+						}
+						index += 1;
+					}
+				}
+				
+			}	
+			private  function addGridMeterialUsed(table:PdfPTable, columns:Array,colDis:Array, dataSource:Array):void {
+				//#1030 CRO
+				for (var i:int=0;i<colDis.length;i++){
+					if(i == 2 || i == 3 ){
+						addSingleCell(table,getTranslatedName(columns[i],colDis[i]),2,false,true);
+					}else if(i == 1){
+						addSingleCell(table,getTranslatedName(columns[i],colDis[i]),5,false,true);
+					}else{
+						addSingleCell(table,getTranslatedName(columns[i],colDis[i]),3,false,true);
+					}
+					
+				}
+				var index:int = 0;
+				for each(var obj:Object in dataSource){
+					index = 0;
+					for each(var prop:Object in columns){
+						var value:String = "";
+						if(obj[prop] != null){
+							value = obj[prop];							
+						}
+						
+						//#1030 CRO
+						if(index == 2 || index == 3 ){
+							addSingleCell(table,value,2,false,false);
+						}else if(index == 1){
+							addSingleCell(table,value,5,false,false);
+						}else{
+							addSingleCell(table,value,3,false,false);
+						}
+						index += 1;
+					}
+				}
+				
+			}
+			
+			
+			private  function getDate(dateString:String, formatString:String='MM-DD-YY'):String {
+				//#864 CRO
+				if (languageCode.indexOf("DEU") != -1){
+					return (DateUtils.format(DateUtils.guessAndParse(dateString), 'DD-MM-YYYY')).replace(/\-/gi,".");
+				}
+				return (DateUtils.format(DateUtils.guessAndParse(dateString), formatString));
+			}
+		
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas width="100%" height="100%" horizontalScrollPolicy="off" styleName="main" left="0" top="0"  right="0" bottom="0">
+		<control:TitleBar id="titlebar" title="{i18n._('GLOBAL_PDF_REPORT')}" y="2" x="25"/>
+		<mx:VBox width="100%" paddingTop="35" paddingLeft="10" paddingRight="10" height="100%">
+			<mx:DataGrid id="groupingGrid" width="100%"  doubleClickEnabled="true" height="100%">
+				<mx:columns>
+					<mx:DataGridColumn sortable="false" width="30" dataField="batchUpdate" headerText="{i18n._('GLOBAL_CHECK_ALL')}" itemRenderer="CheckBoxRenderer" headerRenderer="CheckBoxRenderer" rendererIsEditor="true" />						
+					<mx:DataGridColumn dataField="IndexedShortText1" headerText="{i18n._('GLOBAL_JDI_ORDER_NUMBER')}" width="120"/>
+					<mx:DataGridColumn dataField="CustomText40" headerText="{i18n._('GLOBAL_OPERATIONS_NUMBER')}" width="120"/>
+					<mx:DataGridColumn dataField="CustomText0" headerText="{i18n._('GLOBAL_CUSTOMER')}" width="150"/> 
+					<mx:DataGridColumn dataField="CustomText8" headerText="{i18n._('GLOBAL_FULL_ADDRESS')}" />
+					
+				</mx:columns>
+			</mx:DataGrid>
+			
+			<mx:Canvas id="buttonCanvas" height="35" bottom="10">
+				<mx:HBox paddingRight="50">	
+					<mx:Label text="{i18n._('GLOBAL_SELECT_LANGUAGE')}"/>
+					<mx:ComboBox id="languages" dataProvider="{language}"/>
+					<mx:LinkButton id="printPdf" toolTip="{i18n._('GLOBAL_GENERATE_REPORT_TO_PDF')}" icon="{groupingIcon}" click="startPrint(event,true);" />
+				    <mx:LinkButton id="groupPDFPreview" icon="{previewIcon}" toolTip="{i18n._('GLOBAL_GROUPING_PDF_PREVIEW')}" click="startPrint(event,false);" visible="false"/>
+					<mx:LinkButton id="startSign" visible="false" toolTip="{i18n._('GLOBAL_PEN_DIAGNOSTICS')}" icon="{epadSignIcon}" click="epadPanel.startSign_clickHandler(event);" />
+				</mx:HBox>	
+			</mx:Canvas>
+			<mx:Canvas id="signCanvas" >
+				<mx:HBox paddingLeft="100">
+					<control:EpadSignPDF id="epadPanel" height="0" width="100"  groupingPDF="{this}"/>
+				</mx:HBox>
+			</mx:Canvas>	
+			
+		</mx:VBox>
+		
+		
+	</mx:Canvas>
+	
+	
+</mx:Window>

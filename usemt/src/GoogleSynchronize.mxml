@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	xmlns:ibm="http://www.ibm.com/xmlns/prod/ilog/elixir/2010"
+	resizable="false"	
+	width="800" height="400"
+	title="Google Synchronize"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init()">
+	
+	<mx:Script>
+		<![CDATA[
+			
+			import ilog.calendar.Calendar;
+			import ilog.utils.TimeUnit;
+			
+			import gadget.control.CalendarIlog;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.util.IncomingGoogleCalendar;
+			import gadget.util.PreferenceUtils;
+			
+			import mx.formatters.DateFormatter;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			
+			public var calendarIlog:CalendarIlog;
+			private var _cal:Calendar;
+			
+			[Bindable] public var loggingMessages:ArrayCollection = new ArrayCollection();
+			
+			public var isSynching:Boolean = false;
+			
+			private function init():void {
+				initButtons();
+				_cal = calendarIlog.cal;
+				var dateRange:Array = [
+					_cal.startDisplayedDate,
+					_cal.endDisplayedDate
+				];
+				var dateFormatter:DateFormatter = new DateFormatter();
+				dateFormatter.formatString = "DD/MM/YYYY";
+				panelTitle.title = panelTitle.title + " Date Range: " + dateFormatter.format(dateRange[0]) + " to " + dateFormatter.format(dateRange[1]);
+			}
+			
+			private function syncData():void {
+				isSynching = true;
+				clearLog();
+				initButtons();
+				var gCalendar:IncomingGoogleCalendar = new IncomingGoogleCalendar(calendarIlog);
+				gCalendar.googleSync = this;
+				gCalendar.start();
+			}
+			
+			private function stop():void {
+				Alert.show(i18n._('SYNCHRONIZE_ALERT_ARE_YOU_SURE_YOU_TO_STOP_SYNCHRONIZE'), i18n._('GLOBAL_SYNCHRONIZATOIN'), 3, this, function(event:CloseEvent):void{
+					if (event.detail==Alert.YES){
+						btnStop.enabled = false;
+						btnClose.enabled = true;
+						isSynching = false;
+						initButtons();
+					}
+				});
+			}
+			
+			private function clearLog():void {
+				loggingMessages = new ArrayCollection();
+				dgLoggingArea.validateNow();
+			}
+			
+			private function toggleSpinner(on:Boolean):void {
+				if (!on) {
+					spinner.stop();
+				} else {
+					spinner.play();
+				}
+			}
+			
+			public function initButtons():void {
+				if (!isSynching) {
+					// hide/stop spinner animation
+					toggleSpinner(false);
+					syncDataBtn.enabled = true;
+					btnStop.enabled = false;
+					btnClose.label = i18n._('GLOBAL_CLOSE');
+					btnClose.enabled=true;
+				} else {
+					// start spinner animation
+					toggleSpinner(true);
+					syncDataBtn.enabled = false;
+					btnStop.enabled = true;	
+					btnClose.enabled = false;
+				}
+				PreferenceUtils.WindowScreenBounds(this);
+			}			
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Style source="ilog-gauges.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/sync.png')" title="{'Google Calendar ' + i18n._('GLOBAL_SYNCHRONIZATOIN')}"/>
+		
+		<mx:VBox top="32" left="16" right="16" bottom="16" verticalGap="16">
+			
+			<mx:Panel id="panelTitle" title="{i18n._('SYNCHRONIZE_PANEL_PROGRESS')}" width="100%">
+				<mx:VBox width="100%" paddingLeft="8" paddingRight="8" paddingTop="8" paddingBottom="8">
+					
+					<mx:DataGrid id="dgLoggingArea" rowCount="5" dataProvider="{loggingMessages}" width="100%" height="135" variableRowHeight="true">
+						<mx:columns>
+							<mx:DataGridColumn headerText="{i18n._('SYNCHRONIZE_DATAGRID_COLUMN_TIME')}" width="100">
+								<mx:itemRenderer>
+									<mx:Component>
+										<mx:Label text="{data.time}" fontSize="10"/>
+									</mx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="{i18n._('GLOBAL_MESSAGE')}" dataField="message" itemRenderer="gadget.control.SynLoggingColorRenderer"/>
+						</mx:columns>
+					</mx:DataGrid>
+					
+					<mx:VBox width="100%" >
+						<mx:HBox width="100%">
+							<control:Spinner id="spinner" tickColor="#66aaff"/>
+							<mx:Text id="ItemSyncInfo"/>
+						</mx:HBox>
+					</mx:VBox>				
+				</mx:VBox>
+			</mx:Panel>	
+			<mx:Canvas width="100%">
+				<mx:HBox left="0">
+					<mx:Button emphasized="true" label="{i18n._('GLOBAL_SYNCHRONIZE')}" id="syncDataBtn" click="syncData()"/>	
+				</mx:HBox>				
+			</mx:Canvas>
+			<mx:Canvas width="100%">
+				<mx:HBox right="0">
+					<mx:Button id="btnStop" label="{i18n._('SYNCHRONIZE_BUTTON_STOP')}" click="stop();"/>
+					<mx:Button id="btnClose" click="close();" right="0"/>	
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

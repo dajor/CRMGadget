@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								 xmlns:control="gadget.control.*"
+								 textAlign="center"
+								 >
+	<fx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.GroupingCollection2;
+			import mx.collections.HierarchicalCollectionView;
+			import mx.collections.HierarchicalData;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.controls.DataGrid;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.controls.dataGridClasses.DataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			import mx.events.CloseEvent;
+			private var grid:AdvancedDataGrid;
+			private var _addEmptyRow:Boolean=false;
+			private var _parentComp:Sprite;
+			private var _showDeleteButton:Function;
+			private var _doDelete:Function;
+
+			public function get parentComp():Sprite
+			{
+				return _parentComp;
+			}
+
+			public function set parentComp(value:Sprite):void
+			{
+				_parentComp = value;
+			}
+			override public function set data(value:Object):void{		
+				super.data = value;		
+				if(showDeleteButton !=null){
+					btnDelete.visible=showDeleteButton(value);
+				}else{
+					var isSHowDeleteButton:Boolean = false;
+					for(var f:String in value){
+						if(f!='mx_internal_uid' && value[f]!=null && !StringUtils.isEmpty(value[f].toString())){
+							isSHowDeleteButton = true;
+							break;
+						}
+					}
+					btnDelete.visible=isSHowDeleteButton;
+				}
+			}		
+
+		
+		
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid = value.owner as AdvancedDataGrid;					
+				}
+			}
+			public final function deleteRow():void{
+				if(grid!=null){
+				if(doDelete!=null){
+					doDelete(data);//do delete selected row
+				}else{
+					Alert.show(i18n._("GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE@Are you sure you want to delete?"), i18n._('GLOBAL_DELETE@Delete'), Alert.YES | Alert.NO, parentComp, alertListener, null, Alert.NO);
+				
+					function alertListener(eventObj:CloseEvent):void {
+						
+						if (eventObj.detail==Alert.YES) {
+							
+							var provider:Object = grid.dataProvider;
+							var items:ArrayCollection;
+							if(provider is HierarchicalCollectionView){
+								var gc2:GroupingCollection2 =(provider as HierarchicalCollectionView).source as GroupingCollection2; 
+							
+								items = gc2.source as ArrayCollection;
+								var childrens:ArrayCollection = data.children;
+								items.filterFunction = function(obj:Object):Boolean{
+									return !childrens.contains(obj);
+								}
+								items.refresh();								
+								gc2.source = items;
+								gc2.refresh();
+								grid.validateNow();
+								return;
+							}else{ 
+								
+								
+								if(provider is Array){
+								items = new ArrayCollection(provider as Array);	
+								}							
+								else{
+									items = provider as ArrayCollection;
+								}
+								
+								if(items!=null && items.length>0){
+									var rowInd:int=items.getItemIndex(data);
+									items.removeItemAt(rowInd);
+									if(items.length==rowInd && addEmptyRow){//delete last row must be add empty row
+										items.addItem(new Object());
+									}
+									grid.dataProvider = items;
+									grid.validateNow();
+								}
+							}
+							
+						}
+					}
+				}
+				}
+				
+			}
+
+			public function get addEmptyRow():Boolean
+			{
+				return _addEmptyRow;
+			}
+
+			public function set addEmptyRow(value:Boolean):void
+			{
+				_addEmptyRow = value;
+			}
+
+			public function get showDeleteButton():Function
+			{
+				return _showDeleteButton;
+			}
+
+			public function set showDeleteButton(value:Function):void
+			{
+				_showDeleteButton = value;
+			}
+
+			public function get doDelete():Function
+			{
+				return _doDelete;
+			}
+
+			public function set doDelete(value:Function):void
+			{
+				_doDelete = value;
+			}
+			
+			
+		]]>
+		
+	</fx:Script>
+	<mx:LinkButton id="btnDelete" icon="@Embed(source='/assets/cancel.png')" toolTip="{i18n._('GLOBAL_DELETE@Delete')}" click="{deleteRow()}" />
+</s:MXAdvancedDataGridItemRenderer>

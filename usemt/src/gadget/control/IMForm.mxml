@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Form xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="100%" paddingTop="0" paddingBottom="0"
+		 >
+	<fx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			
+			private const IMFORM_FORMITEM_LABEL_ROOM_URL:String = "IMFORM_FORMITEM_LABEL_ROOM_URL";
+			private const IMFORM_FORMITEM_LABEL_USER_SIGN_IN_ID:String = "IMFORM_FORMITEM_LABEL_USER_SIGN_IN_ID";
+			//CRO 05.01.2011
+			private const IMFORM_FORMITEM_LABEL_PASSWORD:String = "GLOBAL_PASSWORD";
+			private const IMFORM_RADIOBUTTON_USER:String = "IMFORM_RADIOBUTTON_USER";
+			private const IMFORM_RADIOBUTTON_GUEST:String = "IMFORM_RADIOBUTTON_GUEST";
+			
+		]]>
+	</fx:Script>
+	<mx:FormItem label="{i18n._(IMFORM_FORMITEM_LABEL_ROOM_URL)}">
+		<mx:TextInput id="roomURL" width="240"/>
+	</mx:FormItem>
+	<mx:FormItem label="{i18n._(IMFORM_FORMITEM_LABEL_USER_SIGN_IN_ID)}">
+		<mx:TextInput id="username" width="240"/>
+	</mx:FormItem>
+	<mx:FormItem id="passwordFormItem" label="{i18n._(IMFORM_FORMITEM_LABEL_PASSWORD)}">
+		<mx:TextInput displayAsPassword="true" id="password" width="240"/>
+	</mx:FormItem>
+	<mx:FormItem>
+		<mx:HBox>
+			<mx:RadioButton label="{i18n._(IMFORM_RADIOBUTTON_USER)}" selected="true" click="passwordFormItem.visible = true"/>
+			<mx:RadioButton label="{i18n._(IMFORM_RADIOBUTTON_GUEST)}" click="passwordFormItem.visible = false"/>
+		</mx:HBox>
+	</mx:FormItem>
+</mx:Form>

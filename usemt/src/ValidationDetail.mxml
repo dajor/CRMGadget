@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="580" height="200" resizable="false"
+	title="{validation.name}" 
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init()"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.Utils;
+			
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			
+			[Bindable] public var validation:Object;
+			[Bindable] public var criteria:Object;
+			[Bindable] public var validationList:ValidationList;
+			[Bindable] private var buttonLabel:String;
+			
+			public var isCreate:Boolean;
+			public var entity:String;
+
+			private function init():void {
+				if(validation == null){
+					validation = new Object();
+					validation.entity = entity;
+					validation.field = "";
+					validation.operator = "";
+					validation.value = "";
+				}
+				validationForm.validation = validation;
+				actionButtonStack.selectedChild = isCreate ? actionButtonAdd : actionButtonUpdate;
+				this.title = isCreate ? i18n._('VALIDATIONDETAIL_TITLE_RULE_CREATION') : validation.rule_name;
+				idTitleBar.title = isCreate ? i18n._('VALIDATIONDETAIL_TITLE_RULE_CREATION') : validation.rule_name;
+			}
+			
+			private function commit():Boolean {
+				var validatorErrorArray:Array = validationForm.validate(false);			
+				if (validatorErrorArray.length == 0) {
+					if(!isCreate){
+						validation.rule_name = validationForm.nameInput.text;	
+						validation.field = validationForm.field_rule.selectedItem.column;
+						validation.operator = validationForm.operator_rule.selectedItem.data;
+						validation.value = validationForm.value_rule.visible ? validationForm.value_rule.text : validationForm.cbovalue_rule.selectedItem.data;
+						validation.message = validationForm.messageInput.text;
+						Database.validationDao.updateValidation(validation);
+					}else{
+						validation = new Object();
+						validation.rule_name =  validationForm.nameInput.text;
+						validation.field = validationForm.field_rule.selectedItem.column;
+						validation.operator = validationForm.operator_rule.selectedItem.data;
+						validation.value = validationForm.value_rule.visible ? validationForm.value_rule.text : validationForm.cbovalue_rule.selectedItem.data;
+						validation.message = validationForm.messageInput.text;
+						validation.entity = entity;
+						validation.num = Database.validationDao.count() + 1;
+						Database.validationDao.insertValidation(validation);
+					}
+					validationList.refreshList();
+					return true;
+				} else {
+					var errorMessageArray:Array = [];
+                    for each (var err:Object in validatorErrorArray) {
+                    	var errField:String = ''; 
+                    	if (err.currentTarget) {
+                        	errField = FormItem(err.currentTarget.source.parent).label + " : ";
+                     	}
+                        errorMessageArray.push(errField + Utils.getTranslatedValidation(err.message));
+                    }
+					//CRO 05.01.2011
+                    Alert.show(errorMessageArray.join("\n"), i18n._('GLOBAL_INVALID_FORM'), Alert.OK, validationForm);
+					return false;
+				}
+			}
+
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="580" height="200" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/validation_rules.png')" id="idTitleBar"/>
+		<mx:VBox top="32" left="16" right="16" bottom="16">
+			<form:ValidationForm id="validationForm" width="100%" height="120"/>
+			<mx:ViewStack id="actionButtonStack" width="100%">
+				<mx:HBox id="actionButtonAdd" width="100%" horizontalAlign="right">					
+					<control:DetailButtonBar action="commit" buttonIcon="@Embed('/assets/add.png')" buttonLabel="GLOBAL_ADD"/>
+				</mx:HBox>
+				<mx:HBox id="actionButtonUpdate" width="100%" horizontalAlign="right">					
+					<control:DetailButtonBar action="commit" buttonIcon="@Embed('/assets/edit.png')" buttonLabel="GLOBAL_UPDATE"/>
+				</mx:HBox>				
+			</mx:ViewStack>
+		</mx:VBox>	
+	</mx:Canvas>
+</mx:Window>

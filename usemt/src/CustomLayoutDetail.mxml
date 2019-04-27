@@ -1,0 +1,704 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="660" height="480" resizable="false"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init()"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.google.maps.Map;
+			
+			import gadget.control.CalculatedField;
+			import gadget.dao.CriteriaDAO;
+			import gadget.dao.Database;
+			import gadget.dao.FilterDAO;
+			import gadget.i18n.i18n;
+			import gadget.lists.FilterList;
+			import gadget.service.PicklistService;
+			import gadget.util.FieldUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			import mx.controls.CheckBox;
+			import mx.validators.StringValidator;
+			import mx.validators.Validator;
+			
+			[Bindable] public var customLayout:Object;
+			[Bindable] public var customLayoutList:CustomLayoutList;
+			//[Bindable] private var buttonLabel:String;
+			
+			
+			private const CUSTOMLAYOUTDETAIL_TITLEBAR_TITLE_CUSTOM_LAYOUT_CREATION:String = 'CUSTOMLAYOUTDETAIL_TITLEBAR_TITLE_CUSTOM_LAYOUT_CREATION' ;
+			//CRO 05.01.2011
+			private const CUSTOMLAYOUTDETAIL_TITLEBAR_TITLE_CUSTOM_LAYOUT:String = 'GLOBAL_CUSTOM_LAYOUT' ;
+			private const CUSTOMLAYOUTDETAIL_ALERT_MSG_TEXT_PLEASE_SELECT_AT_LEASE_ONE_CONDITION:String = 'CUSTOMLAYOUTDETAIL_ALERT_MSG_TEXT_PLEASE_SELECT_AT_LEASE_ONE_CONDITION' ;
+			private const CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_VALUE:String = 'CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_VALUE';
+			private const CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_OPERATOR:String = 'CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_OPERATOR' ;
+			private const CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_FIELD:String = 'CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_FIELD' ;
+			private const CUSTOMLAYOUTDETAIL_MSG_TEXT_AND_COLUMN_VALUE:String = 'CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_VALUE' ;
+			private const CUSTOMLAYOUTDETAIL_MSG_TEXT_AND_COLUMN_OPERATOR:String = 'CUSTOMLAYOUTDETAIL_MSG_TEXT_AND_COLUMN_OPERATOR' ;
+			private const CUSTOMLAYOUTDETAIL_MSG_TEXT_IS:String = 'CUSTOMLAYOUTDETAIL_MSG_TEXT_IS' ;
+			private const CUSTOMLAYOUTDETAIL_MSG_TEXT_ARE:String = 'CUSTOMLAYOUTDETAIL_MSG_TEXT_ARE' ;
+			private const CUSTOMLAYOUTDETAIL_MSG_TEXT_MISSING:String = 'CUSTOMLAYOUTDETAIL_MSG_TEXT_MISSING' ;
+			private const CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_ENTITY:String = 'GLOBAL_ENTITY' ;
+			private const CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_LAYOUT_ID:String = 'GLOBAL_LAYOUT_ID' ;
+			private const CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_ICON:String = 'CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_ICON' ;
+			private const CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_TITLE_BAR_COLOR:String = 'CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_TITLE_BAR_COLOR' ;
+			private const CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_DISPLAY_NAME:String = 'GLOBAL_DISPLAY_NAME' ;
+			private const CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_PLURAL:String = 'CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_PLURAL' ;
+			private const CUSTOMLAYOUTDETAIL_LABEL_TEXT_FIELD:String = 'GLOBAL_FIELD' ;
+			private const CUSTOMLAYOUTDETAIL_LABEL_TEXT_OPERATOR:String = 'CUSTOMLAYOUTDETAIL_LABEL_TEXT_OPERATOR' ;
+			private const CUSTOMLAYOUTDETAIL_LABEL_TEXT_VALUE:String = 'GLOBAL_VALUE' ;
+			private const CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_CONDITION:String = 'CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_CONDITION' ;
+			private const CUSTOMLAYOUTDETAIL_BUTTON_LABEL_FIELD_LAYOUT:String = 'CUSTOMLAYOUTDETAIL_BUTTON_LABEL_FIELD_LAYOUT' ;
+			private const GLOBAL_ADD:String = 'GLOBAL_ADD' ;
+			private const GLOBAL_UPDATE:String = 'GLOBAL_UPDATE' ;
+			
+			
+			private var validate:Array = new Array();
+			
+			public var mainWindow:MainWindow;
+			
+			[Bindable] private var operatorData:ArrayCollection = new ArrayCollection(
+				[ {label:"", data:""},
+					{label:"equals", data:"="},
+					{label:"contains", data:"contains"},
+					{label:"different", data:"!="}		
+				]);
+			
+			[Bindable] public var isCreate:Boolean;
+			
+			private function init():void {
+				
+				
+				var stringValidator:StringValidator = new StringValidator();
+				//Bug fixing 471
+				//stringValidator.property = "text";
+				//stringValidator.source = layoutName;
+				//validate.push(stringValidator);
+				//CRO 11.01.2011
+				//stringValidator.property = "text";
+				//stringValidator.source = displayName;
+				//validate.push(stringValidator);
+				if(customLayout == null){
+					customLayout = new Object();
+					customLayout.entity = "";
+					customLayout.layout_name = "";
+				}
+				actionButtonAdd.visible = isCreate;
+				actionButtonAdd.includeInLayout = isCreate;
+				actionButtonUpdate.visible = !isCreate;
+				actionButtonUpdate.includeInLayout = !isCreate;
+				this.title = isCreate ? i18n._(CUSTOMLAYOUTDETAIL_TITLEBAR_TITLE_CUSTOM_LAYOUT_CREATION) : i18n._(CUSTOMLAYOUTDETAIL_TITLEBAR_TITLE_CUSTOM_LAYOUT) + ": " + customLayout.layout_name;
+				idTitleBar.title = this.title;
+				conditionBox.visible = (customLayout.deletable == null || customLayout.deletable == true);
+				
+				// layout icon
+				var icons:ArrayCollection = ImageUtils.getFlagIcon();
+				if(customLayout.deletable == false){
+					for each (var customLayoutIcon:Object in ImageUtils.getCustomLayoutIconsByEntity(customLayout.entity)) {
+						var object:Object = new Object();
+						object.data = customLayoutIcon.name;
+						object.icon = customLayoutIcon.icon;
+						object.label = "";
+						icons.addItem(object);
+					}
+				} 
+				layoutIcon.dataProvider = icons;
+				
+				// Get data Combobox Entity
+				if (isCreate) {
+					stringValidator = new StringValidator();
+					stringValidator.property = "text";
+					stringValidator.source = layoutEntity;
+					validate.push(stringValidator);
+					var transactions:ArrayCollection = new ArrayCollection();
+					transactions.addItem({label:"", data:""});
+					for each (var transaction:Object in Database.transactionDao.listTransaction()){
+						transactions.addItem(
+							{label:Database.customLayoutDao.getDisplayName(transaction.entity), data:transaction.entity, icon:ImageUtils.getImage(transaction.entity)});
+					}
+					layoutEntity.dataProvider = transactions;
+					layoutBackgroundColor.selectedColor = 0xEEEEEE;
+				} else {
+					//if (customLayout.custom_layout_icon!=null && customLayout.custom_layout_icon!="")
+					layoutIcon.selectedItem = getSelectedItem(customLayout.custom_layout_icon, layoutIcon.dataProvider as ArrayCollection, "data");
+					txtlayoutEntity.text = customLayout.entity;
+					layoutDependOn.dataProvider = getOnlyPicklist(customLayout.entity);
+					layoutDependOn.selectedIndex = CalculatedField.getComboSelectedIndex(layoutDependOn,customLayout.layout_depend_on);
+					layoutTitlebar.selectedItem = getSelectedItem(customLayout.custom_layout_title, layoutTitlebar.dataProvider as ArrayCollection, "column");
+					if (customLayout.background_color != null && customLayout.background_color != '')
+						layoutBackgroundColor.selectedColor = customLayout.background_color;
+					else
+						layoutBackgroundColor.selectedColor = 0xEEEEEE;
+					
+				}
+				layoutEntity.visible = isCreate;
+				editmode.visible = !isCreate;
+				fieldLayoutBtn.visible = !isCreate;
+				
+				for (var i:int = 0; i < 4; i++) {
+					loadConditionData(customLayout.entity, i);
+				}
+				
+				layoutName.enabled = (customLayout.deletable == null || customLayout.deletable == true);
+				layoutName.visible = false;
+				layoutEntity.setFocus();
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function getField(listField:ArrayCollection,colname:String):Object{
+				var obj:Object = new Object();
+				for(var i:int=0;i<listField.length;i++){
+					var objField:Object = listField[i];
+					if(objField.column == colname){
+						obj = objField;
+						break;
+					}
+				}
+				return obj;
+			}
+			private function loadConditionData(entity:String, i:int):void {
+				var fields:Object = getConditionFields()[i];
+				var condition:Object = Database.customLayoutConditionDAO.find(customLayout.entity, String(customLayout.subtype), String(i+1));
+				
+				// Get All Fields by Entity
+				var listFields:ArrayCollection =  Utils.getColumns(entity);
+				fields.field.dataProvider =listFields;
+				if (condition != null) {
+					fields.field.selectedIndex = Utils.getComboColIndex(condition.column_name, condition.entity);
+					// Get data to Combobox Operator
+					fields.operator.selectedItem = getSelectedItem(condition.operator, operatorData, "data");
+					
+					var fieldInfo:Object = getField(listFields,condition.column_name);
+					// Get data to Combobox Value if field is picklist
+					var picklist:ArrayCollection = PicklistService.getPicklist(condition.entity, condition.column_name);
+					var visibleCombo:Boolean = fieldInfo.type == "Picklist" && picklist.length > 1;
+					
+					if (fieldInfo.type=="Picklist" && visibleCombo) {
+						
+						fields.combo.visible = true;
+						fields.combo.dataProvider = picklist;
+						fields.combo.selectedIndex = Utils.getComboParamIndex(condition.column_name, condition.entity, condition.params);
+						disabledButtonAddPicklist(layoutOperator1.selectedItem);
+						findConditonValue(condition.params);
+						layoutValue1.text = getConditonValue("label");
+						fields.value.visible = false;
+					}else if(fieldInfo.type=="Checkbox"){
+						fields.checkbox.visible = true;
+						fields.value.visible = false;
+						fields.checkbox.selected = StringUtils.isTrue(condition.params);
+					} else {
+						fields.value.text = condition.params;
+					}					
+				}
+				
+				
+			}
+			
+			
+			private function getOnlyPicklist(entity:String):ArrayCollection{
+				var allPicklist:ArrayCollection = new ArrayCollection();
+				var data:ArrayCollection = new ArrayCollection();
+				allPicklist.addItem({label:'',data:''});
+				
+					data = Utils.getColumns(entity, true, false);
+					for each (var picklist:Object in data){
+						if(picklist.type=='Picklist' || picklist.type=='Checkbox'){
+							allPicklist.addItem(picklist);
+						}
+					}
+				
+				return allPicklist;
+			}
+			private function changeEntityAction(event:Event):void{
+				var cbo:ComboBox = event.currentTarget as ComboBox;
+				var data:ArrayCollection = new ArrayCollection();
+				data = Utils.getColumns(cbo.selectedItem.data, true, false);
+				layoutDependOn.dataProvider = getOnlyPicklist(cbo.selectedItem.data);
+				layoutTitlebar.dataProvider = data; // Change Request #747
+				layoutField1.dataProvider = data;
+				layoutField2.dataProvider = data;
+				layoutField3.dataProvider = data;
+				layoutField4.dataProvider = data;
+				
+				modifiedEntity(layoutValue1, cbolayoutValue1, layoutOperator1);
+				modifiedEntity(layoutValue2, cbolayoutValue2, layoutOperator2);
+				modifiedEntity(layoutValue3, cbolayoutValue3, layoutOperator3);
+				modifiedEntity(layoutValue4, cbolayoutValue4, layoutOperator4);
+			}
+			
+			private function modifiedEntity(layoutValue:TextInput, cbolayoutValue:ComboBox, cboLayoutOperator:ComboBox):void{
+				cbolayoutValue.visible = false;
+				layoutValue.visible = true;
+				layoutValue.text = "";
+				cboLayoutOperator.selectedIndex = 0;
+			}
+			
+			
+			private function getSelectedItem(strValue:String, data:ArrayCollection, field:String):Object{
+				for each(var object:Object in data){
+					if(object[field] == strValue)
+						return object;
+				}
+				return data.getItemAt(0);
+			}
+			
+			private function checkExistedCondition():Boolean{
+				var objField:Object = layoutField1.selectedItem;
+				var objVal:Object = cbolayoutValue1.selectedItem;
+				var ent:String = '';
+				if (!isCreate){
+					ent = txtlayoutEntity.text;// layoutEntity.selectedLabel;
+				} else {
+					ent = layoutEntity.selectedItem.data
+				}
+				if(objField != null && objVal != null){
+					var condition:Object = Database.customLayoutConditionDAO.checkExisted(ent,objField.column,objVal.data);
+					if(condition != null){
+						return true;
+					}
+				}
+				
+				
+				return false;
+			}
+			private function commit():Boolean {
+				var error:String = "";
+				for each(var objError:Object in Validator.validateAll(validate)){
+					if(objError.type=="invalid"){
+						error += objError.message;
+						break;
+					}
+				}
+				//CRO #1274
+				var condictValue:String = getConditonValue();
+				if(condictValue != null && condictValue != ""){
+					layoutValue1.text = getConditonValue();
+				}
+				if(StringUtils.isEmpty(error)){
+					//					if(checkExistedCondition()){
+					//						Alert.show("Filter is already existed", "", Alert.OK, this);
+					//						return false;
+					//					}
+					if (customLayout.deletable == null || customLayout.deletable == true) {
+						if (!isCreate){
+							customLayout.entity = txtlayoutEntity.text;// layoutEntity.selectedLabel;
+							customLayout.layout_name = layoutName.text;
+						} else {
+							customLayout.entity = layoutEntity.selectedItem.data;//layoutEntity.selectedLabel;
+							customLayout.subtype = Database.customLayoutDao.nextSubtype(layoutEntity.selectedItem.data/*layoutEntity.selectedLabel*/);
+							customLayout.layout_name = layoutName.text;
+							customLayout.deletable = 1;
+						}
+						
+						var object:Object = catchConditionError();
+						error = object.error;
+						
+						
+						if(StringUtils.isEmpty(error)){
+							Database.begin();
+							customLayout.custom_layout_icon = layoutIcon.selectedItem.data;
+							customLayout.background_color = "0x" + layoutBackgroundColor.selectedColor.toString(16);
+							customLayout.display_name = displayName.text;
+							customLayout.display_name_plural = pluralName.text;
+							if(layoutDependOn.selectedItem){
+								customLayout.layout_depend_on = layoutDependOn.selectedItem.data;
+							}
+							customLayout.custom_layout_title = layoutTitlebar.selectedItem.column==null?'':layoutTitlebar.selectedItem.column; // Change Request #747
+							
+							Database.customLayoutConditionDAO.deleted(customLayout.entity, customLayout.subtype);
+							for each(var objectCondition:Object in object.conditions){
+								Database.customLayoutConditionDAO.insert(objectCondition);
+							}							
+							
+							if(isCreate)
+								Database.customLayoutDao.insert(customLayout);
+							else
+								Database.customLayoutDao.update(customLayout);
+							
+							Database.commit();
+							customLayoutList.refreshList();
+							return true;
+						}
+					}else {
+						customLayout.custom_layout_icon = layoutIcon.selectedItem.data;
+						customLayout.background_color = "0x" + layoutBackgroundColor.selectedColor.toString(16);
+						customLayout.display_name = displayName.text;
+						customLayout.display_name_plural = pluralName.text;
+						if(layoutDependOn.selectedItem){
+							customLayout.layout_depend_on = layoutDependOn.selectedItem.data;
+						}
+						customLayout.custom_layout_title = layoutTitlebar.selectedItem.column==null?'':layoutTitlebar.selectedItem.column; // Change Request #747
+						Database.customLayoutDao.update(customLayout);
+						customLayoutList.refreshList();
+						mainWindow.navigator.removeAllChildren();
+						mainWindow.updateTransactions();
+						mainWindow.selectList();
+						return true;
+					}
+				}
+				Alert.show(error, "", Alert.OK, this);
+				return false;
+			}
+			
+			
+			private function getConditionFields():Array {
+				return [
+					{field:layoutField1, operator:layoutOperator1, combo:cbolayoutValue1, value:layoutValue1,checkbox:chklayoutValue1},
+					{field:layoutField2, operator:layoutOperator2, combo:cbolayoutValue2, value:layoutValue2,checkbox:chklayoutValue2},
+					{field:layoutField3, operator:layoutOperator3, combo:cbolayoutValue3, value:layoutValue3,checkbox:chklayoutValue3},
+					{field:layoutField4, operator:layoutOperator4, combo:cbolayoutValue4, value:layoutValue4,checkbox:chklayoutValue4}];
+			} 
+			
+			private function catchConditionError():Object{
+				var error:String = "";
+				var object:Object = new Object();
+				var array:Array = new Array();
+				
+				var count:int = 1;
+				for each (var field:Object in getConditionFields()) {
+					var objectCondition:Object = checkCondition(customLayout.entity, customLayout.subtype, count, field.field, field.operator, field.combo, field.value,field.checkbox);
+					if (!StringUtils.isEmpty(objectCondition.column_name)) {
+						error += objectCondition.missing;
+						array.push(objectCondition);
+						count++;
+					}
+				}
+				object.error = error;
+				object.conditions = array;
+				if(array.length<=0) object.error = i18n._(CUSTOMLAYOUTDETAIL_ALERT_MSG_TEXT_PLEASE_SELECT_AT_LEASE_ONE_CONDITION);
+				return object;
+			}
+			
+			private function checkCondition(entity:String, subtype:String, num:int, layoutField:ComboBox, layoutOperator:ComboBox, cbolayoutValue:ComboBox, layoutValue:TextInput,checkbox:CheckBox):Object{
+				var objectCondition:Object = new Object();
+				objectCondition.entity = entity;
+				objectCondition.subtype = subtype;
+				objectCondition.num = num;
+				var missing:String = "";
+				var params:String;
+				if(layoutValue.visible)
+					params = layoutValue.text;
+				else if (checkbox.visible)
+					params = checkbox.selected.toString();
+				else
+					params = cbolayoutValue.selectedItem.data;
+				
+				var column_name:String = layoutField.selectedItem.column;
+				var operator:String = layoutOperator.selectedItem.data;
+				
+				if(StringUtils.isEmpty(params) && !StringUtils.isEmpty(operator) && !StringUtils.isEmpty(column_name)){
+					missing += i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_VALUE) + " " + num + " " + i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_IS) + " ";
+				}else if(StringUtils.isEmpty(params) && StringUtils.isEmpty(operator) && !StringUtils.isEmpty(column_name)){
+					missing += i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_OPERATOR) + " " + num + " " + i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_AND_COLUMN_VALUE) + " " + num + " " + i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_ARE) + " ";
+				}else if(StringUtils.isEmpty(params) && !StringUtils.isEmpty(operator) && StringUtils.isEmpty(column_name)){
+					missing += i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_FIELD) + " " + num + " " + i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_AND_COLUMN_VALUE) + " " + num + " " + i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_ARE) + " ";
+				}else if(!StringUtils.isEmpty(params) && StringUtils.isEmpty(operator) && StringUtils.isEmpty(column_name)){
+					missing += i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_FIELD) + " " + num + " " + i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_AND_COLUMN_OPERATOR) + " " + num + " " + i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_ARE) + " ";
+				}else if(!StringUtils.isEmpty(params) && StringUtils.isEmpty(operator) && !StringUtils.isEmpty(column_name)){
+					missing += i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_OPERATOR) + " " + num + " " + i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_IS) + " ";
+				}else if(!StringUtils.isEmpty(params) && !StringUtils.isEmpty(operator) && StringUtils.isEmpty(column_name)){
+					missing += i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_COLUMN_FIELD) + " " + num + " " + i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_IS) + " ";
+				}
+				if(!StringUtils.isEmpty(missing)) missing += i18n._(CUSTOMLAYOUTDETAIL_MSG_TEXT_MISSING);
+				objectCondition.missing = missing;
+				objectCondition.params = params;
+				objectCondition.column_name = StringUtils.isEmpty(column_name)? "" : column_name;
+				objectCondition.operator = operator;
+				return objectCondition;
+			}
+			
+			
+			/*
+			private function updateCustomLayoutDefaultIcons(bDefault:Boolean = true):void {
+			for each( var customLayout:Object in Database.customLayoutDao.readAll() ){
+			if(customLayout.entity == "Activity"){
+			switch(customLayout.subtype){
+			case 0: customLayout.custom_layout_icon = bDefault ? 'activity' : 'activityTaskDefault'; break;
+			case 1: customLayout.custom_layout_icon = bDefault ? 'activity' : 'activityAppointmentDefault'; break;
+			}
+			}else{
+			if(customLayout.subtype == 0){
+			switch(customLayout.entity){
+			case "Account" : customLayout.custom_layout_icon = bDefault ? 'account' : 'accountDefault'; break;
+			case "Contact" : customLayout.custom_layout_icon = bDefault ? 'contact' : 'contactDefault'; break;
+			case "Opportunity" : customLayout.custom_layout_icon = bDefault ? 'opportunity' : 'opportunityDefault'; break;
+			case "Product" : customLayout.custom_layout_icon = bDefault ? 'product' : 'productDefault'; break;
+			case "Service Request" : customLayout.custom_layout_icon = bDefault ? 'service' : 'serviceDefault'; break;
+			case "Campaign" : customLayout.custom_layout_icon = bDefault ? 'campaign' : 'campaignDefault'; break;
+			case "Custom Object 1" : customLayout.custom_layout_icon = bDefault ? 'custom' : 'customDefault'; break;
+			case "Lead" : customLayout.custom_layout_icon = bDefault ? 'lead' : 'leadDefault'; break;
+			}
+			}
+			}
+			Database.customLayoutDao.update(customLayout);
+			}
+			mainWindow.navigator.removeAllChildren();
+			mainWindow.updateTransactions();
+			}*/
+			
+			private function changeFieldAction(event:Event):void{
+				var lyoutField:ComboBox = event.currentTarget as ComboBox;
+				var objectField:Object = lyoutField.selectedItem;
+				//entity, element_name, display_name, data_type
+				if(StringUtils.endsWith(lyoutField.id, "1")){
+					if(layoutOperator1.selectedItem != null && layoutOperator1.selectedItem.data =='contains'){
+						disabledButtonAddPicklist(layoutOperator1.selectedItem);
+					}else{
+						btnOp1.visible = false;
+						modifiedFieldAndLoadValue(layoutValue1, cbolayoutValue1, objectField,chklayoutValue1);
+					}
+					
+					
+				}else if(StringUtils.endsWith(lyoutField.id, "2")){
+					modifiedFieldAndLoadValue(layoutValue2, cbolayoutValue2, objectField,chklayoutValue2);
+				}else if(StringUtils.endsWith(lyoutField.id, "3")){
+					modifiedFieldAndLoadValue(layoutValue3, cbolayoutValue3, objectField,chklayoutValue3);
+				}else if(StringUtils.endsWith(lyoutField.id, "4")){
+					modifiedFieldAndLoadValue(layoutValue4, cbolayoutValue4, objectField,chklayoutValue4);
+				}
+			}
+			
+			private function modifiedFieldAndLoadValue(layoutValue:TextInput, cbolayoutValue:ComboBox, objectField:Object,chkBoxValue:CheckBox):void{
+				var datasource:ArrayCollection = PicklistService.getPicklist(objectField.entity, objectField.column);
+				if(objectField.type == "Checkbox"){
+					chkBoxValue.visible = true;
+					layoutValue.visible = false;
+					cbolayoutValue.visible = false;
+				}else{
+					chkBoxValue.visible = false;
+					var visibleCombo:Boolean = objectField.type == "Picklist" && datasource.length > 1 ? true : false;
+					cbolayoutValue.visible = visibleCombo;
+					layoutValue.visible = !visibleCombo;
+					layoutValue.text = "";
+					if(visibleCombo){
+						cbolayoutValue.dataProvider = datasource;
+					}
+				}
+				
+			}
+			private function onOkMultiPicklist(list:ArrayCollection):void{
+				listValues = list;
+				layoutValue1.text = getConditonValue("label"); 
+			}
+	
+			
+			private function openMultiPicklistPopup():void{
+				var entity:String;
+				if (!isCreate){
+					entity = txtlayoutEntity.text;// layoutEntity.selectedLabel;
+				} else {
+					entity = layoutEntity.selectedItem.data;//layoutEntity.selectedLabel;
+				}
+				var obj:Object = layoutField1.selectedItem;
+				var multiPicklist:Object = PicklistService.getMultiSelectPicklist(entity, obj, obj.column);
+				multiPicklist.selectedItems = listValues;
+				var multi:CustomMultiPickListPopup = new CustomMultiPickListPopup();
+				multi.picklist = multiPicklist;
+				multi.onOkMultiPicklist = onOkMultiPicklist;
+				WindowManager.openModal(multi);
+				
+			}
+			
+			private var objMap:Object = new Object();
+			private var listValues:ArrayCollection = new ArrayCollection();
+			private function findConditonValue(keys:String):void{
+				var arr:Array = keys.split(";");
+				for each (var key:String in arr){
+					var obj:Object = objMap[key];
+					if(obj) listValues.addItem(obj);
+				}
+			}
+			
+			public static function findConditonValue1(keys:String,entity:String,field:String):void{
+				var list:ArrayCollection = PicklistService.getPicklist(entity, field);
+				var arr:Array = keys.split(";");
+				var map:Object = new Map();
+				for each (var tmp:Object in list){
+					map[tmp.data] = tmp;
+				}
+				var listCon:ArrayCollection = new ArrayCollection();
+				for each (var key:String in arr){
+					var obj:Object = map[key];
+					listCon.addItem(obj);
+					
+				}
+			}
+			
+			private function getConditonValue(key:String='data'):String{
+				var strtmp:String = "";
+				for each(var tmp:Object in listValues){
+					if(!StringUtils.isEmpty(strtmp)) strtmp += ";" 
+					strtmp += tmp[key];
+				}
+				return strtmp;
+			}
+			
+			private function disabledButtonAddPicklist(objSelectedOperator:Object):void{
+				var obj:Object = layoutField1.selectedItem;
+				var dataPicklist:ArrayCollection = PicklistService.getPicklist(obj.entity, obj.column);
+				var visibleCombo:Boolean = obj.type == "Picklist" && dataPicklist.length > 1 ? true : false;
+				if(objSelectedOperator.data=='contains' && visibleCombo){
+					cbolayoutValue1.visible = false;
+					layoutValue1.visible = true;
+					btnOp1.visible = true;	
+					// map
+					objMap = new Object();
+					for each(var tmp:Object in dataPicklist){
+						objMap[tmp.data] = tmp;
+					}
+				}else if(obj.type == "Checkbox"){
+					cbolayoutValue1.visible = false;
+					chklayoutValue1.visible = true;
+					btnOp1.visible = false;			
+					layoutValue1.visible = false;;
+				}else{
+					cbolayoutValue1.visible = visibleCombo;
+					btnOp1.visible = false;			
+					layoutValue1.visible = !visibleCombo;
+					
+				}
+			}
+			private function onChangeOperator(event:Event):void{
+				var cbo:ComboBox = event.currentTarget as ComboBox;
+				var objSelected:Object = cbo.selectedItem;
+				disabledButtonAddPicklist(objSelected);
+			}
+			
+			private function editLayout():void {
+				var layout:CustomLayout = new CustomLayout();
+				layout.entity = customLayout.entity;
+				layout.subtype = customLayout.subtype;
+				WindowManager.openModal(layout);
+			}			
+			private function onChangeDependOn(event:Event):void{
+				var cbo:ComboBox = event.currentTarget as ComboBox;
+				var objSelected:Object = cbo.selectedItem;
+				layoutField1.selectedIndex = CalculatedField.getComboSelectedIndex(layoutField1,objSelected.data);
+				
+				
+				var objectField:Object = layoutField1.selectedItem;
+				//entity, element_name, display_name, data_type
+				
+					if(layoutOperator1.selectedItem != null && layoutOperator1.selectedItem.data =='contains'){
+						disabledButtonAddPicklist(layoutOperator1.selectedItem);
+					}else{
+						btnOp1.visible = false;
+						modifiedFieldAndLoadValue(layoutValue1, cbolayoutValue1, objectField,chklayoutValue1);
+					}
+					
+			}
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="660" height="480" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/customize.png')" id="idTitleBar"/>
+		<mx:VBox top="32" left="16" right="16" bottom="16">
+			<mx:Form width="100%">
+				<mx:FormItem label="{i18n._(CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_ENTITY)}">
+					<!--<mx:ComboBox includeInLayout="false" width="245" id="layoutEntity" change="changeEntityAction(event)" />-->
+					<control:IconComboBox includeInLayout="false" width="220" id="layoutEntity" change="changeEntityAction(event)" />
+					<mx:HBox includeInLayout="false" id="editmode">
+						<!-- CH <mx:Image source="{ImageUtils.getImage(customLayout.entity)}" id="imgLayoutEntity" />-->
+						<mx:Text width="220" id="txtlayoutEntity" />
+					</mx:HBox>
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._(CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_LAYOUT_ID)}" visible="false" height="0">
+					<mx:TextInput width="220" height="0" id="layoutName" text="{customLayout.layout_name}" />
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._(CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_ICON)}">
+					<control:IconComboBox width="40" id="layoutIcon"/>
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._(CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_TITLE_BAR_COLOR)}">
+					<!--selectedColor="0xFFFFFF"-->
+					<mx:ColorPicker id="layoutBackgroundColor" showTextField="true" />
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._('GLOBAL_TITLE_BAR@Title Bar')}">
+					<mx:ComboBox width="220" id="layoutTitlebar" dataProvider="{Utils.getColumns(customLayout.entity, true, false)}" />
+				</mx:FormItem>
+				<!-- visible="{customLayout.display_name==null || isCreate ? false : true}" -->
+				<mx:FormItem label="{i18n._(CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_DISPLAY_NAME)}" >
+					<mx:TextInput width="220" id="displayName" text="{customLayout.display_name}"  />
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._(CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_PLURAL)}" >
+					<mx:TextInput width="220" id="pluralName" text="{customLayout.display_name_plural==null? Database.customLayoutDao.getPlural(customLayout.entity) : customLayout.display_name_plural}" />
+				</mx:FormItem>
+				
+				<mx:FormItem label="{i18n._('GLOBAL_LAYOUT_DEPENDS_ON@Layout depends on')}" >
+					<mx:ComboBox width="220" id="layoutDependOn" change="onChangeDependOn(event)" />
+				</mx:FormItem>
+				
+			</mx:Form>
+			<mx:HRule width="100%"/>
+			<mx:Form id="conditionBox" paddingTop="0" width="100%">				
+				<!--<mx:Label text="Condition" fontWeight="bold" />-->
+				<mx:FormItem label="">
+					<mx:HBox>
+						<mx:Label text="{i18n._(CUSTOMLAYOUTDETAIL_LABEL_TEXT_FIELD)}" width="160" fontWeight="bold" />
+						<mx:Label text="{i18n._(CUSTOMLAYOUTDETAIL_LABEL_TEXT_OPERATOR)}" width="110" fontWeight="bold" />
+						<mx:Label text="{i18n._(CUSTOMLAYOUTDETAIL_LABEL_TEXT_VALUE)}" width="160" fontWeight="bold" />
+					</mx:HBox>
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._(CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_CONDITION)} 1">
+					<mx:HBox>
+						<mx:ComboBox id="layoutField1" width="160" change="changeFieldAction(event)" />
+						<mx:ComboBox id="layoutOperator1" dataProvider="{operatorData}" change="onChangeOperator(event)" width="110" />
+						<mx:ComboBox id="cbolayoutValue1" visible = "false" includeInLayout="false" width="150"  />
+						<mx:CheckBox id="chklayoutValue1" visible = "false" includeInLayout="false"/>
+						<mx:HBox>
+							<mx:TextInput id="layoutValue1" visible = "true" width="150" />
+							<mx:Button id="btnOp1" click="openMultiPicklistPopup()" label="Add" visible="false" />							
+						</mx:HBox>
+					</mx:HBox>
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._(CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_CONDITION)} 2">
+					<mx:HBox>
+						<mx:ComboBox id="layoutField2" width="160" change="changeFieldAction(event)" />
+						<mx:ComboBox id="layoutOperator2" dataProvider="{operatorData}" width="110" />
+						<mx:TextInput id="layoutValue2" visible = "true" includeInLayout="false" width="150" />
+						<mx:ComboBox id="cbolayoutValue2" visible = "false" includeInLayout="false" width="150"  />
+						<mx:CheckBox id="chklayoutValue2" visible = "false" includeInLayout="false"/>
+					</mx:HBox>
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._(CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_CONDITION)} 3">
+					<mx:HBox>
+						<mx:ComboBox id="layoutField3" width="160" change="changeFieldAction(event)" />
+						<mx:ComboBox id="layoutOperator3" dataProvider="{operatorData}" width="110" />
+						<mx:TextInput id="layoutValue3" visible = "true" includeInLayout="false" width="150" />
+						<mx:ComboBox id="cbolayoutValue3" visible = "false" includeInLayout="false" width="150"  />
+						<mx:CheckBox id="chklayoutValue3" visible = "false" includeInLayout="false"/>
+					</mx:HBox>
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._(CUSTOMLAYOUTDETAIL_FORMITEM_LABEL_CONDITION)} 4">
+					<mx:HBox>
+						<mx:ComboBox id="layoutField4" width="160" change="changeFieldAction(event)" />
+						<mx:ComboBox id="layoutOperator4" dataProvider="{operatorData}" width="110" />
+						<mx:TextInput id="layoutValue4" visible = "true" includeInLayout="false" width="150" />
+						<mx:ComboBox id="cbolayoutValue4" visible = "false" includeInLayout="false" width="150"  />
+						<mx:CheckBox id="chklayoutValue4" visible = "false" includeInLayout="false"/>
+					</mx:HBox>
+				</mx:FormItem>
+			</mx:Form>
+			
+			
+			<mx:HBox width="95%" horizontalAlign="right" verticalAlign="middle">	
+				<mx:Button id="fieldLayoutBtn" label="{i18n._(CUSTOMLAYOUTDETAIL_BUTTON_LABEL_FIELD_LAYOUT)}" icon="@Embed('/assets/customize.png')" click="editLayout()"/>
+				<control:DetailButtonBar id="actionButtonAdd" buttonIcon="@Embed('/assets/add.png')" action="commit" buttonLabel="GLOBAL_ADD"/>
+				<control:DetailButtonBar id="actionButtonUpdate" buttonIcon="@Embed('/assets/edit.png')" action="commit" buttonLabel="GLOBAL_UPDATE"/>
+			</mx:HBox>
+		</mx:VBox>	
+	</mx:Canvas>
+</mx:Window>

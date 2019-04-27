@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="800" height="400"
+	title="{i18n._('GLOBAL_VALIDATION_RULE')}"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init()"
+	
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.control.CalculatedField;
+			import gadget.control.ValidationRule;
+			import gadget.dao.CustomFieldDAO;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridItemRenderer;
+			import mx.events.CloseEvent;
+			
+			private function init():void {	
+				gridRule.addEventListener(MouseEvent.DOUBLE_CLICK, function(e:MouseEvent):void{
+					if(e.target is DataGridItemRenderer && !(e.target.data is DataGridColumn)){
+						openWindow_clickHanler(e,e.target.data);
+					}
+				});
+				cbolanguageCodes.selectedIndex = CalculatedField.getComboSelectedIndex(cbolanguageCodes,CustomFieldDAO.DEFAULT_LANGUAGE_CODE);
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+				cboEntitys.setFocus();
+			}
+			private function changeLanguageCode():void{
+				var languageCode:String = CalculatedField.getComboDataField(cbolanguageCodes);
+				if(languageCode!=CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+					btnNewField.enabled = false;
+					btndeleteField.enabled = false;
+				}else{
+					btnNewField.enabled = true;
+					btndeleteField.enabled = true;
+				}
+				// fieldsGrid.dataProvider = Database.customFieldDao.selectAll(CalculatedField.getComboDataField(cboEntitys),languageCode);
+				refreshListDataGrid();
+			}
+			private function refreshListDataGrid():void{
+				var list:ArrayCollection = Database.validationRuleDAO.selectAll(CalculatedField.getComboDataField(cboEntitys));
+				//-- translate validation rule--//			
+				var langCode:String = cbolanguageCodes.selectedItem == null ? CustomFieldDAO.DEFAULT_LANGUAGE_CODE : cbolanguageCodes.selectedItem.data;
+				for each (var obj:Object in list){
+					
+					var valTran:Object = Database.validationRuleTranslotorDAO.selectField(obj.entity,obj.ruleName,langCode);
+					if(valTran != null && !StringUtils.isEmpty(valTran['errorMessage'])){
+						obj['errorMessage'] = valTran['errorMessage'] ;
+					}
+					obj['active_'] = obj.active=="1"?true:false;
+					
+				}
+				gridRule.dataProvider = list;
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function btnDelete_clickHanler(event:MouseEvent):void {
+				var selectedList:ArrayCollection = null;
+				if(gridRule != null && gridRule.dataProvider != null){
+					selectedList = FieldManagmentWindow.getListSelectedData(gridRule)
+				}
+				if(selectedList != null && selectedList.length>0){
+					Alert.show(i18n._('GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE'),titlebar.title, Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+						if (event.detail==Alert.YES){
+							for each(var obj:Object in selectedList){
+								Database.validationRuleTranslotorDAO.deleteByRuleName(obj);
+								Database.validationRuleDAO.deleteByRuleName(obj);
+							}
+							refreshListDataGrid();
+						}    	 
+					});
+				}else{
+					Alert.show(i18n._('GLOBAL_PLEASE_SELECT_A_RECORD'), "", Alert.OK, this);
+				}	
+				
+			}
+			private function openWindow_clickHanler(event:MouseEvent,objectRule:Object=null):void {
+				if(!StringUtils.isEmpty(cboEntitys.text)){
+					var validationRule:ValidationRule = new ValidationRule();
+					validationRule.entity = CalculatedField.getComboDataField(cboEntitys);
+					validationRule.ruleName = objectRule==null?"":objectRule.ruleName;		
+					validationRule.langaugeCode = cbolanguageCodes.selectedItem == null ? CustomFieldDAO.DEFAULT_LANGUAGE_CODE : cbolanguageCodes.selectedItem.data;
+					validationRule.refreshGridEntity = refreshListDataGrid;
+					WindowManager.openModal(validationRule);
+				}else{
+					Alert.show(i18n._('GLOBAL_PLEASE_SELECT_ENTITY_FRIST'),this.title, Alert.OK, this);
+				}
+				
+			}
+			
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="800" height="400" right="0" bottom="0">
+		<control:TitleBar title="{i18n._('GLOBAL_VALIDATION_RULE')}" icon="@Embed(source='/assets/customize.png')" id="titlebar" y="2" x="25"/>
+		<!--mx:VBox top="40" left="0" right="0" bottom="0"-->
+			<!-- mx:Canvas width="100%" -->
+				<mx:VBox top="40" left="0" right="0" bottom="0">
+					<mx:Form paddingTop="5" paddingLeft="0" width="100%">	
+						<mx:FormItem>
+							<mx:HBox>
+								<mx:Label text="{i18n._('GLOBAL_ENTITY')}" textAlign="right" width="100" fontWeight="bold" />
+								<mx:ComboBox id="cboEntitys" dataProvider="{FieldManagmentWindow.entityList}" labelFunction="{FieldManagmentWindow.getEntityDisplayName}" change="refreshListDataGrid()" width="160" />
+								<mx:Label text="{i18n._('GLOBAL_LANGUAGE')}" fontWeight="bold" />
+								<mx:ComboBox id="cbolanguageCodes" dataProvider="{FieldManagmentWindow.languageCodes}" change="changeLanguageCode()" width="160" />
+
+							</mx:HBox>
+						</mx:FormItem>
+						<mx:FormItem paddingTop="10">
+							<mx:VBox>							
+								<mx:HBox paddingLeft="10">
+									<mx:DataGrid id="gridRule" width="760"  doubleClickEnabled="true" height="230">
+										<mx:columns>
+											<mx:DataGridColumn sortable="false" width="30" dataField="batchUpdate" headerText="{i18n._('check Delete')}" itemRenderer="CheckBoxRenderer" headerRenderer="CheckBoxRenderer" rendererIsEditor="true" />
+											<mx:DataGridColumn dataField="ruleName" headerText="{i18n._('GLOBAL_RULE_NAME')}"/>
+											<mx:DataGridColumn dataField="message" headerText="{i18n._('GLOBAL_DESCRIPTION')}"/>
+											<mx:DataGridColumn dataField="errorMessage" headerText="{i18n._('GLOBAL_ERROR_MESSAGE')}"/>
+											<mx:DataGridColumn dataField="value" headerText="{i18n._('GLOBAL_VALUE')}"/>
+											<mx:DataGridColumn dataField="orderNo" headerText="{i18n._('GLOBAL_ORDER_NO')}" width="60"/>
+											<mx:DataGridColumn dataField="active_" headerText="{i18n._('GLOBAL_ACTIVE')}" width="60"/>
+										</mx:columns>
+									</mx:DataGrid>
+								</mx:HBox>
+								<mx:HBox paddingLeft="20">
+									<mx:Button id="btnNewField" label="{i18n._('GLOBAL_CREATE')}" click="openWindow_clickHanler(event)" right="0"/>
+									<mx:Button id="btndeleteField" label="{i18n._('GLOBAL_DELETE')}" click="btnDelete_clickHanler(event)" right="0"/>
+								</mx:HBox>
+							</mx:VBox>						
+						</mx:FormItem>				
+					</mx:Form>
+					<mx:HBox width="95%" horizontalAlign="right">
+						<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" right="0" icon="{ImageUtils.cancelIcon}"/>
+						<!-- mx:Button id="createBtn" label="{i18n._('GLOBAL_SAVE')}" click="update_clickHanler(event)" right="0" icon="{ImageUtils.acceptIcon}"/ -->
+					</mx:HBox>
+				</mx:VBox>	
+			<!--/mx:Canvas -->
+		<!--/mx:VBox -->
+	</mx:Canvas>
+	
+</mx:Window>

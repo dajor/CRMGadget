@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window
+		xmlns:mx="http://www.adobe.com/2006/mxml"
+		xmlns:control="gadget.control.*"
+		showFlexChrome="false" systemChrome="none" 
+		resizable="false"			
+		layout="absolute" width="800" height="600" creationComplete="init()"  showStatusBar="false">
+	<mx:Script>
+		<![CDATA[
+			import com.ibm.ilog.elixir.timeline.skins.spark.BTTVTimelineRangeSelectorSkin;
+			
+			import gadget.dao.BaseDAO;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.containers.Panel;
+			import mx.controls.Label;
+			
+			
+			[binable]public var syncEnd:Function;
+			[binable]public var datas:ArrayCollection;
+			
+			public var startSyn:Function;
+			protected var cancel:Boolean = false;
+			
+			private function dispose():void{
+
+				if(syncEnd!=null){
+					cancel = true;
+					syncEnd(false);					
+				}
+				this.close();
+				
+				
+			}
+			
+			private function updateDataFromCRM():void{
+				Database.begin();
+				for each (var obj:Object in datas){
+					var localeObj:Object = obj.localeRec;
+					var serverObj:Object = obj.serverRec;
+					localeObj.deleted = false;
+					localeObj.local_update = null;
+					localeObj.error = false;
+					for(var f:String in serverObj){
+						localeObj[f]=serverObj[f];
+					}
+					var dao:BaseDAO = Database.getDao(localeObj.gadget_type);
+					dao.updateByOracleId(localeObj);
+					
+				}
+				
+				
+				Database.commit();
+			}
+			
+			
+			private function continueAction():void{
+				this.close();
+				
+			}
+			
+		
+			
+			private function init():void{
+				cancel = false;
+				var recCount:int=0;
+				if(datas!=null){
+					recCount = datas.length;
+				}
+				lblInfo.text = i18n._('YOURS_G2G_HAS_REC_CONFLICT_WITH_CRM@Your G2G has {1} record(s) that conflict with CRM.',recCount);
+				addEventListener(Event.CLOSE,closeListener);
+			}
+			private function closeListener(event:Event):void{
+				if(!cancel){
+					if(chkUnsure.selected){
+						var mergeConflicts:MergeConflictsObject=new MergeConflictsObject();
+						mergeConflicts.datas=datas;
+						mergeConflicts.syncEnd=syncEnd;
+						mergeConflicts.startSyn=startSyn;
+						WindowManager.openModal(mergeConflicts);
+					}else if(chkCRM.selected){
+						updateDataFromCRM();
+						startSyn();
+					}else{
+						//nothing to do when chkg2g selected
+						startSyn();
+					}
+				}
+			}
+			private function setTitle(title:String):void {
+				this.title = title;
+				titlebar.title=title;
+			
+			}
+			
+			private function chkClieckEvent(event:MouseEvent):void{
+				var target:CheckBox = event.currentTarget as CheckBox;
+				if(target.selected){
+					if(chkCRM!=target){
+						chkCRM.selected=!target.selected;
+					}
+					if(chkG2G!=target){
+						chkG2G.selected=!target.selected;
+					}
+					if(chkUnsure!=target){
+						chkUnsure.selected=!target.selected;
+					}
+				}
+				btnContinue.enabled=target.selected;
+			}
+			
+			
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	
+	<mx:Canvas width="100%" height="100%" horizontalScrollPolicy="off" styleName="main" left="0" top="0" bottom="0">
+		<control:TitleBar closeable="false" id="titlebar" y="2" x="25" title="{i18n._('CONFLICT_OVERVIEW@Conflict Overview')}"/>
+		<mx:VBox width="100%" height="100%" paddingTop="35" paddingBottom="10" paddingLeft="10" paddingRight="10">
+			
+				<mx:VBox width="100%" height="100%">
+					<mx:Label id="lblInfo" width="100%" height="38" color="#87CEEB" fontSize="20" fontWeight="bold"
+							  textAlign="center" />
+					<mx:Label id="lblsync" width="100%" height="30" fontSize="16" fontWeight="bold"
+							  text="{i18n._('SYNC_YOUR_G2G_OFTEN_TO_AVOID_CONFLICTS@Sync your G2G often to avoid conflicts.')}" textAlign="center"/>
+					<mx:Label height="60"/>
+					<mx:Label paddingLeft="15" height="38" width="100%"  color="#87CEEB" fontSize="20" fontWeight="bold"
+							  horizontalCenter="11" text="{i18n._('WHICH_DATA_MORE_ACCURATE@Which data is more accurate?')}"/>
+					<mx:CheckBox id="chkG2G" paddingLeft="15"   width="100%" height="26" label="{i18n._('YOURS_G2G@Your G2G')}" fontSize="16" click="chkClieckEvent(event)" />
+					<mx:CheckBox paddingLeft="15" id="chkCRM" width="100%" height="26" label="{i18n._('CRM (The main system)')}" fontSize="16" click="chkClieckEvent(event)"/>
+					<mx:CheckBox paddingLeft="15" id="chkUnsure" width="100%" height="26" label="{i18n._('UNSURE_REVIEW_EACH_CONFLICT@Unsure; review each conflict')}" click="chkClieckEvent(event)" fontSize="16"/>
+					
+				</mx:VBox>
+			
+			
+			<mx:HBox width="100%" horizontalAlign="right" paddingTop="4" paddingRight="8">
+				<mx:Button label="{i18n._('GLOBAL_CANCEL@Cancel')}" click="dispose()" />
+				<mx:Button id = "btnContinue" label="{i18n._('CONTINUE@Continue')}" click="continueAction()" enabled="false" />
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

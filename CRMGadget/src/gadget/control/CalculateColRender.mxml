@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.service.PicklistService;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+
+
+			private var _columns:ArrayCollection;
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid = null;
+		
+			public function get columns():ArrayCollection
+			{
+				return _columns;
+			}
+			
+			public function set columns(value:ArrayCollection):void
+			{
+				_columns = value;
+			}
+			
+			override public function set data(value:Object):void
+			{
+				
+				super.data = value;
+				var total:int = 0;
+				if(columns != null && value != null && column != null){
+					for each(var objCol:String in columns){
+						
+						var val:int = parseInt(value[objCol]);
+						total =  val + total;
+						
+					}
+					super.data[column.dataField] = total;
+					cal.text = total+"";
+				}
+			}
+			
+			override public function set listData(value:BaseListData):void
+			{
+				// TODO Auto Generated method stub
+				super.listData = value;
+				if(value!=null){
+					grid = value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						
+					}
+					
+				}
+			}
+
+		]]>
+		
+	</fx:Script>
+	<mx:Label id="cal" />
+</s:MXAdvancedDataGridItemRenderer>

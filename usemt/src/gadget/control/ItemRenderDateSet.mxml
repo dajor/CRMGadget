@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox 
+		xmlns:control="gadget.control.*"
+		xmlns:mx="http://www.adobe.com/2006/mxml"
+		>
+	<mx:Script>
+		<![CDATA[
+			
+		]]>
+	</mx:Script>
+	<mx:HBox horizontalGap="20">
+		<mx:Label text="{data.StartTime}" />
+		<mx:Label text="{data.Subject}" />
+	</mx:HBox>
+	<mx:HRule width="100%" />
+</mx:VBox>

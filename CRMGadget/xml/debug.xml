@@ -1,0 +1,7 @@
+<configuration>
+  <prefs>
+    <pref key="response_log">(*)</pref>
+    <pref key="request_log">(*)</pref>
+    <pref key="verbose">1</pref>
+  </prefs>
+</configuration>

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	title="Add leads to campaign {item.CampaignName}"
+	width="400" height="250" verticalAlign="middle"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.DAO;
+			import gadget.dao.Database;
+			import gadget.dao.LeadDAO;
+			import gadget.dao.RecordTypeDAO;
+			import gadget.i18n.i18n;
+			import gadget.lists.ListDetail;
+			import gadget.util.FieldUtils;
+			import gadget.util.ImageUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.ItemClickEvent;
+			
+			[Bindable] public var item:Object;
+			[Bindable] public var filterList:ArrayCollection;
+			
+			// Change to use ImageUtils
+//			[Bindable] [Embed("assets/accept.png")] private var acceptIcon:Class;
+//			[Bindable] [Embed("assets/cancel.png")] private var cancelIcon:Class;
+			
+			public var detail:ListDetail;
+			
+			private function init():void {
+				filterList = Database.filterDao.listFiltersCriteria("Contact");
+				for each(var obj:Object in filterList){
+					//CRO Bug fixing 69 20.01.2011
+					var objName:String = (obj.name as String);
+					objName = objName.indexOf('GLOBAL') == -1 ? objName : i18n._(objName);
+					obj.name = objName.replace("{ENTITY}",Database.customLayoutDao.getPlural("Contact"));
+					//obj.name = (obj.name as String).replace("{ENTITY}",Database.customLayoutDao.getPlural("Contact"));
+				}
+				
+			}
+			
+			private function buttonsHandle(e:ItemClickEvent):void{
+				if (e.label == i18n._("GLOBAL_ADD_LEADS")) {
+					if(gridFilter.selectedIndex < 0){
+						Alert.show(i18n._("GLOBAL_PLEASE_SELECT_A_CONTACT_FILTER"), "", Alert.OK, this);
+						return;
+					}
+					var itemGridFilter:Object = gridFilter.selectedItem;
+					
+					var baseDao:DAO = Database.getDao(itemGridFilter.entity);
+					var contactRecords:ArrayCollection = baseDao.findAll(
+						FieldUtils.DEFAULT_MAP_FIELD_CONTACT, 
+						FieldUtils.computeFilter(itemGridFilter));
+					var leadDao:LeadDAO = Database.leadDao;
+					var countRecord:Number = 0;
+					for each(var contact:Object in contactRecords){
+						if(!leadDao.checkExistContact(contact.ContactId, item.CampaignId)){
+							leadDao.insert(mapLeadField(contact, item.CampaignId));
+							var lead:Object = leadDao.selectLastRecord()[0];
+							// by default, sets the OracleId as gadget_id
+							lead["LeadId"] = "#" + lead.gadget_id;
+							leadDao.update(lead);
+							countRecord ++;
+						}
+					}
+					if (countRecord == contactRecords.length){
+						//CRO 12.01.2011
+						Alert.show(countRecord + " " + i18n._("GLOBAL_LEADS_ADDED_TO") + " " + item.CampaignName + ".", "", Alert.OK, this);
+					} else if(countRecord > 0){
+						var existsRecord:Number = contactRecords.length - countRecord;
+						Alert.show(countRecord + " " + i18n._("GLOBAL_LEADS_ADDED_TO") + " " + item.CampaignName + 
+							"\n" + existsRecord + " " + i18n._("GLOBAL_LEADS_ALREADY_EXIST"), "", Alert.OK, this);
+					} else {
+						Alert.show(contactRecords.length + " " + i18n._("GLOBAL_LEADS_ALREADY_EXIST_IN") + " " + item.CampaignName + ".", "", Alert.OK, this);
+					}
+					gridFilter.selectedIndex = -1;
+					detail.loadData();
+					detail.validateNow();
+					return;
+				}
+				this.close();
+			}
+			
+			private function mapLeadField(obj:Object, campaignId:String):Object{
+				var lead:Object = new Object();
+				lead.LeadFirstName = obj.ContactFirstName;
+				lead.LeadLastName = obj.ContactLastName;
+				lead.ContactId = obj.ContactId;
+				lead.CampaignId = campaignId;
+				lead.ContactFirstName = obj.ContactFirstName;
+				lead.ContactLastName = obj.ContactLastName;
+				lead.deleted = false;
+				return lead;
+			}
+			
+			
+		]]>
+	</mx:Script>
+	
+	
+	<mx:Canvas styleName="main" left="0" top="0" width="400" height="250" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/contact.png')" title="{i18n._('GLOBAL_ADD_LEADS_TO_CAMPAIGN')} {item.CampaignName}"/>
+		<mx:VBox top="40" left="16" right="16" width="100%">
+			<mx:DataGrid id="gridFilter" width="100%" dataProvider="{filterList}">
+				<mx:columns>
+					<mx:DataGridColumn headerText="{i18n._('GLOBAL_FILTER_CONTACTS')}" dataField="name"/>
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox width="100%" horizontalAlign="right">
+				<mx:ButtonBar id="buttons" itemClick="buttonsHandle(event)">
+					<mx:dataProvider>
+						<mx:Object label="{i18n._('GLOBAL_CLOSE')}" icon="{ImageUtils.cancelIcon}"/>
+						<mx:Object label="{i18n._('GLOBAL_ADD_LEADS')}" icon="{ImageUtils.acceptIcon}"/>
+					</mx:dataProvider>
+				</mx:ButtonBar>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute">
+<maps:Map xmlns:maps="com.google.maps.*" id="map" mapevent_mapready="onMapReady(event)" width="100%" height="100%" url="http://desktop.crm-gadget.com" key="ABQIAAAADLVFWzMFYMu28dkOxNfgART-y38ddP0OAp0wGY0-KVK-F9BaeBTlJb_TNeDzXn7pdnOV1YkAG5Qthw"/>
+<mx:Script>
+<![CDATA[
+
+import com.google.maps.LatLng;
+import com.google.maps.Map;
+import com.google.maps.MapEvent;
+import com.google.maps.MapType;
+
+private function onMapReady(event:Event):void {
+this.map.setCenter(new LatLng(40.736072,-73.992062), 14, MapType.NORMAL_MAP_TYPE);
+}
+]]>
+</mx:Script>
+</mx:Window>
+-->
+
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="650" height="500"
+	title="Google Map" 
+	showFlexChrome="false" xmlns:maps="com.google.maps.*" 
+	transparent="true" systemChrome="none" 
+	creationComplete="init()">
+	
+	<mx:Script>
+		<![CDATA[
+			import com.google.maps.LatLng;
+			import com.google.maps.Map;
+			import com.google.maps.MapEvent;
+			import com.google.maps.MapType;
+			import com.google.maps.MapUtil;
+			
+			import gadget.util.MapUtils;
+			
+			import mx.core.UIComponent;
+			
+			public var apiKey:Object;
+			public var info:Object;
+			public var travel:Boolean = false;
+			
+			private function init():void {
+				titlebar.icon = info.icon;
+				titlebar.title = info.title;
+				//				var mapControl:UIComponent = MapUtils.getMapControl(apiKey,info,true);
+				var mapControl:DisplayObject = travel ? MapUtils.getGoogleMapTravelControl(apiKey, info) : MapUtils.getGoogleMapControl(apiKey,info);
+				mapControl.width = 645;
+				mapControl.height = 460;
+				displayMap.addChild(mapControl);
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="650" height="500" right="0" bottom="0">
+		<control:TitleBar id="titlebar"/>
+		<mx:HBox top="30" left="0" right="0" id="displayMap"/>
+	</mx:Canvas>
+</mx:Window>
+

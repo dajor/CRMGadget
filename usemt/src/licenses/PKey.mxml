@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   systemChrome="none" 
+		   width="330" height="110" showStatusBar="false" 
+		   showFlexChrome="false" transparent="true"
+		   resizable="false" 
+		   title="Enter your product key" 
+		   closing="closingHandler(event);">
+	<fx:Script>
+		<![CDATA[
+			public var okClicked:Boolean = false;
+
+			protected function btnActivate_clickHandler(event:MouseEvent):void
+			{
+				okClicked = true;
+				this.close();
+			}
+
+			protected function btnCancel_clickHandler(event:MouseEvent):void
+			{
+				this.close();
+			}
+
+			public function ShowError(err:String):void
+			{
+				lblErr.text = err;
+			}
+
+			protected function closingHandler(event:Event):void
+			{
+				// if we're currently activating wait for a 
+				// response before allowing the user to close the window
+				if (!this.enabled)
+				{
+					event.preventDefault();
+				}
+			}
+
+			protected function txtPkey_changeHandler(event:Event):void
+			{
+				lblErr.text = "";
+			}
+		]]>
+	</fx:Script>
+	<fx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" width="100%" height="100%" left="0" top="0" right="0" bottom="0" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+		<mx:Canvas id="windowTitleBar" backgroundColor = "#EEEEEE" styleName="titleBar" doubleClickEnabled="true"  mouseDown="nativeWindow.startMove()" height="24" top="2" left="2" right="2">			
+			<mx:Image source="@Embed(source='/assets/smallIcon.png')" height="16" width="16" top="2" left="4"/>			
+			<mx:Button styleName="iconClose" height="16" width="16" top="2" right="4" click="close()"/>
+		</mx:Canvas>
+		<mx:VBox width="100%" top="30" left="2">			
+			<mx:Label text="Enter your product key and click activate:"/>
+			<mx:TextInput  id="txtPkey" change="txtPkey_changeHandler(event)"/>
+			<mx:HBox width="100%">				
+				<mx:Button label="Activate" id="btnActivate" click="btnActivate_clickHandler(event)"/>
+				<mx:Button label="Cancel" id="btnCancel" click="btnCancel_clickHandler(event)"/>
+				<mx:Label text="" id="lblErr" fontWeight="bold"/>
+			</mx:HBox>			
+	   </mx:VBox>
+	</mx:Canvas>	
+</mx:Window>

@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="740" height="580"
+	showFlexChrome="false" 
+	transparent="true" 
+	systemChrome="none" 
+	xmlns:form="gadget.form.*"
+	creationComplete="init()"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.LocaleService;
+			import gadget.util.FieldUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.Relation;
+			import gadget.util.SQLUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.TextInput;
+			import mx.utils.StringUtil;
+			import mx.validators.NumberValidator;
+			import mx.validators.Validator;
+			
+			[Bindable] public var textInput:TextInput;
+			[Bindable] public var _data:Object;
+			[Bindable] private var filter:Object;
+			[Bindable] private var criteria1:Object; // binding column betweet parent and child
+			[Bindable] private var criteria2:Object;
+			[Bindable] private var criteria3:Object;
+			[Bindable] private var criteria4:Object;
+			[Bindable] private var criteria5:Object;
+			[Bindable] private var criteria6:Object;
+			
+			// MultiSelectList
+			[Bindable] private var availableItems:ArrayCollection;
+			[Bindable] private var selectedItems:ArrayCollection;
+			private var validator:Array = [];
+			[Bindable] private var create:Boolean = false;
+			
+			private function init():void {
+				
+				availableItems = new ArrayCollection();
+				selectedItems = new ArrayCollection();
+				filter = new Object();
+				filter.entity_src = _data.entity;
+				filter.list_name = _data.column_name; // column_name {SQLLIST0}, {SQLLIST1}, ...
+				
+				if(_data.hasOwnProperty("criterias") && _data.criterias.length > 0) {
+					criteria1 = _data.criterias[0];
+					criteria2 = _data.criterias[1];
+					criteria3 = _data.criterias[2];
+					criteria4 = _data.criterias[3];
+					criteria5 = _data.criterias[4];
+					criteria6 = _data.criterias[5];
+					filter.entity_dest = criteria1.entity_dest;
+					object.selectedIndex = getComboColIndex(filter.entity_dest);
+					loadData(filter.entity_dest, criteria1.columns);
+				}else {
+					create = true;
+					resetFilterCriteria();
+					object.selectedIndex = 0;
+					loadData();
+				}
+				
+				// check object entity
+				var numberValidator:NumberValidator = new NumberValidator();
+				numberValidator.source = object;
+				numberValidator.property = "selectedIndex";
+				numberValidator.lowerThanMinError = "This field is required.";
+				numberValidator.minValue = 1;
+				validator.push(numberValidator);
+				validator = validator.concat(sqlFilterForm.validate());
+				object.setFocus();
+			}
+			
+			private function getSelectedColumn(entity_dest:String, columns:String):ArrayCollection {
+				var fields:ArrayCollection = new ArrayCollection();
+				if(columns) {
+					for each(var field:String in columns.split(",")) {
+						// var fld:Object = Database.fieldDao.findFieldByPrimaryKey(entity_dest, StringUtil.trim(field));
+						var fld:Object = FieldUtils.getField(entity_dest, StringUtil.trim(field));
+						if(fld == null) fld = FieldUtils.getField(entity_dest, StringUtil.trim(field),false,true);
+						if(fld != null) fields.addItem({entity: fld.entity, label: fld.display_name, column: fld.element_name, type: fld.data_type, data: fld.element_name });
+					}
+				}
+				return fields;
+			}
+			
+			private function update():void {
+				
+				var validatorErrorNumber:Array = Validator.validateAll(validator);
+				
+				if(validatorErrorNumber.length == 0) { // validate successfull
+					
+					if(selectedItems.length == 0) { // check required field
+						Alert.show("Please select at least one field.", "", 4, this);
+						return;
+					}
+					
+					var criterias:ArrayCollection = new ArrayCollection();
+					
+					// bind column between child and parent
+					criteria1.num = "1";
+					criteria1.column_name = sqlFilterForm.bindFilterCol.selectedItem.column;
+					criteria1.operator = "=";
+					criteria1.param = sqlFilterForm.bindFilterParam.selectedItem.column;
+					criteria1.conjunction = "and";
+					criterias.addItem(criteria1);
+					
+					// Criterial1
+					criteria2.num = "2";
+					criteria2.column_name = sqlFilterForm.filterCol1.selectedItem.column;
+					criteria2.operator = sqlFilterForm.filterOp1.selectedItem.data;
+					criteria2.param = getParam(sqlFilterForm.filterParam1, sqlFilterForm.cboFilterParam1);
+					criteria2.conjunction = sqlFilterForm.filterConj1.selectedValue;
+					criterias.addItem(criteria2);
+					
+					// Criterial2
+					criteria3.num = "3";
+					criteria3.column_name = sqlFilterForm.filterCol2.selectedItem.column;
+					criteria3.operator = sqlFilterForm.filterOp2.selectedItem.data;
+					criteria3.param = getParam(sqlFilterForm.filterParam2, sqlFilterForm.cboFilterParam2);
+					criteria3.conjunction = sqlFilterForm.filterConj2.selectedValue;
+					criterias.addItem(criteria3);
+					
+					// Criterial3
+					criteria4.num = "4";
+					criteria4.column_name = sqlFilterForm.filterCol3.selectedItem.column;
+					criteria4.operator = sqlFilterForm.filterOp3.selectedItem.data;
+					criteria4.param = getParam(sqlFilterForm.filterParam3, sqlFilterForm.cboFilterParam3);
+					criteria4.conjunction = sqlFilterForm.filterConj3.selectedValue;
+					criterias.addItem(criteria4);
+					
+					// Criterial4
+					criteria5.num = "5";
+					criteria5.column_name = sqlFilterForm.filterCol4.selectedItem.column;
+					criteria5.operator = sqlFilterForm.filterOp4.selectedItem.data;
+					criteria5.param = getParam(sqlFilterForm.filterParam4, sqlFilterForm.cboFilterParam4);
+					criteria5.conjunction = "";
+					criterias.addItem(criteria5);
+					
+					// Order By
+					criteria6.num = "6";
+					criteria6.column_name = sqlFilterForm.filterCol5.selectedItem.column;
+					criteria6.operator = "";
+					criteria6.param = sqlFilterForm.sortType.selectedValue;
+					criteria6.conjunction = "";
+					criterias.addItem(criteria6);
+					
+					var table:String = DAOUtils.getTable(filter.entity_dest); // get actual table name
+					var columns:String = getColumns();
+					var where:String	= 	StringUtil.trim((
+												SQLUtils.setCondition(criteria1, true) +
+												SQLUtils.setCondition(criteria2) +
+												SQLUtils.setCondition(criteria3) +
+												SQLUtils.setCondition(criteria4) +
+												SQLUtils.setCondition(criteria5)
+											).replace(/(\sand\s|\sor\s)$/gi, "")); // remove trailling and/or at the end of line
+					
+					var orderby:String	=	SQLUtils.setCondition(criteria6);
+					
+					for each(var criteria:Object in criterias) {
+						criteria.entity_src = filter.entity_src;
+						criteria.entity_dest = filter.entity_dest;
+						criteria.list_name = filter.list_name; // {SQLLIST0}, {SQLLIST1}, ...
+						criteria.columns = columns;
+					}
+					
+					var sqlStatement:String = "select " + columns + " from " + table + (where != "" ? " where " + where : "") + (orderby != "" ? " order by " + orderby : "");
+					
+					textInput.text = sqlStatement ? sqlStatement : "";
+					_data.custom = sqlStatement ? sqlStatement : ""; // data reference
+					_data.criterias = criterias;
+					
+					close();
+					
+				}
+				
+			}
+			
+			private function getParam(filterParam:TextInput, cboFilterParam:ComboBox):String {
+				var value:String = filterParam.visible ? filterParam.text : cboFilterParam.selectedItem.data;
+				return value ? value : "";
+			}
+			
+			private function getColumns():String {
+				var data:ArrayCollection = selectedItems;
+				var s:String="";
+				for(var i:int=0; i < data.length; i++) {
+					s += i==0 ? data[i].column : ", " + data[i].column;
+				}
+				return s;
+			}
+			
+			private function listTransaction():ArrayCollection {
+				var trans:ArrayCollection = new ArrayCollection();
+				trans.addItem({data: "", label: ""});
+				for each(var t:Object in Database.transactionDao.listEnabledTransaction()) {
+					trans.addItem({data: t.entity, label: t.entity});
+				}
+				return trans;
+			}
+			
+			private function getComboColIndex(entity:String):int {
+				var trans:ArrayCollection = listTransaction();
+				for(var i:int=0; i < trans.length; i++) {
+					if(entity == trans[i].data) {
+						return i;
+					}
+				}
+				return 0;
+			}
+			
+			private function resetFilterCriteria():void {
+				// {entity_src: "", list_name: "", entity_dest: "", column_name: "", operator: "", param: "", conjunction: "", columns: "", num: ""}
+				criteria1 = {};
+				criteria2 = {};
+				criteria3 = {};
+				criteria4 = {};
+				criteria5 = {};
+				criteria6 = {};
+			}
+			
+			private function changeAction(event:Event):void {
+				var entity_dest:String = (event.currentTarget as ComboBox).selectedItem.data;
+				resetFilterCriteria();
+				loadData(entity_dest);
+			}
+			
+			private function loadData(entity_dest:String=null, columns:String=null):void {
+				if(entity_dest != null) {
+					filter.entity_dest = entity_dest;
+					availableItems = Utils.getColumns(filter.entity_dest, false);
+					selectedItems = getSelectedColumn(filter.entity_dest, columns);
+					sqlFilterForm.init();
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" width="740" height="580" top="0" right="0" bottom="0" left="0">
+		<control:TitleBar title="SQL Create"/>
+		<mx:VBox top="32" left="16" right="16" >
+			<mx:HBox width="100%">
+				<mx:Label text="Object" />
+				<mx:ComboBox width="160" id="object" dataProvider="{listTransaction()}" labelField="label" change="changeAction(event);" />
+			</mx:HBox>
+			<control:MultiSelectList id="multiSelectList" availableItems="{availableItems}" selectedItems="{selectedItems}" width="100%"/>
+			<form:SQLFilterForm id="sqlFilterForm" filter="{filter}" criteria1="{criteria1}"  criteria2="{criteria2}" criteria3="{criteria3}" criteria4="{criteria4}" criteria5="{criteria5}" criteria6="{criteria6}" width="100%"/>
+			<mx:Canvas width="100%">
+				<mx:HBox width="100%" horizontalAlign="right">
+					<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" right="0" icon="{ImageUtils.cancelIcon}"/>
+					<mx:Button id="createBtn" label="{create ? i18n._('GLOBAL_CREATE') : i18n._('GLOBAL_UPDATE')}" click="update()" right="0" icon="{ImageUtils.acceptIcon}" />
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>	
+	</mx:Canvas>
+</mx:Window>

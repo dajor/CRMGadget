@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			public var column:AdvancedDataGridColumn;
+			
+			
+			override public function set data(value:Object):void{		
+				 super.data = value;
+				 if(column!=null && value){
+					 var val:Object = value[column.dataField];	
+					 cborender.dataProvider = value["listfields001"];
+					 cborender.selectedItem=val;
+				 }			
+			 }		
+			private function itemChange(event:Event):void{
+				if(data!=null && column!=null){
+					data[column.dataField] = cborender.selectedItem;				
+				}
+			}
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					var grid:AdvancedDataGrid = value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						cborender.width = column.width-3;
+					}
+				
+				}
+			}
+			
+			private function getLabelField(item:Object):String{
+				if(column!=null){
+					return column.labelFunction(item);
+				}
+				return "";
+			}
+			
+			public function get selectedItem():Object{
+				return cborender.selectedItem
+			}
+			
+			
+			
+		]]>
+		
+	</fx:Script>
+	<mx:ComboBox id="cborender" change="itemChange(event)" labelFunction="getLabelField"  selectedIndex="-1"/>
+</s:MXAdvancedDataGridItemRenderer>

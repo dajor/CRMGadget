@@ -1,0 +1,678 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:control="gadget.control.*"
+		   width="100%" height="100%" 
+		   xmlns:form="gadget.form.*" 
+		   creationComplete="init()"
+		   >
+	
+	<mx:Style>
+		.panelStyle{
+			height:100px;
+		}
+	</mx:Style>
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.images.JPGEncoder;
+			import com.adobe.serialization.json.JSON;
+			
+			import gadget.control.CustomLinkButton;
+			import gadget.dao.BaseDAO;
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.util.DateUtils;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.MapUtils;
+			import gadget.util.PDFUtil;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Form;
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			import mx.controls.HTML;
+			import mx.controls.Image;
+			import mx.controls.Label;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.rpc.events.ResultEvent;	
+			
+	
+			private static const DAILYAGENDA_NO_MATCH_ROW_ID:String = 'DAILYAGENDA_NO_MATCH_ROW_ID';
+			public static const DAILYAGENDA_LABEL_STARTTIME:String = 'DAILYAGENDA_LABEL_STARTTIME';
+			public static const DAILYAGENDA_LABEL_ENDTIME:String = 'DAILYAGENDA_LABEL_ENDTIME';
+			public static const DAILYAGENDA_LABEL_LOCATION:String = 'DAILYAGENDA_LABEL_LOCATION';
+			public static const DAILYAGENDA_LABEL_NOTE:String = 'DAILYAGENDA_LABEL_NOTE';
+			//CRO 05.01.2011
+			public static const DAILYAGENDA_LABEL_ACCOUNT_NAME:String = 'GLOBAL_ACCOUNT_NAME';
+			public static const DAILYAGENDA_LABEL_ACCOUNT_TYPE:String = 'DAILYAGENDA_LABEL_ACCOUNT_TYPE';
+			public static const DAILYAGENDA_LABEL_ANNUAL_REVENUES:String = 'GLOBAL_ANNUAL_REVENUES';
+			private static const DAILYAGENDA_MSG_LOADING:String = 'DAILYAGENDA_MSG_LOADING';
+			
+			private static const DAILYAGENDA_ALERT_MSG_THE_LOGO_IMAGE_MUST_NOT_HAVE:String = 'GLOBAL_ALERT_MSG_LOGO_ERROR';
+			private static const DAILYAGENDA_TITLEBAR_LABEL_DIALY_AGENDA:String = 'GLOBAL_DAILY_AGENDA';
+			private static const DAILYAGENDA_LABEL_TEXT_TRAVEL_SCHEDULE:String = 'DAILYAGENDA_LABEL_TEXT_TRAVEL_SCHEDULE';
+			private static const DAILYAGENDA_TOOLTIP_PDF_EXPORT:String = 'GLOBAL_PDF_EXPORT';
+			[Bindable] private var visibleSurvey:Boolean = false;
+
+			private static const DAILYAGENDA_TOOLTIP_PDF_EXPORT_LAYOUT:String = 'DAILYAGENDA_PDF_EXPORT_LAYOUT';
+		
+			private var selectedItem:Object;
+			private var timeFormatString:String;
+			private var startInspection:StartInspection;
+			private var currentDate:Date;
+			private var  mapObj:Object = new Object();
+			private function init():void{
+				startInspection = new StartInspection();
+				// Request #5581 Daily Agenda PDF export
+				CustomLayoutPDFExport.initExportLayout();
+				
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+				timeFormatString = DateUtils.getCurrentUserDatePattern().timeFormat;
+				currentDate = new Date();
+				reloadData(currentDate);
+				
+				dateSetPanel.tileList.doubleClickEnabled = true;
+				dateSetPanel.tileList.addEventListener(ListEvent.ITEM_CLICK, itemClickHandler);
+				dateSetPanel.tileList.addEventListener(ListEvent.ITEM_DOUBLE_CLICK, itemDoubleClickHandler);
+				loadBtn.x = (imap.width / 2 - loadBtn.width) + 30;
+				loadBtn.y = imap.height / 2 - loadBtn.height;
+				
+				var disabledPDFExport:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_PDF_EXPORT);
+				pdfExportBtn.enabled = !disabledPDFExport;
+				
+				var disable_layout_Manager:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_LAYOUT_MANAGER) as Boolean;				
+				pdfExportLayoutBtn.visible =  !disable_layout_Manager;
+				pdfExportLayoutBtn.includeInLayout = !disable_layout_Manager;
+			}
+			
+			public function loadDataOfSelectedDate():void{
+				if(currentDate!=null){
+					reloadData(currentDate);
+				}
+				
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					//this.close();
+				}
+			}
+			private function nextDayClickHandler(event:MouseEvent):void{
+				var date:Date = dateSetPanel.getDataLabel() as Date;
+				date.setDate(date.getDate() + 1);
+				currentDate = date;
+				reloadData(date);
+			}
+			
+			private function previousDayClickHandler(event:MouseEvent):void{
+				var date:Date = dateSetPanel.getDataLabel() as Date;
+				date.setDate(date.getDate() - 1);
+				currentDate = date;
+				reloadData(date);
+			}
+			
+			private function nextMonthClickHandler(event:MouseEvent):void{
+				var date:Date = dateSetPanel.getDataLabel() as Date;
+				date.setMonth(date.getMonth() + 1);
+				currentDate = date;
+				reloadData(date);
+			}
+			
+			private function previousMonthClickHandler(event:MouseEvent):void{
+				var date:Date = dateSetPanel.getDataLabel() as Date;
+				date.setMonth(date.getMonth() - 1);
+				currentDate = date;
+				reloadData(date);
+			}
+			
+			
+			
+			private function reloadData(date:Date):void{
+				visibleSurvey = false;
+				var markerLetter:Array = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R","S", "T", "U", "V", "W", "X", "Y", "Z"];
+				imap.removeAllChildren();
+				//var dataSource:ArrayCollection = Database.activityDao.getCurrentAppointmentList(getStartTimeEndTime(date));
+				var criteria:Object = getStartTimeEndTime(date);
+				criteria.OwnerId = Database.allUsersDao.ownerUser().Id;
+				var dataSource:ArrayCollection = Database.activityDao.getCurrentAppointmentAccountList(criteria);
+				var relationWithAccount:Object = Relation.getRelation("Activity", "Account");
+				var relationWithContact:Object = Relation.getRelation("Activity", "Contact");
+				var itemsAcount:Array = new Array();
+				
+			
+				for each(var activity:Object in dataSource){
+					activity['icon'] = ImageUtils.getImageDailyAgenda(activity);
+					activity.stTime = DateUtils.format(DateUtils.guessAndParse(activity.StartTime), timeFormatString);
+					activity.enTime = DateUtils.format(DateUtils.guessAndParse(activity.EndTime), timeFormatString);
+					
+					if(activity[relationWithContact.keySrc] && activity[relationWithContact.keySrc] != "No Match Row Id"){				
+						var contact:Object = Database.contactDao.findByOracleId(activity[relationWithContact.keySrc]);
+						if(contact){
+							activity.conFirstName = contact.ContactFirstName;
+							activity.conLastName = contact.ContactLastName;
+							activity.conCellularPhone = contact.CellularPhone==null?"":contact.CellularPhone;
+						}
+					}
+					if(activity[relationWithAccount.keySrc] && activity[relationWithAccount.keySrc] != "No Match Row Id"){
+						var account:Object = Database.accountDao.findByOracleId(activity[relationWithAccount.keySrc]);
+						if(account){
+							var address:String = account.PrimaryShipToStreetAddress;
+							var code:String = account.PrimaryShipToPostalCode;
+							var city:String  = account.PrimaryShipToCity;
+							if(StringUtils.isEmpty(address) && StringUtils.isEmpty(code) && StringUtils.isEmpty(city)) {
+								address = account.PrimaryBillToStreetAddress;
+								code = account.PrimaryBillToPostalCode;
+								city = account.PrimaryBillToCity;
+							}
+							account.address = GUIUtils.getAddress(Database.accountDao.entity,account);//StringUtil.trim((address ? address + ' ' : '') + (code ? code + ' ' : '') + (city ? city : ''));
+							activity.address = account.address;
+							itemsAcount.push(account);
+							if(!StringUtils.isEmpty(address) || !StringUtils.isEmpty(code) || !StringUtils.isEmpty(city)){
+								if(markerLetter.length > 0) {
+									activity.mark = markerLetter.shift();
+									
+									
+									
+								}
+							}
+						}
+					}
+					
+				}
+				
+				var childObj:DisplayObject = GUIUtils.getMapTravelComponet("Account", itemsAcount);
+				if(childObj){
+					(childObj as HTML).addEventListener(Event.COMPLETE, function(e:Event):void {
+						loadBtn.visible = false;
+						loadBtn.includeInLayout = false;
+					});
+					loadBtn.start();
+					loadBtn.label = i18n._(DAILYAGENDA_MSG_LOADING);
+					loadBtn.visible = true;
+					loadBtn.includeInLayout = true;
+					childObj.width = 365;
+					childObj.height = 225;
+					imap.addChild(childObj);
+				}else {
+					if(markerLetter.length == 26) {
+						loadBtn.label = "";
+						loadBtn.visible = false;
+						loadBtn.includeInLayout = false;
+					}
+				}
+				imap.addChild(loadBtn);
+				//total.text = "Total Marks - " + itemsAcount.length;
+				clearData();
+				dateSetPanel.setTextLabel(DateUtils.format(date, "EEEE, MMMM DD, YYYY"), date);
+				if(dataSource.length>1){
+					//A->B, if have more thant 2 point of map
+					var orignal:Object = dataSource.getItemAt(0);
+					var activity:Object = dataSource.getItemAt(1);
+					MapUtils.getDuration(orignal.address,activity.address,function (event:Event):void{ onDirLoad(event,activity.address,dataSource,1)});
+				}else{
+					loadDataGrid(dataSource);
+				}
+				
+				
+			}
+			private function loadDataGrid(dataSource:ArrayCollection):void {
+				dateSetPanel.vs.selectedIndex = dataSource.length > 0 ? 0 : 1; // 0 = DataGrid to display data, 1 = HBox 'No appointment'
+				dateSetPanel.dataProvider = dataSource;
+				dateSetPanel.refreshTotal();
+				setDefaultDataGrid();
+			}
+			private function setDefaultDataGrid():void {
+				if(dateSetPanel.dataProvider.length > 0) {
+					if(selectedIndex!=-1 && selectedIndex<dateSetPanel.dataProvider.length){
+						dateSetPanel.tileList.selectedIndex = selectedIndex;
+					}else{
+						dateSetPanel.tileList.selectedIndex = 0;	
+					}
+					
+					itemClickHandler(null);
+				}
+			}
+			
+		
+			
+			private function onDirLoad(event:Event,startAddress:String,dataSource:ArrayCollection,count:int):void{
+				try {
+					if(event is ResultEvent){
+						var rsEvent:ResultEvent = event as ResultEvent;
+						var activity:Object = dataSource.getItemAt(count);
+						var json:Object = JSON.decode(rsEvent.result as String);
+						//trace("url request driving status:" + json.status);
+						//trace(json.toString());
+						if(json.status == "OK"){
+							var rows:Object = json.rows;
+							if(rows != null){
+								var elements:Object = rows[0].elements[0];
+								
+								if(elements != null){
+//									var distance:Object = elements.distance;
+//									var duration:Object = elements.duration;								
+									//activity.duration = distance.text +"/" + getDuration(duration.value);
+									activity.mapDistance=elements;
+								}
+								
+								
+							}
+							
+							
+							//						var region:String = json.results[0].address_components[0].short_name;
+							
+						}
+					}
+					count++;
+					if(count == dataSource.length){
+						loadDataGrid(dataSource);
+					}else{
+						var act:Object = dataSource.getItemAt(count);
+						MapUtils.getDuration(startAddress,act.address,function (event:ResultEvent):void{ onDirLoad(event,activity.address,dataSource,count)});
+					}
+					
+					
+				} catch(ignored:Error) {
+					//trace(ignored);
+					loadDataGrid(dataSource);
+				}
+				
+				
+			}
+			private function getStartTimeEndTime(date:Date):Object{
+				var object:Object = new Object();
+				date.setHours(0, 0, 1);
+				
+				var sTime:Date = new Date(date.getTime()-DateUtils.getCurrentTimeZone(date)*GUIUtils.millisecondsPerHour);
+				
+				object.StartTime = DateUtils.format(sTime, DateUtils.DATABASE_DATETIME_FORMAT);
+				date.setHours(23, 59, 59);
+				var endTime:Date = new Date(date.getTime()-DateUtils.getCurrentTimeZone(date)*GUIUtils.millisecondsPerHour);
+				object.EndTime = DateUtils.format(endTime, DateUtils.DATABASE_DATETIME_FORMAT);
+				return object;
+			}
+			//Open daily agenda layout
+			private function editLayout(entity:String,item:Object):void{
+				var dailyLayout:DailyAgendaLayout = new DailyAgendaLayout();
+				dailyLayout.dailyAgenda = this;
+				dailyLayout.entity = entity;
+				dailyLayout.refreshLayout = refreshLayout;
+				dailyLayout.item = item;
+				WindowManager.openModal(dailyLayout);
+			}
+			//Create edit layout
+			public function createButton(_icon:Class,_tootip:String,entity:String,item:Object):LinkButton{
+				var button:LinkButton = new LinkButton();
+				button.label = _tootip;
+				button.setStyle("icon", _icon);
+				button.toolTip = _tootip;
+				button.addEventListener(MouseEvent.CLICK,function(e:MouseEvent):void{
+					editLayout(entity,item);
+				});
+				return button;
+			}
+			private function getEditLayoutIcon(entity:String,item:Object):HBox{
+				var disable_layout_Manager:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_LAYOUT_MANAGER) as Boolean;
+				var hboxIconEdit:HBox = new HBox();
+				hboxIconEdit.percentWidth = 100;
+				hboxIconEdit.addChild(createButton(ImageUtils.customIcon,i18n._('GLOBAL_EDIT_LAYOUT'),entity,item));
+				hboxIconEdit.setStyle("horizontalAlign", "right");
+				hboxIconEdit.enabled = !disable_layout_Manager;
+				return hboxIconEdit;
+			}
+			private function getDisplayName(item:Object,entity:String):String{
+				var field:Object =  FieldUtils.getField(entity, item.element_name);
+				if(field==null) field =  FieldUtils.getField(entity, item.element_name, false, true); // read custom field
+				return field == null ? "" : field.display_name;
+			}
+			private function refreshLayout(item:Object):void{
+				
+				if(item.gadget_type!=Database.activityDao.entity){
+					return;
+				}
+				clearData();
+				detailPanel.title = item.Subject;
+				detailPanel.toolTip = item.Subject
+				
+				var hbox:HBox = new HBox();
+				//hbox.setStyle("horizontalGap", "10");
+				hbox.percentWidth = 100;
+				var formActivity:Form = new Form();
+				var column0s:ArrayCollection = Database.dailyAgendaColumnLayoutDao.selFieldByEntity(Database.activityDao.entity);
+				var realItem:Object = Database.activityDao.findByGadgetId(item.gadget_id);
+				if(column0s.length == 0 ){
+					column0s = FieldUtils.ACTIVITY_DEFAULT_DAILY_AGENDA;
+				}
+				
+				for each(var activityField:Object in column0s){
+					var formItemActivity:FormItem = new FormItem();
+					formItemActivity.label = activityField.display_name == null ? getDisplayName(activityField,Database.activityDao.entity) : activityField.display_name;
+					var columnValueActivity:Label = new Label();
+					var values:String = realItem[activityField.element_name];
+					if(activityField.element_name == "StartTime" || activityField.element_name == "EndTime"){
+						var date:Date=DateUtils.guessAndParse(values);						
+						values = DateUtils.format(new Date(date.getTime()+DateUtils.getCurrentTimeZone(date)*GUIUtils.millisecondsPerHour), timeFormatString);
+					}
+					columnValueActivity.text = values;
+					columnValueActivity.setStyle("color", "blue");
+					columnValueActivity.id = realItem.gadget_type+realItem.gadget_id;
+					mapObj[realItem.gadget_type+realItem.gadget_id] = realItem;
+					if(activityField.element_name == "Subject"){
+						columnValueActivity.setStyle("textDecoration","underline");
+						columnValueActivity.addEventListener(MouseEvent.CLICK,function(e1:MouseEvent):void{
+							var currentLabel:Label = e1.currentTarget as Label;
+							openDetail(currentLabel.id);
+						});
+					}
+					formItemActivity.addChild(columnValueActivity);
+					formActivity.addChild(formItemActivity);
+				}
+				
+				detailPanel.addChild(getEditLayoutIcon("Activity",realItem));
+				hbox.addChild(formActivity);
+				detailPanel.addChild(hbox);
+				
+				
+				var relationWithAccount:Object = Relation.getRelation("Activity", "Account");
+				if(realItem[relationWithAccount.keySrc] && realItem[relationWithAccount.keySrc] != "No Match Row Id"){
+					var accountObject:Object = Database.accountDao.findByOracleId(realItem[relationWithAccount.keySrc]);
+					if(accountObject){
+						accountPanel.visible = true;
+						accountPanel.includeInLayout=true;
+						accountPanel.title =Database.customLayoutDao.getDisplayName(Database.accountDao.entity)+ ": " + accountObject[relationWithAccount.labelSrc[0]];
+						hbox = new HBox();
+						hbox.setStyle("horizontalGap", "10");
+						hbox.percentWidth = 100;
+						var column1s:ArrayCollection = Database.dailyAgendaColumnLayoutDao.selFieldByEntity(Database.accountDao.entity);
+						if(column1s.length == 0 ) column1s = FieldUtils.ACCOUNT_DEFAULT_DAILY_AGENDA;
+						var formAccount:Form = createForm(accountObject,column1s,Database.accountDao.entity);
+						hbox.addChild(formAccount);
+						accountPanel.addChild(getEditLayoutIcon("Account",realItem));
+						accountPanel.addChild(hbox);
+					}else{
+						accountPanel.visible = false;
+						accountPanel.includeInLayout=false;
+					}
+				}else{ //#5059 CRO
+					accountPanel.visible = false;
+					accountPanel.includeInLayout=false;
+				}
+				
+				var relationWithContact:Object = Relation.getRelation("Activity", "Contact");
+				
+				if(realItem[relationWithContact.keySrc] && realItem[relationWithContact.keySrc] != "No Match Row Id"){
+					
+					contactPanel.title = Database.customLayoutDao.getDisplayName("Contact");
+					var contactObject:Object = Database.contactDao.findByOracleId(realItem[relationWithContact.keySrc]);
+					if(contactObject){
+						contactPanel.visible = true;
+						contactPanel.includeInLayout=true;
+						// -- VM -- bug 486
+						var vbox:VBox = new VBox();
+						//vbox.width = 120;
+						vbox.percentHeight = 120;
+						var img:Image = new Image();;
+						img.width = 100;
+						img.height = 110; //92;
+						img.scaleContent = true;
+						img.setStyle("horizontalAlign", "center"); 
+						img.setStyle("verticalAlign", "middle");
+						
+						if(contactObject["picture"] == null){
+							// img.load("/assets/d_silhouette.gif");
+							//Bg #4993 CRO
+							img.source = ImageUtils.noPhoto;
+						}else{ 
+							img.source = contactObject["picture"];
+						}
+						var label:Label = new Label();
+						label.setStyle("color", "blue");
+						// label.text = contactObject["ContactLastName"] + " " + contactObject["ContactFirstName"];
+						vbox.setStyle("paddingTop", "8");
+						vbox.setStyle("paddingLeft", "8");
+						vbox.addChild(img);
+						// vbox.addChild(label);
+						
+						var hboxContact:HBox = new HBox();						
+						hboxContact.setStyle("horizontalGap", "10");
+						hboxContact.percentWidth = 100; // CellularPhone = Mobile Phone #
+						var columns:ArrayCollection = Database.dailyAgendaColumnLayoutDao.selFieldByEntity(Database.contactDao.entity); // get fields from edit layout
+						if(columns.length == 0 ) columns = FieldUtils.CONTACT_DEFAULT_DAILY_AGENDA; // get default fields
+						var formContact:Form = createForm(contactObject,columns,Database.contactDao.entity);						
+						hboxContact.addChild(vbox);
+						hboxContact.addChild(formContact);
+						contactPanel.addChild(getEditLayoutIcon("Contact",realItem));
+						contactPanel.addChild(hboxContact);
+					}else{
+						contactPanel.visible = false;
+						contactPanel.includeInLayout=false;
+					}
+				}else{//Bug #5656
+					contactPanel.visible = false;
+					contactPanel.includeInLayout=false;
+				}
+			}
+			
+			private function itemClickHandler(event:ListEvent):void{
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_ASSESSMENT_SCRIPT))visibleSurvey = true;
+				var item:Object =null;
+				if(event!=null){
+					item=event.itemRenderer.data;
+				}else{
+					item = dateSetPanel.tileList.selectedItem;
+					if(item==null && dateSetPanel.dataProvider.length>0){
+						item = dateSetPanel.dataProvider.getItemAt(0);
+					}
+				}				
+				selectedItem = item;
+				refreshLayout(item);
+			}
+			
+			private function itemDoubleClickHandler(event:ListEvent):void{
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_ASSESSMENT_SCRIPT))visibleSurvey = true;
+				var item:Object = event != null ? event.itemRenderer.data : dateSetPanel.dataProvider.getItemAt(0);
+				selectedItem = item;
+				// refreshLayout(item);
+				var screenDetail:Detail = new Detail();
+				
+				if (item == null) {
+					return;
+				}
+				var mainWindow:MainWindow = this.parentApplication as MainWindow;
+				selectedIndex = dateSetPanel.tileList.selectedIndex;
+				GUIUtils.openDetailScreen(false,mainWindow,Database.activityDao.entity,refreshFunction,item);
+				
+//				var entity:String = "Activity";
+//				var baseDOA:BaseDAO = Database.getDao(entity);
+//				screenDetail.item = baseDOA.findByGadgetId(item.gadget_id); 
+//				baseDOA.increaseImportant(screenDetail.item);
+//				
+//				screenDetail.entity = entity;
+//				
+//				var mainWindow:MainWindow = this.parentApplication as MainWindow;
+//				screenDetail.mainWindow = mainWindow;			
+//				screenDetail.refreshFunction = refreshFunction;
+//				screenDetail.create = false;
+//				screenDetail.isRefreshList = false;
+//				WindowManager.openModal(screenDetail);
+				
+				// Alert.show("view appointment" , "view appointment", Alert.OK , this.parentApplication as MainWindow);
+			}
+			
+			private var selectedIndex:int = -1;
+			private function refreshFunction(item:Object):void{
+				var date:Date = dateSetPanel.getDataLabel() as Date;
+				date.setDate(date.getDate() + 0);
+				reloadData(date);
+//				dateSetPanel.tileList.selectedIndex = selectedIndex;
+//				if(item.gadget_type==Database.activityDao.entity){
+//					selectedItem = item;
+//				}
+				//refreshLayout(selectedItem);
+				
+			}
+			
+			private function createForm(object:Object,files:ArrayCollection,entity:String):Form{
+				var form:Form = new Form();
+				for each(var file:Object in files){
+					var formItem:FormItem = new FormItem();
+					formItem.label = file.display_name == null ? getDisplayName(file,entity) : file.display_name;
+					var columnValue:Label = new Label();
+					columnValue.setStyle("color", "blue");
+					columnValue.text = object[file.element_name];
+					columnValue.id = object.gadget_type + object.gadget_id;
+					mapObj[object.gadget_type + object.gadget_id] = object;
+					if(file.element_name == "AccountName"){
+						columnValue.setStyle("textDecoration","underline");
+						columnValue.addEventListener(MouseEvent.CLICK,function(e1:MouseEvent):void{
+							var currentLabel:Label = e1.currentTarget as Label;
+							openDetail(currentLabel.id);
+							
+						});
+					}else if(file.element_name == "ContactFirstName"){
+						columnValue.setStyle("textDecoration","underline");
+						columnValue.addEventListener(MouseEvent.CLICK,function(e1:MouseEvent):void{
+							var currentLabel:Label = e1.currentTarget as Label;
+							openDetail(currentLabel.id);
+							
+						});
+					}
+					formItem.addChild(columnValue);
+					form.addChild(formItem);
+				}
+				return form;
+				
+			}
+			private function openDetail(id:String):void{
+				var screenDetail:Detail = new Detail();
+				var item:Object = mapObj[id];
+				if (item == null) {
+					return;
+				}
+				var mainWindow:MainWindow = this.parentApplication as MainWindow;
+				selectedIndex = dateSetPanel.tileList.selectedIndex;
+				GUIUtils.openDetailScreen(false,mainWindow,item.gadget_type,refreshFunction,item);
+			}
+			private function clearData():void{
+				
+				detailPanel.removeAllChildren();
+				accountPanel.removeAllChildren();
+				accountPanel.title = "";
+				contactPanel.removeAllChildren();
+				contactPanel.title = ""
+				detailPanel.title = "";
+			}
+			
+			private function exportToPDF():void {
+				//CR #1730 CRO
+				if(dateSetPanel.tileList.dataProvider.source && imap.height>0){
+					
+					var myJPG:BitmapData = new BitmapData(imap.width,imap.height);
+					myJPG.draw(imap);				
+					var jpgEncode:JPGEncoder = new JPGEncoder(85);
+					var jpgStream:ByteArray = jpgEncode.encode(myJPG);
+					var date:Date = dateSetPanel.getDataLabel() as Date;
+					dateSetPanel.tileList.dataProvider.source;
+					Alert.show(i18n._('GLOBAL_DO_YOU_WANT_TO_INCLUDE_ROUTE_DETAILS'),i18n._('') , Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+						var isIncludeRoute:Boolean ;
+						if (event.detail==Alert.YES){
+							isIncludeRoute = true;
+							
+						} 	
+						PDFUtil.dailyAgendaToPDF(DateUtils.format(date, "EEEE, MMMM DD, YYYY"),dateSetPanel.tileList.dataProvider.source,jpgStream,logo_error_message,isIncludeRoute);
+					});	
+					
+				}	
+			}
+			private function editExportLayout():void {
+				var layout:CustomLayoutPDFExport = new CustomLayoutPDFExport();
+				//layout.entity = "Account"; //customLayout.entity;
+				//layout.subtype = 0; //customLayout.subtype;
+				WindowManager.openModal(layout);
+			}	
+			
+			
+			private function exportSurvey():void{
+				var realItem:Object = Database.activityDao.findByGadgetId(selectedItem.gadget_id);
+				try
+				{
+					if(Utils.exportSurveyPDF(realItem,this)==0) 
+					{
+						Alert.show(i18n._('There is no survey. Please do survey first.'), "Export Survey PDF", Alert.OK, this);
+					}
+				} 
+				catch(error:Error) 
+				{
+					Alert.show(error.message, "", Alert.OK, this);
+				}
+				
+			}
+			
+			private function logo_error_message():void{
+				Alert.show(i18n._(DAILYAGENDA_ALERT_MSG_THE_LOGO_IMAGE_MUST_NOT_HAVE), "", Alert.OK, this);
+			}
+			private function openSurvey():void{
+				var acc:Object = Utils.getAccount(selectedItem);
+				if(acc == null){
+					Alert.show(i18n._("YOU_CAN_NOT_CREATE_SURVEY_WITH_ACCOUNT_IN_APPOINTMENT"),"", Alert.OK, this);
+				}else{
+					startInspection.openAssessmentModel(selectedItem);
+				}
+			}
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="1010" height="600" right="0" bottom="0">
+		<!--<control:TitleBar icon="@Embed(source='/assets/daily_agenda.png')" title="{i18n._(DAILYAGENDA_TITLEBAR_LABEL_DIALY_AGENDA)}" y="2" x="25"/>-->
+		<mx:Canvas top="06" left="8" right="8" bottom="8" horizontalScrollPolicy="off">
+			<mx:HBox width="100%" height="100%">
+				<mx:VBox >
+					<control:DateSetPanel id="dateSetPanel" height="230" width="420" 
+									  nextDayClick="nextDayClickHandler" 
+									  previousDayClick="previousDayClickHandler"
+									  nextMonthClick="nextMonthClickHandler" 
+									  previousMonthClick="previousMonthClickHandler"
+									   />
+					<mx:HBox width="100%" height="100%">
+						<mx:VBox width="100%" height="100%">
+							<mx:HBox width="100%" >
+								<mx:Label text="{i18n._(DAILYAGENDA_LABEL_TEXT_TRAVEL_SCHEDULE)}" fontWeight="bold" />
+								<!--
+								<mx:HBox width="100%" horizontalAlign="right">
+									<mx:Label id="total" fontWeight="bold" />
+								</mx:HBox>
+								-->
+							</mx:HBox>
+							<mx:Canvas id="imap" width="100%" height="100%">
+								<control:CustomLinkButton id="loadBtn" icon="{ImageUtils.synOkIcon}" label="{i18n._(DAILYAGENDA_MSG_LOADING)}" 
+														  visible="false" includeInLayout="false" />
+							</mx:Canvas>
+						</mx:VBox>
+					</mx:HBox>
+				</mx:VBox>
+				<mx:VBox width="100%" height="100%" >
+					<mx:Panel id="detailPanel" width="100%" height="100%"  />
+					<mx:Panel id="accountPanel" width="100%" height="100%" />
+					<mx:Panel id="contactPanel" width="100%" height="100%" />	
+				</mx:VBox>
+			</mx:HBox>
+		</mx:Canvas>	
+		<mx:Canvas id="buttonCanvas" left="8" right="8" bottom="8" height="30">
+			<mx:HBox left="8" right="8" horizontalGap="0">
+				<mx:LinkButton id="pdfExportBtn" icon="{ImageUtils.pdfIcon}" toolTip="{i18n._(DAILYAGENDA_TOOLTIP_PDF_EXPORT)}" click="Utils.showLoadingProgressWindow(exportToPDF, i18n._(StringUtils.LOADING_STR), i18n._(StringUtils.ATTACHMENTS_STR));" visible="{ imap.height>0 ? true:false}"/>	
+				<mx:HBox visible="{ imap.height>0 ? true:false}">
+					<mx:LinkButton id="pdfExportLayoutBtn" icon="{ImageUtils.customIcon}" toolTip="{i18n._(DAILYAGENDA_TOOLTIP_PDF_EXPORT_LAYOUT)}" click="editExportLayout();" />
+				</mx:HBox>
+				<mx:LinkButton id="startInspectionBtn" toolTip="{i18n._('GLOBAL_START_INSPECTION')}" click="openSurvey();" visible="{visibleSurvey}" label="{i18n._('GLOBAL_START_INSPECTION')}"/>
+				<mx:LinkButton id="pdfSurveyExportBtn"  toolTip="{i18n._('GLOBAL_OPEN_END_FINISH_BASICALLY')}" click="exportSurvey();" icon="{ImageUtils.excelIcon}" visible="{visibleSurvey}" label="{i18n._('GLOBAL_OPEN_END_FINISH_BASICALLY')}"/>	
+			</mx:HBox>
+		</mx:Canvas>
+	</mx:Canvas>
+	
+</mx:Canvas>

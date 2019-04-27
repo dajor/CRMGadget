@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="absolute" width="560" height="430"
+		   showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*" xmlns:control="gadget.control.*"
+		   initialize="init()"
+		   >
+	
+	<fx:Script>
+		<![CDATA[
+			import com.assessment.DtoConfiguration;
+			
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.FormItem;
+			import mx.events.ListEvent;
+			[Bindable]public var parentItem:Object;
+			[Bindable]private var lstData:ArrayCollection = new ArrayCollection();
+			private var roleName:String = "";
+			private function init():void{
+				
+				///profileName = Database.roleServiceDao.getOwnerAccessProfile(Database.rightDAO.getRole());
+				roleName = Database.rightDAO.getRole()
+				if(roleName == null){
+					roleName = "";
+				}
+				txtFindAss.text = roleName;
+				txtFindAss.setFocus();
+				lstData= new ArrayCollection( Database.assessmentConfigDao.getAssessmentConfigByEnitty(parentItem.gadget_type,roleName));
+			}
+			
+			private function clickFuction(event:ListEvent):void{
+				
+				var survey:Survey = new Survey();
+				//survey.assType = lstAssName.selectedItem.AssessmentType;
+				survey.parentItem = parentItem;
+				survey.assModel = lstAssName.selectedItem as DtoConfiguration;
+				survey.closeAssModelFunction = closeAssModel;
+				WindowManager.openModal(survey);
+				
+			}
+			public function closeAssModel():void{
+				this.close();
+			}
+			private function findAssessments():void{
+				lstData= new ArrayCollection( Database.assessmentConfigDao.getAssessmentConfigByEnitty(parentItem.gadget_type,txtFindAss.text));
+			}
+		]]>		
+		
+	</fx:Script>
+	<fx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="10" top="0" width="100%" height="100%" right="10" bottom="0">
+		<control:TitleBar id="titlebar" y="2" x="25" title="{i18n._('LIST_OF_ASSESSMENT_MODELS')}">
+		</control:TitleBar>	
+		<mx:VBox paddingTop="40" paddingLeft="4" paddingRight="3" >
+			<mx:HBox>
+				<mx:Image source="@Embed('/assets/search.png')"/>
+				<mx:TextInput id="txtFindAss" width="503"  change="{findAssessments()}"/>
+			</mx:HBox>
+			
+			<mx:AdvancedDataGrid id="lstAssName" 
+								 dataProvider="{lstData}"						
+								 displayItemsExpanded="true"
+								 showHeaders="true"
+								 height="350"
+								 itemClick="{clickFuction(event)}"
+								 >
+				<mx:columns>
+					<mx:AdvancedDataGridColumn dataField="assessmentModel"
+											   headerText="{i18n._('GLOBAL_ASSESSMENT_NAME')}"
+											   sortable="false" width="525"
+											   
+											   />
+					
+				</mx:columns>
+			</mx:AdvancedDataGrid>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas
+	xmlns:control="gadget.control.*"
+	xmlns:mx="http://www.adobe.com/2006/mxml"  
+	
+	horizontalScrollPolicy="off"
+	creationComplete="init();" xmlns:s="library://ns.adobe.com/flex/spark"
+	>
+	
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			
+			import mx.controls.Alert;
+			
+			private var nativeProcess:NativeProcess;
+			private var npInfo:NativeProcessStartupInfo;
+			private var processBuffer:ByteArray;
+			private var bLength:int = 0;
+			public var generateBarCodeReader:Function;
+			
+			private function init():void{
+			}
+			
+			private function onStandardErrorData(e:ProgressEvent):void{
+				//need to log to data base
+				trace(e.toString())
+			}
+			
+			private function onStandardOutputData(e:ProgressEvent):void{
+				//tArea.text += nativeProcess.standardOutput.readUTFBytes(nativeProcess.standardOutput.bytesAvailable);
+				var strBarCodeList:String = nativeProcess.standardOutput.readUTFBytes(nativeProcess.standardOutput.bytesAvailable);
+				generateBarCodeReader(strBarCodeList,true);
+				trace(strBarCodeList);
+			}
+			
+			public function show_BarcodeReader():void{
+				try{		
+					var jarFile:File =File.applicationDirectory.resolvePath("barcodereader/BcsBarCode.VB-NET.exe");
+					// var jarFile:File =File.applicationDirectory.resolvePath("crm-jd-epadsign.jar");
+					var arg:Vector.<String> = new Vector.<String>;
+					//arg.push("-Djava.library.path="+jarFile.parent.nativePath);
+					//arg.push("-jar");
+					
+					arg.push(jarFile.nativePath);
+					
+					processBuffer = new ByteArray();					
+					npInfo = new NativeProcessStartupInfo();
+					// npInfo.executable = new File("c:/windows/system32/javaw.exe");
+					npInfo.executable = new File(jarFile.nativePath);
+					//npInfo.arguments = arg;
+					nativeProcess = new NativeProcess();
+					nativeProcess.addEventListener(ProgressEvent.STANDARD_OUTPUT_DATA, onStandardOutputData);
+					nativeProcess.addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onStandardErrorData);
+					nativeProcess.start(npInfo);
+					
+				}catch(e:Error){
+					Alert.show("Trace " + e.getStackTrace() + " \nMessage : " + e.message , "", Alert.OK, this);
+				}
+			
+			}
+			
+			
+			
+			protected function epadSign_closeHandler(event:Event):void{
+				nativeProcess.closeInput();
+			}
+			
+		]]>
+	</mx:Script>
+	
+	
+</mx:Canvas>

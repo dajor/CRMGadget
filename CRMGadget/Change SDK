@@ -1,0 +1,27 @@
+To setup the right version of the SDK, please do following:
+
+Check out module "CRMGadget-SDK" from CVS like you checked out this project here.
+Then look into "change_flex_sdk" to follow the screenshots.
+
+You do not need to keek the SDK-Project open for it to work,
+as it only contains the binaries to work with.
+However you must have it fully checked out.
+
+
+IF YOU PREVIOUSLY USED FLEX_SDK_4.1.0_16076 SUBDIRECTORY, work as follows:
+
+FIRST, DEACTIVATE the old Flex 4.1 SDK, delete it from the configuration.
+SECOND, do the checkout and ACTIVATE the new Flex 4.1 SDK in it's own project.
+THIRD, EXIT FLASHBUILDER and restart it again.
+
+
+Here is some additional information:
+
+Click on the project click on properties
+follow the screenshot in director change sdk
+
+on the mac i had to give permission to adl und adt
+
+chmod +x adl 
+chmod x adt
+

@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="440" height="450"
+	showFlexChrome="false" transparent="true" systemChrome="none" 
+	creationComplete="init();"
+	>
+
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.util.FieldUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.ComboBox;
+			import mx.controls.TextInput;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.ItemClickEvent;
+			import mx.validators.Validator;
+			
+			[Bindable] public var records:Object;
+			[Bindable] public var entityFields:ArrayCollection;
+			public var entity:String;
+			public var refreshFunction:Function;
+			private var validators:Array;
+			
+			private var map:Object;
+			
+			private const CANCEL:String = i18n._('GLOBAL_CANCEL');
+			private const PREVIOUS:String = i18n._('BATCHUPDATE_PREVIOUS_STR');
+			private const NEXT:String = i18n._('BATCHUPDATE_NEXT_STR');
+			private const PROCESS:String = i18n._('BATCHUPDATE_PROCESS_STR');
+			
+			private function init():void {
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+				
+				entityFields = Utils.getColumns(entity);
+				initDataGrid();
+				initButtonBarAction(getButtons([CANCEL,NEXT]));
+				setTitle(1);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function initDataGrid():void {
+				
+				var columns:Array = [];
+				clearBatchUpdateCheckBox();
+				
+				for each(var nameColumn:String in DAOUtils.getNameColumns(entity)){ 
+					var displayName:String = FieldUtils.getField(entity, nameColumn).display_name;
+					var dataGridColumn:DataGridColumn = new DataGridColumn();
+					dataGridColumn.dataField = nameColumn;
+					dataGridColumn.headerText  = displayName;
+					columns.push(dataGridColumn);
+				}
+				
+				list.columns = list.columns.concat(columns);
+				list.sortableColumns = false;
+				(list.columns[0] as DataGridColumn).width = 50;	
+				
+			}
+			
+			private function clearBatchUpdateCheckBox():void {
+				for each(var rec:Object in records){
+					rec.batchUpdate = false;
+				}
+			}
+			
+			private function initButtonBarAction(commands:ArrayCollection):void {
+				buttonBarAction.dataProvider = commands;
+			}
+			
+			private function setTitle(stepIndex:int):void {
+				this.title = i18n._('BATCHUPDATE_TITLE_BATCH_UPDATE_STEP') + " " + String(stepIndex);
+				barTitle.title = this.title; 
+			}
+			
+			private function buttonBarActionClickHandler(event:ItemClickEvent):void {
+				
+				var lastViewIndex:int = batchUpdateVS.getChildren().length -1;
+				
+				if(event.label == NEXT){
+					batchUpdateVS.selectedIndex += 1;
+					if( batchUpdateVS.selectedIndex > lastViewIndex)
+						batchUpdateVS.selectedIndex = lastViewIndex;
+				}else if(event.label == PREVIOUS){
+					batchUpdateVS.selectedIndex -= 1;
+				}else if(event.label == CANCEL){
+					this.close();
+				}else {
+					batchUpdateProcess();
+				}
+				
+				if(batchUpdateVS.selectedIndex == 0){
+					setHeightWindow();
+					initButtonBarAction(getButtons([CANCEL,NEXT]));
+				}else if(batchUpdateVS.selectedIndex < lastViewIndex){
+					setHeightWindow();
+					initButtonBarAction(getButtons([CANCEL, PREVIOUS, NEXT]));
+				}else{
+					setHeightWindow(250);
+					initButtonBarAction(getButtons([CANCEL, PREVIOUS, PROCESS]));
+				}
+				
+				setTitle(batchUpdateVS.selectedIndex + 1); //first index is 0
+				
+			}
+			
+			private function setHeightWindow(height:int=450):void {
+				this.height = height;
+				mainCanvas.height = height;
+			}
+			
+			private function getButtons(commands:Array):ArrayCollection {
+				var buttons:ArrayCollection = new ArrayCollection();
+				var iconClass:Class;
+				for each(var command:String in commands){
+					switch(command){
+						case CANCEL: iconClass = ImageUtils.cancelIcon; break;
+						case PREVIOUS: iconClass = ImageUtils.leftIcon; break;
+						case NEXT: iconClass = ImageUtils.rightIcon; break;
+						case PROCESS: iconClass = ImageUtils.acceptIcon; break;
+						default: iconClass = new Class();
+					}
+					buttons.addItem({label: command, icon: iconClass, enabled: false});
+				}	
+				return buttons;
+			}
+			
+			private function batchUpdateProcess():void {
+				
+				if(!map) {
+					Alert.show(i18n._('BATCHUPDATE_ALERT_TEXT_PLEASE_SELECT_ATLEASE_ONE_ITEM_BEFORE_YOU_CAN_PRECESS'), '', Alert.OK, this);
+					return;
+				}
+				
+				if(validators){
+					var validatorErrorArray:Array = Validator.validateAll(validators);
+					if (validatorErrorArray.length != 0) {
+						var errorMessageArray:Array = [];
+						for each (var err:Object in validatorErrorArray) {
+							var errField:String = ''; 
+							errorMessageArray.push(errField + Utils.getTranslatedValidation(err.message));
+						}
+						//CRO 05.01.2011
+						Alert.show(errorMessageArray.join("\n"), i18n._('GLOBAL_INVALID_FORM'), Alert.OK, this);
+						return;
+					}
+				}
+				var ownerId:String = Database.userDao.read().id;
+				Database.begin();
+				for each(var rec:Object in getSelectedRecords()){
+					setUpdateField(rec,comboField1);
+					setUpdateField(rec,comboField2);
+					setUpdateField(rec,comboField3);
+					setUpdateField(rec,comboField4);
+					rec["local_update"] = new Date().getTime();
+					rec["deleted"] = false;
+					rec["OwnerId"] = ownerId;
+					Database.getDao(entity).update(rec);
+				}
+				Database.commit();
+				(records as ArrayCollection).refresh();
+				refreshFunction();
+				this.close();
+				
+			}
+			
+			private function setUpdateField(rec:Object, comboField:ComboBox):void {
+				var toggleControl:Array = map[comboField.id];
+				var textField:TextInput = toggleControl[0];
+				var textFieldCombo:ComboBox = toggleControl[1];
+				var selectedObj:Object = comboField.selectedItem;
+				if(selectedObj && selectedObj.column){
+					var datasource:ArrayCollection = PicklistService.getPicklist(selectedObj.entity, selectedObj.column);
+					var visibleCombo:Boolean = selectedObj.type == "Picklist" && datasource.length > 1 ? true : false;
+					rec[selectedObj.column] = visibleCombo ? textFieldCombo.selectedLabel : textField.text;
+				}				
+			}
+			
+			private function getSelectedRecords():ArrayCollection {
+				var batchRecordsToUpdate:ArrayCollection = new ArrayCollection((records as ArrayCollection).toArray());
+				batchRecordsToUpdate.filterFunction = function(item:Object):Boolean {
+					return ( item.batchUpdate!=null && item.batchUpdate == true );
+				};
+				batchRecordsToUpdate.refresh();
+				return batchRecordsToUpdate;
+			}
+			
+			private function changeFieldAction(event:Event):void{
+				
+				map = {
+					'comboField1':[textField1,textField1Combo],
+					'comboField2':[textField2,textField2Combo],
+					'comboField3':[textField3,textField3Combo],
+					'comboField4':[textField4,textField4Combo]
+				};
+				
+				var target:ComboBox = (event.currentTarget as ComboBox); 
+				var fieldInfo:Object = target.selectedItem;
+				fieldInfo.required = FieldUtils.getDefaultMandatory(fieldInfo.entity, fieldInfo.column);
+				//entity, element_name, display_name, data_type
+				var datasource:ArrayCollection = PicklistService.getPicklist(fieldInfo.entity, fieldInfo.column);
+				var visibleCombo:Boolean = fieldInfo.type == "Picklist" && datasource.length > 1 ? true : false;
+				
+				var toggleControl:Array = map[target.id];
+				var textInput:TextInput = toggleControl[0];
+				var comboInput:ComboBox = toggleControl[1];
+				textInput.visible = !visibleCombo;
+				textInput.includeInLayout = !visibleCombo; 
+				if(fieldInfo.required == true){
+					var validateOn:DisplayObject = visibleCombo ? comboInput : textInput;
+					validators = FieldUtils.getValidators(fieldInfo,validateOn);
+				}
+				comboInput.visible = visibleCombo;
+				comboInput.includeInLayout = visibleCombo;
+				if(visibleCombo){
+					comboInput.dataProvider = datasource;
+				}
+				
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	
+	<mx:Canvas id="mainCanvas" styleName="main" left="0" top="0" width="440" height="450" right="0" bottom="0">
+		<control:TitleBar id="barTitle" icon="@Embed(source='/assets/edit.png')"/>
+		<mx:VBox top="32" left="16" right="16" bottom="16">	<!--CRO 05.01.2011 BATCHUPDATE_TITLE_BATCH_UPDATE = -->		
+			<mx:Canvas label="{i18n._('GLOBAL_BATCH_UPDATE')}" width="100%" height="100%" styleName="myStyle">
+				<mx:ViewStack id="batchUpdateVS" width="100%" height="100%">
+					<mx:HBox height="100%" width="100%">
+						<mx:VBox height="100%" width="100%">							
+							<mx:Label text="{i18n._('BATCHUPDATE_LABEL_PLEASE_SELECT_THE_ITEMS_YOU_WANT_TO_UPDATE')}" fontWeight="bold" />
+							<mx:DataGrid id="list" dataProvider="{records}" width="100%" height="100%">
+								<mx:columns>
+									<mx:DataGridColumn dataField="batchUpdate" itemRenderer="CheckBoxRenderer" headerRenderer="CheckBoxRenderer"/>
+								</mx:columns>
+							</mx:DataGrid>
+						</mx:VBox>
+					</mx:HBox>
+					<mx:HBox>
+						<mx:VBox>							
+							<mx:Label text="{i18n._('BATCHUPDATE_LABEL_PLEASE_SELECT_THE_FIELDS_TO_UPDATE_AND_ENTER_THEIR_NEW_VALUE')}" fontWeight="bold"/>
+							<mx:HBox id="hboxFieldValueStep2" width="100%">
+								<mx:VBox><!--CRO 05.01.2011-->
+									<mx:Label text="{i18n._('GLOBAL_FIELD')}" fontWeight="bold"/>
+									<mx:ComboBox id="comboField1" width="200" dataProvider="{entityFields}" change="changeFieldAction(event)"/>
+									<mx:ComboBox id="comboField2" width="200" dataProvider="{entityFields}" change="changeFieldAction(event)"/>
+									<mx:ComboBox id="comboField3" width="200" dataProvider="{entityFields}" change="changeFieldAction(event)"/>
+									<mx:ComboBox id="comboField4" width="200" dataProvider="{entityFields}" change="changeFieldAction(event)"/>
+								</mx:VBox>
+								<mx:VBox>
+									<mx:Label text="{i18n._('BATCHUPDATE_LABEL_NEW_VALUE')}" fontWeight="bold"/>
+									<mx:TextInput id="textField1" width="190"/>
+									<mx:ComboBox includeInLayout="false" visible="false" id="textField1Combo" width="190"/>
+									<mx:TextInput id="textField2" width="190"/>
+									<mx:ComboBox includeInLayout="false" visible="false" id="textField2Combo" width="190"/>
+									<mx:TextInput id="textField3" width="190"/>
+									<mx:ComboBox includeInLayout="false" visible="false" id="textField3Combo" width="190"/>
+									<mx:TextInput id="textField4" width="190"/>
+									<mx:ComboBox includeInLayout="false" visible="false" id="textField4Combo" width="190"/>
+								</mx:VBox>
+							</mx:HBox>
+						</mx:VBox>
+					</mx:HBox>
+				</mx:ViewStack>
+			</mx:Canvas>	
+			<mx:HBox horizontalAlign="right" width="100%">
+				<mx:ButtonBar id="buttonBarAction" itemClick="buttonBarActionClickHandler(event);" color="0x000000"/>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

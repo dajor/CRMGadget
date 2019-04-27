@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+	xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:xsdLocal1="urn:/crmondemand/xml/deleteditem"
+	targetNamespace="urn:crmondemand/ws/deleteditem/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:tns="urn:crmondemand/ws/deleteditem/">
+	<types>
+		<xsd:schema elementFormDefault="qualified"
+			attributeFormDefault="unqualified" xmlns:xsdLocal1="urn:/crmondemand/xml/deleteditem"
+			targetNamespace="urn:/crmondemand/xml/deleteditem" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:annotation>
+				<xsd:documentation>Copyright (C) 2001, 2008, Oracle and/or its affiliates. All rights reserved. Siebel XSD Generation</xsd:documentation>
+			</xsd:annotation>
+			<xsd:element name="ListOfDeletedItem" type="xsdLocal1:ListOfDeletedItem" />
+			<xsd:complexType name="ListOfDeletedItemTopElmt">
+				<xsd:sequence>
+					<xsd:element name="ListOfDeletedItem" maxOccurs="1"
+						minOccurs="1" type="xsdLocal1:ListOfDeletedItem" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="ListOfDeletedItem">
+				<xsd:sequence>
+					<xsd:element name="DeletedItem" maxOccurs="unbounded"
+						minOccurs="0" type="xsdLocal1:DeletedItem" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="DeletedItem">
+				<xsd:sequence>
+					<xsd:element name="DeletedItemId" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string30" />
+					<xsd:element name="DeletedById" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="DeletedBy" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="DeletedDate" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="Name" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string255" />
+					<xsd:element name="ObjectId" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Type" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string30" />
+					<xsd:element name="ExternalSystemId" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string30" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:simpleType name="string255">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="255" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string30">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="30" />
+				</xsd:restriction>
+			</xsd:simpleType>
+		</xsd:schema>
+		<xsd:schema elementFormDefault="qualified"
+			attributeFormDefault="unqualified" targetNamespace="urn:crmondemand/ws/deleteditem/"
+			xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:import namespace="urn:/crmondemand/xml/deleteditem" />
+			<xsd:element name="DeletedItemWS_DeletedItemQueryPage_Input">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="PageSize" minOccurs="0" type="xsd:string" />
+						<xsd:element ref="xsdLocal1:ListOfDeletedItem" />
+						<xsd:element name="StartRowNum" minOccurs="0" type="xsd:string" />
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="DeletedItemWS_DeletedItemQueryPage_Output">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="LastPage" type="xsd:string" />
+						<xsd:element ref="xsdLocal1:ListOfDeletedItem" />
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+		</xsd:schema>
+	</types>
+	<message name="DeletedItemWS_DeletedItemQueryPage_Input">
+		<part name="DeletedItemWS_DeletedItemQueryPage_Input" element="tns:DeletedItemWS_DeletedItemQueryPage_Input" />
+	</message>
+	<message name="DeletedItemWS_DeletedItemQueryPage_Output">
+		<part name="DeletedItemWS_DeletedItemQueryPage_Output" element="tns:DeletedItemWS_DeletedItemQueryPage_Output" />
+	</message>
+	<portType name="Default_Binding_deleteditem">
+		<operation name="DeletedItemQueryPage">
+			<input message="tns:DeletedItemWS_DeletedItemQueryPage_Input" />
+			<output message="tns:DeletedItemWS_DeletedItemQueryPage_Output" />
+		</operation>
+	</portType>
+	<binding name="Default_Binding" type="tns:Default_Binding_deleteditem">
+		<soap:binding transport="http://schemas.xmlsoap.org/soap/http"
+			style="document" />
+		<operation name="DeletedItemQueryPage">
+			<soap:operation
+				soapAction="document/urn:crmondemand/ws/deleteditem/:DeletedItemQueryPage" />
+			<input>
+				<soap:body use="literal" />
+			</input>
+			<output>
+				<soap:body use="literal" />
+			</output>
+		</operation>
+	</binding>
+	<service name="DeletedItem">
+		<port binding="tns:Default_Binding" name="Default">
+			<soap:address
+				location="https://secure-ausomxapa.crmondemand.com/Services/Integration" />
+		</port>
+	</service>
+</definitions>

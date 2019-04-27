@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!-- itemRenderers\dataGrid\myComponents\RendererDGHeader.mxml -->
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" paddingLeft="10">
+	<mx:Script>
+		<![CDATA[
+			import gadget.util.ImageUtils;
+			[Bindable] public var textHeader:String;
+			[Bindable] public var entity:String;
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Image height="100%" source="{ImageUtils.getImage(entity=='User'? 'Contact':entity)}" />
+	<mx:Label text="{textHeader}"/>
+	
+</mx:HBox>

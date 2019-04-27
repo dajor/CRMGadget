@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false" height="450"
+	width="500" 
+	title="Groupng PDF"
+	showFlexChrome="false" systemChrome="none" xmlns:form="gadget.form.*"
+	creationComplete="init()" xmlns:s="library://ns.adobe.com/flex/spark" xmlns:local="*"
+	
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			private var msg:String;
+			private var entity:String;
+			public function count(length:int):void{
+				var record:String = length >1 ? " records":" record";
+				msg = "There are"+length +record +" in your query for"+" Account";
+				this.entity = entity;
+			}
+			private function init():void{
+				msgStr.setStyle("fontSize","14");
+				
+			}
+			private function doClose():void{
+				close();
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas width="430" height="180" horizontalScrollPolicy="off" styleName="main" left="0" top="0"  right="0" bottom="0">
+		<control:TitleBar id="titlebar" title="{i18n._('GLOBAL_RECORD_COUNT')}" y="2" x="25"/>
+		<mx:VBox width="100%" paddingTop="35" paddingLeft="20" paddingRight="10" paddingBottom="10" height="170">
+			<mx:VBox height="20"/>
+			<s:Label text="{msg}" id="msgStr" fontSize="24" fontWeight="bold"/>
+			<mx:VBox height="20"/>
+			<mx:HBox width="100%" paddingLeft="160" height="30">
+				<s:Button label="OK"  click="doClose()"/>
+			</mx:HBox>
+		</mx:VBox>
+		
+		
+	</mx:Canvas>
+
+	
+</mx:Window>

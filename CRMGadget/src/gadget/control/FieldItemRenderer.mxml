@@ -1,0 +1,669 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox verticalScrollPolicy="off" horizontalScrollPolicy="off" creationComplete="init()" xmlns:mx="http://www.adobe.com/2006/mxml" height="30" width="100%" paddingLeft="8" paddingRight="8" paddingTop="4" paddingBottom="4" xmlns:control="gadget.control.*">
+
+	<mx:Script>
+	    <![CDATA[
+			import gadget.dao.BookDAO;
+			import gadget.dao.CustomFieldDAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.SQLListDAO;
+			import gadget.i18n.i18n;
+			import gadget.service.LocaleService;
+			import gadget.util.FieldUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.CheckBox;
+			import mx.controls.ComboBox;
+			import mx.controls.DateField;
+			import mx.controls.Image;
+			import mx.controls.Label;
+			import mx.controls.NumericStepper;
+			import mx.controls.TextInput;
+			import mx.core.Container;
+			import mx.events.FlexEvent;
+			protected var addedFunctionChange:Boolean = false;
+			protected var firstTime:Boolean = true;
+			private var mapComponent:Array =[
+				initTextType,
+				initTextWithLabel,
+				initDateTime,
+				initMultiPicklist,
+				initCheckBox,
+				initPicture,
+				createUnknowType,
+				initSqlList,
+				initSqlfield,
+				initHtmlCode,
+				initHtmlCode,
+				initRelation,
+				initPercent,
+				initCalculateField,
+				initHeaderField,
+				initDynamicBlock
+			];
+			
+			
+			
+            private function getIndex(data:Object):int {
+            	if (data.custom != null) {
+					if(data.column_name.indexOf(CustomLayout.SQLLIST_CODE)>-1){
+						return 7;
+					} else if(data.column_name.indexOf(CustomLayout.SQLFIELD_CODE)>-1){
+						return 8;
+					} else if(data.column_name.indexOf(CustomLayout.HTMLFIELD_CODE)>-1){
+						return 9;
+					} else if(data.column_name.indexOf(CustomLayout.NEWS_CODE)>-1){
+						return 10;
+					} else if(data.column_name.indexOf(CustomLayout.RELATION_CODE)>-1){
+						return 11;
+					}else if(data.column_name.indexOf(CustomLayout.CALCULATED_CODE)>-1){
+						return 13;
+					}else if(data.column_name.indexOf("#")>-1){
+						return 14;
+					}
+            		return 0;
+            	}else if(data.column_name.indexOf(CustomLayout.BLOCK_DYNAMIC_CODE)>-1){
+					return 15;					
+				}
+            	return FieldUtils.getIndexFieldItemRenderer(data);
+            }
+            
+            private function getValue(data:Object):String {
+				var item:Object = (parentApplication as CustomLayout).item;
+				if(item!=null){
+				return item[data.column_name];
+				}
+				
+				return "";
+            }
+			private function getSampleValue(field:String):String {
+				var item:Object = (parentApplication as CustomLayout).item;
+				if(item!=null){
+					return item[field];
+				}
+				
+				return "";       
+			}
+
+//          public override function invalidateDisplayList():void{
+//			  super.invalidateDisplayList();
+//			  removeAllChildren();
+//			  init();
+//		  }
+			private function init():void {
+				if( data){
+					var f:Function = mapComponent[getIndex(data)];
+					if(f!=null){
+						f();
+					}
+					
+				}
+					
+				if(!addedFunctionChange){
+					this.addEventListener(FlexEvent.DATA_CHANGE, dataChanged);
+					this.addedFunctionChange=true;
+				}
+				
+				//this.addEventListener(FlexEvent.DATA_CHANGE, dataChanged);
+
+				
+				
+			}
+			
+			
+			
+			
+			private function initComboRelation(cboHBox:HBox):void {
+				
+				//Create iconcomboboxs
+				if(cboHBox && data){
+					
+					var imgLink:Image = new Image();
+					imgLink.source = ImageUtils.linkIcon;
+					
+					var iconCbo:IconComboBox = new IconComboBox();
+					iconCbo.percentWidth = 100;
+					iconCbo.styleName = "backgroundRelation";
+					
+					
+					var entity:String = data.entity;
+					//iconCbo.dataProvider = Relation.getMNReferenced(data.entity);
+					var listChildren:Array = Database.subSyncDao.listSubEnabledOrder(entity);
+					var relations:ArrayCollection = new ArrayCollection();
+					for each(var child:Object in listChildren){
+						var r:Object = Relation.getMNRelation(entity,child.entity_name);
+						if(r==null){
+							r =  Relation.getRelation(child.entity_name,entity);
+						}
+						if(r!=null){
+							r.entity_name = child.entity_name;
+							relations.addItem(r);
+						}
+					}
+					iconCbo.dataProvider =relations;
+					iconCbo.labelFunction = function(rl:Object):String{
+//						if(rl.supportTable){
+//							return Database.customLayoutDao.getDisplayName(rl.entity_name);
+//						}else{
+//							return Database.customLayoutDao.getDisplayName(rl.entity_name);
+//						}
+						return Database.customLayoutDao.getDisplayName(rl.entity_name);
+					
+					};
+					
+					//Load icons
+					initComboEntity(iconCbo);
+					
+					iconCbo.addEventListener(Event.CHANGE, function(event:Event):void {
+						var rel:Object = (event.target as ComboBox).selectedItem;
+						if(rel!=null){
+							if(rel.supportTable){
+								data.custom =rel.entityDest;
+							}else{
+								data.custom =rel.entitySrc;
+							}
+						}else{
+							data.custom = "";
+						}
+						
+					});
+					
+					iconCbo.setFocus();
+					
+					cboHBox.addChild(imgLink);
+					cboHBox.addChild(iconCbo);
+				}
+			}
+			
+			private function initCalculatedField(event:MouseEvent,block:Boolean=false):void {
+				var calculatedField:CalculatedField = new CalculatedField();
+				// quickSearch.mainWindow = this;
+				var textInput:TextInput = event.currentTarget as TextInput;
+				calculatedField.postSave =function(label:String):void{
+					if(block){
+						delete data.custom;
+					}
+					textInput.text=label;
+				};
+				calculatedField.tempHeaderVal = textInput.text;
+				calculatedField.dataField = data;
+				WindowManager.openModal(calculatedField);
+			}
+			
+			
+		
+			private function getCalculatedValue():String {
+				return data==null?"":data.customField==null?"":data.customField.value;
+			}
+			private function getHeaderValue():String {				
+				if(data!=null && data.customField!=null){
+					var headerValue:String = CustomFieldDAO.getHeaderValue(data.customField.value);
+					if(!StringUtils.isEmpty(headerValue)){
+						data.custom = headerValue;
+						return headerValue;
+					} 
+				}
+				return data==null?"":data.custom;
+			}
+			
+			
+			private function getBlockValue():String{
+				
+				var label:String = "";
+				if(data!=null){
+					label = data.label;
+					if(StringUtils.isEmpty(label)){
+						var gadget_id:String = data.column_name;
+						var obj:Object = Database.blockLayoutDao.getByGadgetId(gadget_id.split('_')[1]);
+						if(obj!=null){
+							if(data.customField!=null){
+								label = CustomFieldDAO.getHeaderValue(data.customField.value);
+								
+							}
+							
+							if(StringUtils.isEmpty(label)){
+								label = obj.Name;
+							}
+							
+						}
+					}
+				}
+				
+				return label;
+				
+			}
+			
+			private function dataChanged(value:Object):void {
+				if(!firstTime){
+					removeAllChildren();
+					init();
+				}
+				firstTime=false;
+//				if(datetimeFieldLockImage){
+//					datetimeFieldLockImage.includeInLayout = data.readonly;
+//					datetimeFieldLockImage.visible = data.readonly;
+//				}
+//				if(datetimeFieldMandatoryImage){
+//					datetimeFieldMandatoryImage.includeInLayout = data.mandatory;
+//					datetimeFieldMandatoryImage.visible = data.mandatory;
+//				}
+//				
+//				// when play drag drop,sometime value in text Input is confuse.
+//				// it happen with text field that can create more than one on layout.
+//				if(headerField){
+//					headerField.text = data.custom;
+//				}else if(calculateField){
+//					calculateField.text = data.customField==null?"":data.customField.value;
+//				}else if(newsField){
+//					newsField.text = data.custom;
+//				}else if(htmlField){
+//					htmlField.text = data.custom;
+//				}else if(sqlField){
+//					sqlField.text = data.custom;
+//				}else if(sqlListField){
+//					sqlListField.text = data.custom;
+//				}else if(dynamicblock){
+//					dynamicblock.text = getBlockValue();
+//				}
+			}
+			
+			private function getComboEntityIndex(combo:ComboBox, value:String):int {
+				for (var i: int = 0; i < combo.dataProvider.length; i++) {
+					if ( value == combo.dataProvider[i].entityDest) {
+						return i;
+					}    
+				}
+				return 0;
+			}
+			
+			private function initComboEntity(combo:ComboBox):void {
+				if (!data.custom) {
+					//data.custom = combo.dataProvider[0].entityDest;	
+				}
+				
+				
+				var selectedIndx:int =0;		
+				var relations:ArrayCollection = combo.dataProvider as ArrayCollection;
+				if(relations!=null){
+					for (var i: int = 0; i <relations.length; i++) {
+						var obj:Object = relations.getItemAt(i);
+						var entity:String = obj.entityDest;
+						if(obj.supportTable==null){						
+							entity= obj.entitySrc;
+						}
+						if(entity==data.custom){
+							selectedIndx=i;
+						}
+						obj.icon = ImageUtils.getImage(entity=="User"?"Contact":entity);
+					}
+				}
+				//combo.selectedIndex = getComboEntityIndex(combo, data.custom);
+				combo.selectedIndex = selectedIndx;
+				//fixed missing value if not change anyvalue
+				var rel:Object = combo.selectedItem;
+				if(rel!=null){
+					if(rel.supportTable){
+						data.custom =rel.entityDest;
+					}else{
+						data.custom =rel.entitySrc;
+					}
+				}else{
+					data.custom ="";
+				}
+			}
+			
+//			private function isMandatoryDefault():Boolean {
+//				return FieldUtils.getDefaultMandatory(data.entity,data.column_name);
+//			}
+
+			private function openSQLCreate(event:Event):void {
+				var textInput:TextInput = (event.currentTarget as TextInput);
+				var sqlCreate:SQLCreate = new SQLCreate();
+				sqlCreate.textInput = textInput;
+				sqlCreate._data = data;
+				WindowManager.openModal(sqlCreate);
+			}
+			//idx=0
+			private  function initTextType():void{
+				var txt:TextInput = new TextInput();
+				txt.percentWidth=100;
+				if(data!=null){
+					txt.text = getValue(data);
+				}
+				this.addChild(txt);
+			}
+			private function createHBox():HBox{
+				var hb:HBox = new HBox();
+				hb.percentWidth=100;
+				return hb;
+			}
+			
+			private function createLabel():Label{
+				var lb:Label = new Label();
+				lb.setStyle("textAlign","right");
+				lb.percentWidth=30;
+				if(data!=null){
+					lb.text = FieldUtils.getFieldDisplayName(data.entity, data.column_name);
+				}
+				return lb;
+			}
+			private function createImgMandatory(parentObj:Container):void{
+				if(data!=null && data.mandatory){
+					var img:Image = createImage(ImageUtils.mandatoryImg);					
+					parentObj.addChild(img);
+				}
+			}
+			
+			private function createImage(src:Class):Image{
+				var img:Image = new Image();
+				img.source = src;
+				return img;
+			}
+			
+			private function createImgReadonly(parentObj:Container):void{
+				if(data!=null && data.readonly){
+					var img:Image = createImage(ImageUtils.lockImg);					
+					parentObj.addChild(img);
+				}				
+			}
+			private function createTextInput():TextInput{
+				var txt:TextInput = new TextInput();
+				txt.enabled = false;
+				txt.percentWidth=70;
+				if(data!=null){
+					txt.text = getValue(data);
+				}
+				return txt;
+			}
+			//idx=1
+			private function initTextWithLabel():void{
+				/*
+				<mx:HBox width="100%">
+				<mx:Label enabled="false" textAlign="right" width="30%" text="{FieldUtils.getField(data.entity, data.column_name).display_name}"/>		
+				<!--<mx:TextInput backgroundDisabledColor="{Utils.getDisableColorLayout(data.readonly)}" enabled="false" width="70%" text="{getValue(data)}"/>-->
+				<mx:TextInput enabled="false" width="70%" text="{getValue(data)}"/>
+				<mx:Image visible="{data.readonly}" includeInLayout="{data.readonly}" source="{ImageUtils.lockImg}"/>
+				<mx:Image visible="{data.mandatory}" includeInLayout="{ data.mandatory}" source="{ImageUtils.mandatoryImg}"/>
+				</mx:HBox>
+				*/
+				var hb:HBox = this;				
+				hb.addChild(createLabel());
+				hb.addChild(createTextInput());
+				createImgReadonly(hb);
+				createImgMandatory(hb);
+			}
+			
+			
+			//idx=2
+			private function initDateTime():void{
+				var hb:HBox = this;				
+				hb.addChild(createLabel());
+				var df:DateField = new DateField();
+				if(data!=null){
+					var objField:Object = FieldUtils.getField(data.entity, data.column_name);
+					if(objField){
+						df.text = objField.display_name;
+						var hr:NumericStepper = new NumericStepper();
+						var mm:NumericStepper = new NumericStepper();
+						df.enabled = false;
+						hr.enabled = false;
+						mm.enabled = false;
+						//dataChanged(null);
+						hb.addChild(df);
+						hb.addChild(hr);
+						hb.addChild(mm);
+					}
+					
+				}
+				createImgReadonly(hb);
+				createImgMandatory(hb);
+			}
+			
+			private function createCombobox():ComboBox{
+				var cbo:ComboBox = new ComboBox();
+				cbo.text = getValue(data);
+				cbo.percentWidth=70;
+				cbo.enabled = false;
+				return cbo;
+			}
+			//idx=3
+			private function initMultiPicklist():void{
+				/*
+				<mx:Canvas width="100%">
+				<mx:HBox width="100%">
+				<mx:Label enabled="false" textAlign="right" width="30%" text="{FieldUtils.getField(data.entity, data.column_name).display_name}"/>
+				<!--<mx:ComboBox fillAlphas="[1,1,1,1]" fillColors="{[Utils.getDisableColorLayout(data.readonly), Utils.getDisableColorLayout(data.readonly), Utils.getDisableColorLayout(data.readonly), Utils.getDisableColorLayout(data.readonly)]}" enabled="false" width="70%" text="{getValue(data)}"/>-->
+				<mx:ComboBox enabled="false" width="70%" text="{getValue(data)}"/>
+				<mx:Image visible="{data.readonly}" includeInLayout="{data.readonly}" source="{ImageUtils.lockImg}"/>
+				<mx:Image visible="{ data.mandatory}" includeInLayout="{ data.mandatory}" source="{ImageUtils.mandatoryImg}"/>
+				</mx:HBox>
+				</mx:Canvas>
+				*/
+				
+				var hb:HBox = this;				
+				hb.addChild(createLabel());
+				hb.addChild(createCombobox());
+				createImgReadonly(hb);
+				createImgMandatory(hb);
+			}
+			//idx=4
+			private function initCheckBox():void{
+				/*
+				<mx:Canvas width="100%">
+				<mx:HBox width="100%">
+				<mx:Label enabled="false" textAlign="right" width="30%" text="{FieldUtils.getField(data.entity, data.column_name).display_name}"/>
+				<!--<mx:CheckBox fillAlphas="[1,1,1,1]" fillColors="{[Utils.getDisableColorLayout(data.readonly), Utils.getDisableColorLayout(data.readonly), Utils.getDisableColorLayout(data.readonly), Utils.getDisableColorLayout(data.readonly)]}" enabled="false" width="70%" selected="{getValue(data) == 'true'}"/>-->
+				<mx:CheckBox enabled="false" width="70%" selected="{getValue(data) == 'true'}"/>
+				<mx:Image visible="{data.readonly}" includeInLayout="{data.readonly}" source="{ImageUtils.lockImg}"/>
+				<mx:Image visible="{ data.mandatory}" includeInLayout="{ data.mandatory}" source="{ImageUtils.mandatoryImg}"/>
+				</mx:HBox>
+				</mx:Canvas>
+				*/
+				var hb:HBox = this;				
+				hb.addChild(createLabel());
+				var chk:CheckBox = new CheckBox();
+				chk.enabled = false;
+				chk.percentWidth=70;
+				hb.addChild(chk);
+				if(data!=null){
+					chk.selected=StringUtils.isTrue(getValue(data));
+				}
+				createImgReadonly(hb);
+				createImgMandatory(hb);
+			}
+			//idx=5;
+			private function initPicture():void{
+				var hb:HBox = this;				
+				hb.addChild(createLabel());
+			}
+			//idx=6
+			private function createUnknowType():void{
+				var hb:HBox = this;				
+				hb.addChild(createLabel());
+				var lb:Label = new Label();				
+				lb.percentWidth=70;
+				if(data!=null){
+					lb.text = getValue(data);
+				}
+				hb.addChild(lb);
+			}
+			//idx=7
+			private function initSqlList():void{
+				/*<mx:Canvas width="100%">
+					<mx:HBox width="100%">
+						<mx:Image source="{ImageUtils.sqlListImg}" />
+						<mx:TextInput id='sqlListField' doubleClickEnabled="true" width="100%" text="{data.custom}" styleName="backgroundQuery" change="data.custom = (event.target as TextInput).text" doubleClick="openSQLCreate(event)" />
+					</mx:HBox>
+				</mx:Canvas>*/
+				this.addChild(createImage(ImageUtils.sqlListImg));
+				var txtSql:TextInput = new TextInput();
+				txtSql.doubleClickEnabled=true;
+				if(data!=null){
+					txtSql.text = data.custom;
+				}
+				txtSql.percentWidth=100;
+				txtSql.styleName = "backgroundQuery";
+				txtSql.addEventListener(Event.CHANGE,function(e:Event):void{
+					data.custom=txtSql.text;
+				});
+				txtSql.addEventListener(MouseEvent.DOUBLE_CLICK,openSQLCreate);
+				this.addChild(txtSql);
+			}
+			//idx=8
+			private function initSqlfield():void{
+				/**
+				 * <mx:Canvas width="100%">
+						<mx:HBox width="100%">
+							<mx:Image source="{ImageUtils.sqlFieldImg}" />
+							<mx:TextInput id='sqlField' width="100%" text="{data.custom}" styleName="backgroundField" change="data.custom = (event.target as TextInput).text" />
+						</mx:HBox>
+					</mx:Canvas>
+				 * */
+				
+				this.addChild(createImage(ImageUtils.sqlFieldImg));
+				var txtSql:TextInput = new TextInput();				
+				txtSql.percentWidth=100;
+				if(data!=null){
+					txtSql.text = data.custom;
+				}
+				txtSql.styleName = "backgroundField";
+				txtSql.addEventListener(Event.CHANGE,function(e:Event):void{
+					data.custom=txtSql.text;
+				});				
+				this.addChild(txtSql);
+			}
+			//idx=9,10
+			private function initHtmlCode():void{
+				/**<mx:HBox width="100%">
+						<mx:Image source="{ImageUtils.htmlFieldImg}" />
+						<mx:TextInput id='htmlField' width="100%" text="{data.custom}" styleName="backgroundHtmlField" change="data.custom = (event.target as TextInput).text" />
+					</mx:HBox>
+				 * */
+				this.addChild(createImage(ImageUtils.sqlFieldImg));
+				var html:TextInput = new TextInput();				
+				html.percentWidth=100;
+				if(data!=null){
+					html.text = data.custom;
+				}
+				html.styleName = "backgroundHtmlField";
+				html.addEventListener(Event.CHANGE,function(e:Event):void{
+					data.custom=html.text;
+				});				
+				this.addChild(html);
+				
+			}
+			//idx=11
+			private function initRelation():void{
+				initComboRelation(this);	
+			}
+			
+			//idx=12
+			private function initPercent():void{
+				/**
+				 * <mx:HBox width="100%">
+						<mx:Label enabled="false" textAlign="right" width="30%" text="{FieldUtils.getField(data.entity, data.column_name).display_name}"/>	
+						<mx:NumericStepper enabled="false" width="50" value="{parseInt(getValue(data))}" />
+						<mx:Image visible="{data.readonly}" includeInLayout="{data.readonly}" source="{ImageUtils.lockImg}"/>
+						<mx:Image visible="{ data.mandatory}" includeInLayout="{ data.mandatory}" source="{ImageUtils.mandatoryImg}"/>
+					</mx:HBox>
+				 * */
+				
+				var hb:HBox = this;				
+				hb.addChild(createLabel());
+				var numStep:NumericStepper = new NumericStepper();
+				numStep.enabled = false;
+				numStep.width=50;
+				if(data!=null){
+					numStep.value = parseInt(getValue(data));
+				}
+				createImgReadonly(hb);
+				createImgMandatory(hb);
+			}
+			
+			//idx=13
+			private function initCalculateField():void{
+				/**
+				 * <mx:Canvas width="100%" height="100%">
+					<mx:HBox width="100%">
+						<mx:Image source="{ImageUtils.formulaIcon}" />
+						<mx:TextInput id='calculateField' width="100%" doubleClickEnabled="true" enabled="false" text="{getCalculatedValue()}" styleName="backgroundQuery" doubleClick="initCalculatedField(event)" />
+					</mx:HBox>
+					</mx:Canvas>
+				 * */
+				
+				this.addChild(createImage(ImageUtils.sqlFieldImg));
+				var calculateField:TextInput = new TextInput();				
+				calculateField.percentWidth=100;
+				calculateField.doubleClickEnabled=true
+				calculateField.text = getCalculatedValue();
+				calculateField.enabled=false;
+				calculateField.styleName = "backgroundQuery";
+				calculateField.addEventListener(MouseEvent.DOUBLE_CLICK,initCalculatedField);				
+				this.addChild(calculateField);
+			}
+			
+			//idx =14
+			private function initHeaderField():void{
+				/**
+				 * <mx:TextInput id='headerField' width="100%" toolTip="{i18n._('GLOBAL_DOUBLE_CLICK_TO_CHANGE_VALUE')}" doubleClickEnabled="true" editable="false" text="{getHeaderValue()}" doubleClick="initCalculatedField(event)" />
+				 * */
+				
+				var headerField:TextInput = new TextInput();			
+				headerField.toolTip = i18n._('GLOBAL_DOUBLE_CLICK_TO_CHANGE_VALUE');
+				headerField.percentWidth=100;
+				headerField.doubleClickEnabled=true
+				headerField.text = getHeaderValue();
+				headerField.editable=false;				
+				headerField.addEventListener(MouseEvent.DOUBLE_CLICK,initCalculatedField);				
+				this.addChild(headerField);
+			}
+			
+			//idx=15
+			
+			private function initDynamicBlock():void{
+				/**
+				 * <mx:TextInput width="100%" id="dynamicblock" text="{getBlockValue()}" enabled="false" doubleClickEnabled="true" doubleClick="initCalculatedField(event,true)" />
+					<mx:Image visible="{data.readonly}" includeInLayout="{data.readonly}" source="{ImageUtils.lockImg}"/>
+				 * */
+				
+				var dynamicField:TextInput = new TextInput();	
+				dynamicField.percentWidth=100;				
+				dynamicField.text =getBlockValue();
+				dynamicField.enabled=false;			
+				dynamicField.doubleClickEnabled = true;
+				dynamicField.addEventListener(MouseEvent.DOUBLE_CLICK,function(e:MouseEvent):void{initCalculatedField(e,true);});				
+				this.addChild(dynamicField);
+				createImgReadonly(this);
+				
+			}
+				
+			
+		
+
+        ]]>
+    </mx:Script>
+
+	<mx:Style>
+		.backgroundQuery {
+			background-color: #E7F98D;
+		}
+		.backgroundField {
+			background-color: #E7F98D;
+		}
+		.backgroundHtmlField {
+			background-color: #70B0F9;
+		}
+		.backgroundRelation {
+			background-color: #CCB3DC;
+		}
+		
+	</mx:Style>
+	
+	
+</mx:HBox>

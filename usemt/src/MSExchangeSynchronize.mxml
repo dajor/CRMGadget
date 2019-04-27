@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable = "false"	
+	width="800" height="400"
+	title="MS Exchange Synchronization"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init()">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			import gadget.sync.incoming.IncomingAppointmentMSExchange;
+			import gadget.sync.incoming.IncomingContactMSExchange;
+			import gadget.sync.incoming.IncomingEmaiMSExchange;
+			import gadget.sync.incoming.IncomingTaskMSExchange;
+			import gadget.sync.incoming.MSExchangeService;
+			import gadget.sync.outgoing.OutgoingAppointmentMSExchange;
+			import gadget.sync.outgoing.OutgoingTaskMSExchange;
+			import gadget.sync.task.WebServiceBase;
+			import gadget.util.PreferenceUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.formatters.DateFormatter;
+			import mx.utils.ObjectProxy;
+			
+
+			
+			[Bindable] public var loggingMessages:ArrayCollection = new ArrayCollection();
+			
+			public var isSynching:Boolean = false;
+			public var loadData:Function;
+			public var entity:String;
+			private var isError:Boolean = false;
+			private var incomingMsExchange:MSExchangeService=null;
+			private static const NONE:String = 'none';
+			private static const G2G_TO_MS:String = 'G2G_2_MS';
+			private static const MS_TO_G2G:String = 'MS_2_G2G';
+			private static const BOTH:String = 'both';	
+			private var isStop:Boolean = false;
+			private function init():void {
+				initButtons();
+				if(entity == "Contact"){
+					directionLayout.visible = false;
+					directionLayout.includeInLayout = false;
+				}
+//				_cal = calendarIlog.cal;
+//				var dateRange:Array = [
+//					_cal.startDisplayedDate,
+//					_cal.endDisplayedDate
+//				];
+//				var dateFormatter:DateFormatter = new DateFormatter();
+//				dateFormatter.formatString = "DD/MM/YYYY";
+//				panelTitle.title = panelTitle.title + " Date Range: " + dateFormatter.format(dateRange[0]) + " to " + dateFormatter.format(dateRange[1]);
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function isFail():Boolean{
+				return isError;
+			}
+			private function syncData():void {
+				isStop = false;
+				if(entity=='Activity'){
+					var dir:Object = direction.selectedItem;
+					if(dir.data ==NONE){
+						return;
+					}
+				}
+				isSynching = true;
+				clearLog();
+				doLog('Synchronization started');
+				initButtons();
+				
+				if(entity=='Contact'){
+					incomingMsExchange = new IncomingContactMSExchange();
+					incomingMsExchange.bindFunctions(doLog,errorHandler,successHandler,loadData);
+				}else{
+					
+					var obj:Object = direction.selectedItem;
+					if(obj.data ==MS_TO_G2G){
+						incomingMsExchange = new IncomingAppointmentMSExchange();
+						incomingMsExchange.fullSync = fullSync.selected;
+						incomingMsExchange.bindFunctions(doLog,errorAppointment,doNextEntity,loadData);
+					}else if(obj.data ==G2G_TO_MS){
+						incomingMsExchange = new OutgoingAppointmentMSExchange('Activity',this);
+						incomingMsExchange.bindFunctions(doLog,errorOutgoing,successHandler,loadData);
+					}else{
+						
+						incomingMsExchange = new OutgoingAppointmentMSExchange('Activity',this);
+						incomingMsExchange.bindFunctions(doLog,errorOutgoing,doIncomingCalendar,loadData);
+					}
+				}
+				incomingMsExchange.fullSync = fullSync.selected;
+				//conSyn.googleSync = this;
+				
+				incomingMsExchange.start();
+			}
+			private function doIncomingCalendar(task:WebServiceBase, result:String):void{
+				if(isStop){
+					return;
+				}
+				doLog(result);
+				incomingMsExchange = new IncomingAppointmentMSExchange();
+				incomingMsExchange.fullSync = fullSync.selected;
+				incomingMsExchange.bindFunctions(doLog,errorAppointment,doNextEntity,loadData);
+				incomingMsExchange.start();
+			}
+			
+			private function doOutgoingTask(task:WebServiceBase, result:String):void{
+				doLog(result);
+				incomingMsExchange = new OutgoingTaskMSExchange('Activity',this);
+				incomingMsExchange.fullSync = fullSync.selected;
+				var obj:Object = direction.selectedItem;
+				if(obj.data ==BOTH){
+					incomingMsExchange.bindFunctions(doLog,errorAppointment,doIncomingCalendar,loadData);
+				}else{
+					incomingMsExchange.bindFunctions(doLog,errorAppointment,successHandler,loadData);
+				}
+				
+				incomingMsExchange.start();
+			}
+			private function errorOutgoing(task:WebServiceBase,error:String, event:Event,recorde_error:Object=null):void{
+				// -- continue to do email 
+				doLog(error);
+				if(!isFail()){
+					isError = true;
+				}
+				//doIncomingCalendar(task,error);
+			}
+			private function doLog(taskTitle:String):void {
+				var d:Date = new Date();
+				var dateFormatter:DateFormatter = new DateFormatter();
+				dateFormatter.formatString = "JJ:NN:SS";
+				var msg:Object = {time:dateFormatter.format(d),message:taskTitle};
+				loggingMessages.addItem(new ObjectProxy(msg));
+				dgLoggingArea.validateNow();
+				//.dgLoggingArea.verticalScrollPosition = googleSync.dgLoggingArea.maxVerticalScrollPosition;
+			}
+			private function errorHandler(task:WebServiceBase,error:String, event:IOErrorEvent,recorde_error:Object=null):void{
+				if(!isFail()){
+					isError = true;
+				}
+				isSynching = false;
+				doLog(error);
+				initButtons();				
+			}
+			private function errorAppointment(task:WebServiceBase,error:String, event:IOErrorEvent,recorde_error:Object=null):void{
+				// -- continue to do email 
+				//errorHandler(task,error,event,recorde_error);
+				//should be check the error can be do next or not
+				//doNextEntity(task,error);
+				if(!isFail()){
+					isError = true;
+				}
+				doLog(error);
+			}
+			private function doTask(task:WebServiceBase, result:String):void{
+				if(isStop){
+					return;
+				}
+				doLog(result);
+				var listApp:ArrayCollection = incomingMsExchange.getListRecord();
+				incomingMsExchange = new IncomingTaskMSExchange();
+				incomingMsExchange.fullSync = fullSync.selected;
+				incomingMsExchange.setListRecord(listApp);
+				incomingMsExchange.bindFunctions(doLog,errorHandler,successHandler,loadData);
+				incomingMsExchange.start();
+			}
+			private function doNextEntity(task:WebServiceBase, result:String):void{
+				if(isStop){
+					return;
+				}
+				doLog(result);
+				var listApp:ArrayCollection = incomingMsExchange.getListRecord();
+				incomingMsExchange = new IncomingEmaiMSExchange();
+				incomingMsExchange.fullSync = fullSync.selected;
+				incomingMsExchange.setListRecord(listApp);
+				incomingMsExchange.bindFunctions(doLog,errorAppointment,doTask,loadData);
+				incomingMsExchange.start();
+			}
+			private function successHandler(task:WebServiceBase, result:String):void{				
+				doLog(result);
+				isSynching = false;
+				initButtons();
+				if(incomingMsExchange.getListRecord().length>0){
+					openPopupSyncRecord()					
+				}
+				if(isFail()){
+					doLog("There had been errors");
+				}else{
+					doLog("Synchronization was successful");
+				}
+				//loadData();
+				
+			}
+			private var grid:AdvancedDataGrid;
+			
+			private function openPopupSyncRecord():void{
+				
+				if(entity=='Contact'){
+					var contactPopup:MSContactPopupRecord = new MSContactPopupRecord();
+					contactPopup.dataRecord =  incomingMsExchange.getListRecord();
+					contactPopup.entity = entity;
+					contactPopup.updateLastSync = incomingMsExchange.upldateLastSync;
+					WindowManager.openModal(contactPopup);
+				}else{
+					var recordPopup:MSTaskPopupRecord = new MSTaskPopupRecord();
+					recordPopup.entity = entity;
+					recordPopup.dataRecord =  incomingMsExchange.getListRecord();
+					recordPopup.updateLastSync = incomingMsExchange.upldateLastSync;
+					WindowManager.openModal(recordPopup);
+				}
+				
+			}
+			[Embed(source='/assets/sync.png')] [Bindable] public var syncIcon:Class;
+			private function stop():void {
+				Alert.show(i18n._('SYNCHRONIZE_ALERT_ARE_YOU_SURE_YOU_TO_STOP_SYNCHRONIZE'), i18n._('GLOBAL_SYNCHRONIZATOIN'), 3, this, function(event:CloseEvent):void{
+					if (event.detail==Alert.YES){
+						btnStop.enabled = false;
+						btnClose.enabled = true;
+						isSynching = false;
+						isStop = true;
+						incomingMsExchange.stop();
+						initButtons();
+					}
+				});
+			}
+			
+			private function clearLog():void {
+				loggingMessages = new ArrayCollection();
+				dgLoggingArea.validateNow();
+			}
+			
+			private function toggleSpinner(on:Boolean):void {
+				if (!on) {
+					spinner.stop();
+				} else {
+					spinner.play();
+				}
+			}
+			private function fullSynData():void {
+				if (fullSync.selected){
+					Alert.show(i18n._('SYNCHRONIZE_ALERT_FULL_SYNCHRONIZATOIN'), i18n._('SYNCHRONIZE_ALERT_WARNING'), Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+						if (event.detail==Alert.NO){
+							fullSync.selected = false;
+						}
+					});
+				} 
+			}	
+			public function initButtons():void {
+				if (!isSynching) {
+					// hide/stop spinner animation
+					toggleSpinner(false);
+					syncDataBtn.enabled = true;
+					fullSync.enabled = true;
+					btnStop.enabled = false;
+					btnClose.label = i18n._('GLOBAL_CLOSE');
+					btnClose.enabled=true;
+					direction.enabled =  true;
+					if(entity =='Activity'){
+						directionChange();
+					}
+					
+				} else {
+					// start spinner animation
+					toggleSpinner(true);
+					syncDataBtn.enabled = false;
+					fullSync.enabled = false;
+					btnStop.enabled = true;	
+					btnClose.enabled = false;
+					direction.enabled =  false;
+				}
+				
+				PreferenceUtils.WindowScreenBounds(this);
+			}		
+			private function directionChange():void{
+				var objDir:Object = direction.selectedItem;
+				if(objDir != null){
+					if(objDir.data == NONE){
+						syncDataBtn.enabled = false;
+					}else{
+						syncDataBtn.enabled = true;
+					}
+				}
+			}
+			private function directionProvider():ArrayCollection{
+				return new ArrayCollection([{label:i18n._('GLOBAL_NONE'),data:NONE},{label:i18n._('GLOBAL_G2G_TO_MS'),data:G2G_TO_MS},{label:i18n._('GLOBAL_MS_TO_G2G'),data:MS_TO_G2G},{label:i18n._('GLOBAL_BOTH'),data:BOTH}]);
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Style source="ilog-gauges.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/sync.png')" title="{'MS Exchange ' + i18n._('GLOBAL_SYNCHRONIZATOIN')}"/>
+		
+		<mx:VBox top="32" left="16" right="16" bottom="16" verticalGap="16">
+			
+			<mx:Panel id="panelTitle" title="{i18n._('SYNCHRONIZE_PANEL_PROGRESS')}" width="100%">
+				<mx:VBox width="100%" paddingLeft="8" paddingRight="8" paddingTop="8" paddingBottom="8">
+					
+					<mx:DataGrid id="dgLoggingArea" rowCount="10" dataProvider="{loggingMessages}" width="100%" height="180" variableRowHeight="true">
+						<mx:columns>
+							<mx:DataGridColumn headerText="{i18n._('SYNCHRONIZE_DATAGRID_COLUMN_TIME')}" width="100">
+								<mx:itemRenderer>
+									<mx:Component>
+										<mx:Label text="{data.time}" fontSize="10"/>
+									</mx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="{i18n._('GLOBAL_MESSAGE')}" dataField="message" itemRenderer="gadget.control.SynLoggingColorRenderer"/>
+						</mx:columns>
+					</mx:DataGrid>
+					
+					<mx:VBox width="100%" >
+						<mx:HBox width="100%">
+							<control:Spinner id="spinner" tickColor="#66aaff"/>
+							<mx:Text id="ItemSyncInfo"/>
+						</mx:HBox>
+					</mx:VBox>				
+				</mx:VBox>
+			</mx:Panel>	
+			<mx:Canvas width="100%">
+				<mx:HBox left="0">
+					<mx:Button emphasized="true" label="{i18n._('GLOBAL_SYNCHRONIZE')}" id="syncDataBtn" click="syncData()"/>
+					<mx:HBox id="directionLayout">
+						<mx:Label text="Synchronize direction" />
+						<mx:ComboBox id="direction" dataProvider="{directionProvider()}" change="directionChange()" />
+					</mx:HBox>
+					<mx:CheckBox id="fullSync" label="{i18n._('SYNCHRONIZE_CHECK_BOX_PERFOM_FULL_SYNCHRONIZE')}" click="fullSynData()"/>
+					<!--<mx:CheckBox id="syncToMS" label="{i18n._('MS Synchronization')}"/> -->
+				</mx:HBox>				
+			</mx:Canvas>
+			<mx:Canvas width="100%">
+				<mx:HBox right="0">
+					<mx:Button id="btnStop" label="{i18n._('SYNCHRONIZE_BUTTON_STOP')}" click="stop();"/>
+					<mx:Button id="btnClose" click="close();loadData()" right="0"/>	
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

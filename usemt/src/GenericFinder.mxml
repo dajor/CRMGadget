@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="480" height="450"
+	title="Finder" 
+	showFlexChrome="false" transparent="true" systemChrome="none" creationComplete="init()">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.control.ImageTextInput;
+			import gadget.dao.DAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.LinkDAO;
+			import gadget.i18n.i18n;
+			import gadget.util.StringUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+
+			[Bindable] public var item:Object;
+			[Bindable] public var dataQuery:Object;
+			
+			public var reload:Function;
+			
+			[Bindable] private var allItems:ArrayCollection;
+			
+			public var textInput:TextInput;
+			
+			private var columns:ArrayCollection = new ArrayCollection(); 
+			
+			private var finder:Object;
+			private var fieldsMap:ArrayCollection;
+			private var keyMap:Object;
+			private var displayMap:Object;
+			
+			private function init():void {
+				updateInfo();
+				
+				var strTableFinder:String = Database.fieldFinderDAO.getFinderTableName(dataQuery);
+				finder = Database.finderDAO.read({'id':strTableFinder});
+				var strTblFieldName:String = DAOUtils.getEntity(finder.finder_table.toLowerCase());
+				this.title = finderBar.title = strTblFieldName + " " + i18n._("GLOBAL_FINDER");
+				
+				fieldsMap = Database.finderMapDAO.read(finder);
+				keyMap = getKeyMap(fieldsMap, finder.key_column);
+				displayMap = getDisplayMap(fieldsMap, dataQuery.element_name);
+
+//				var strTblFieldName:String = DAOUtils.getTable(finder.finder_table);
+//				strTblFieldName = strTblFieldName.charAt(0).toUpperCase() + strTblFieldName.substring(1);
+//				if(strTblFieldName == 'Allusers') strTblFieldName = 'User';
+//				if(strTblFieldName == 'Custom_object_14') strTblFieldName = 'CustomObject14';
+				
+				
+
+				
+				var gCols:Array = new Array();
+				// #bug 26
+				for each(var fieldMap:Object in fieldsMap){
+					columns.addItem({'element_name':fieldMap.column});
+				} 
+				var colDisplay:Array = finder.display_column.split(",");
+				for each(var colName:String in colDisplay){
+					var col:DataGridColumn = new DataGridColumn();
+					col.dataField = colName;
+					var objFeild:Object = Database.fieldDao.findFieldByPrimaryKey(strTblFieldName,colName);
+					col.headerText = objFeild==null?strTblFieldName:objFeild.display_name;
+					gCols.push(col);
+					columns.addItem({'element_name':colName});
+				}
+				
+				resultList.columns = gCols;
+								 
+				var filterResults:ArrayCollection = Database.finderDAO.filterAll(columns, finder.finder_table, finder.key_column + " = '" + item[keyMap.field] + "'");
+				var obj:Object = null;
+				if (filterResults.length > 0) obj = filterResults.getItemAt(0);
+				if(obj){
+					// #Bug 26 
+					searchInput.text = obj[displayMap.column];  // searchInput.text = obj[finder.display_column];
+					searchInput.setSelection(searchInput.text.length,searchInput.text.length);
+					doSearch();
+				}else{
+					allItems = showAllUsers();
+				}
+				searchInput.setFocus();
+				searchInput.selectionBeginIndex =0;
+				searchInput.selectionEndIndex = searchInput.text.length;
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function getKeyMap(fieldsMap:ArrayCollection, keyName:String):Object {
+				for each(var fieldMap:Object in fieldsMap){
+					if(fieldMap.column == keyName) return fieldMap;
+				}
+				return null;
+			}
+			
+			private function getDisplayMap(fieldsMap:ArrayCollection, displayName:String):Object {
+				for each(var fieldMap:Object in fieldsMap){
+					if(fieldMap.field == displayName) return fieldMap;
+				}
+				return null;
+			}
+			
+			private function doSearch():void {
+				if (searchInput.text.length > 0) {
+					var filter:String = '';
+					var name:String = searchInput.text.toUpperCase();
+					// CH : # Bug 372 // Alias : change from Alias to FirstName,LastName #Bug 26 
+					if(finder.display_column == "FirstName,LastName" && finder.finder_table == "AllUsers"){
+						//should be search by link field is better
+						var searchColumn:String = "upper("+displayMap.column+")";
+						filter=searchColumn+">='" + name + "' AND "+searchColumn+" <= '" + name + "zzzz'"
+						filter += " OR ( upper(FirstName) >='" + name + "' AND upper(FirstName) <= '" + name + "zzzz'" +
+								" OR upper(LastName) >='" + name + "' AND upper(LastName) <= '" + name + "zzzz')";
+					}else{
+						filter = "upper(" + finder.display_column + ") >='" + name + "' AND upper(" + finder.display_column + ") <= '" + name + "zzzz'";
+						
+					}
+					if(finder.finder_table == "Address"){
+						filter += " AND ParentId='" + item['AccountId'] + "' ";
+					}
+					allItems = Database.finderDAO.filterAll(columns, finder.finder_table, filter);
+				} else {
+					allItems = showAllUsers();
+				}
+				updateInfo();
+			}
+			
+			private function showAllUsers():ArrayCollection {
+				if(finder.finder_table == "Address"){
+					return Database.finderDAO.filterAll(columns, finder.finder_table," ParentId='" + item['AccountId'] + "' ");
+				}
+				return Database.finderDAO.filterAll(columns, finder.finder_table);
+			}
+			
+			private function updateInfo():void {
+				if (allItems != null && allItems.length == 1000) {
+					//CRO 12.01.2011
+					info.text = i18n._('GLOBAL_ONLY_THE_FIRST_1000_MATCHING_ITEMS_ARE_SHOWN');
+				}  else if (allItems != null) {
+					info.text = allItems.length + " "+i18n._('GLOBAL_ITEMS_FOUND');
+				} else {
+					info.text = i18n._('GLOBAL_PLEASE_ENTER_AT_LEAST_TWO_CHARACTERS_FOR_SEARCH');
+				}
+			}
+			
+			private function selectItem(selected:Object):void {
+				if(selected)
+				{	
+					for each(var fieldMap:Object in fieldsMap){
+						item[fieldMap.field] = selected[fieldMap.column];
+					}
+					if(displayMap!=null) textInput.text = selected[displayMap.column];	
+					if (reload!=null) reload();
+					close();
+				}
+			}
+
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="480" height="450" right="0" bottom="0">
+		<control:TitleBar id="finderBar" icon="@Embed(source='/assets/search.png')" title="{i18n._('GLOBAL_FINDER')}" />
+		<mx:VBox top="32" left="16" right="16">
+			<mx:Form width="100%" paddingBottom="8">
+				<mx:Label id="info" left="0"/>
+				<mx:FormItem label="{i18n._('GLOBAL_SEARCH')}">
+					<mx:TextInput id="searchInput" change="doSearch()"/>
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._('GLOBAL_RESULTS')}" width="100%">
+					<mx:DataGrid id="resultList" width="100%" dataProvider="{allItems}" rowHeight="27" rowCount="10" click="selectItem(resultList.selectedItem)">
+					</mx:DataGrid>
+				</mx:FormItem>
+			</mx:Form>
+			<mx:Canvas width="100%">
+				<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="this.close()" right="0"/>	
+			</mx:Canvas>		
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

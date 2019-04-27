@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="300" height="200"
+	title="{entity}"
+	showFlexChrome="false" transparent="true" systemChrome="none" 
+	close="OOPSwindow.bye()"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			
+			import mx.collections.ArrayCollection;
+			
+			[Bindable] public var entity:String;
+			public var onChangeRecordType:Function;			
+			[Bindable] public var _listValue:ArrayCollection;	
+			[Bindable] public var field:String;
+			
+			private function okClick():void{
+
+				onChangeRecordType(comboValue);
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="300" height="200" right="0" bottom="0">
+		<control:TitleBar title="{entity}" id="titlebar" y="2" x="25"/>
+		<mx:VBox top="10" left="8" right="8" bottom="8">
+			<mx:Canvas width="95%" height="130">
+				<mx:VBox paddingTop="20">
+					<mx:Label textAlign="right" text="{i18n._('Please select one record type')}" height="20"/>
+					<mx:HBox>
+						<mx:Label textAlign="right" text="{field==null?'':field}" height="20"/>
+						<mx:ComboBox id="comboValue" width="120" dataProvider="{_listValue}"/>
+					</mx:HBox>
+					
+				</mx:VBox>
+			</mx:Canvas>	
+			<mx:Canvas width="95%" height="50">
+				<mx:HBox width="100%" horizontalAlign="right">
+					<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="this.close();" right="0" />
+					<mx:Button id="createBtn" click="okClick();" label="{i18n._('Ok')}" right="0" />
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

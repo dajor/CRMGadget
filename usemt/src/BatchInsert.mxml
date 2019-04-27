@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="1115"
+	height="540"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init();"
+	>
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.GridItem;
+			import mx.containers.GridRow;
+			import mx.controls.Alert;
+			import mx.controls.ButtonBar;
+			import mx.controls.Label;
+			import mx.controls.TextInput;
+			import mx.events.ItemClickEvent;
+			import mx.validators.Validator;
+			
+			[Binable] public var entity:String;
+			
+			private static var PICTURE_STR:String = "Picture";
+			//private var item:Object = new Object();
+			private var items:ArrayCollection = new ArrayCollection();
+			private var numOfComponents:int = 0;
+			private var validators:Array = [];
+			private var map:ArrayCollection = new ArrayCollection();			
+			public var mainWindow:MainWindow;
+			private var rowCount:int = 0;
+			private var mandatoryPerRow:int = 0;
+			private var isFirstTime:Boolean = true;
+			
+			private static const CANCEL_STR:String = i18n._('GLOBAL_CANCEL');
+			private static const CREATE_STR:String = i18n._('GLOBAL_CREATE');
+			
+			private function init():void{
+				
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+				
+				var fields:ArrayCollection = Database.layoutDao.selectLayout(entity, 0);
+				grid.addChild(addChilds(fields, "Header"));
+				grid.addChild(addChilds(fields, "Row"));
+				initButton();
+				this.width = mainCanvas.width = (numOfComponents * 111) + 5;
+				//CRO 05.01.2011
+				this.title = barTitle.title = entity + " " + i18n._('GLOBAL_BATCH_INSERT_TITLE');
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function addLine():void{
+				var fields:ArrayCollection = Database.layoutDao.selectLayout(entity, 0);
+				grid.addChild(addChilds(fields, "Row"));
+				refreshButton();
+			}
+			
+			private function removeLine():void {
+				if(isRemoveButton()) {
+					grid.removeChildAt(grid.getChildren().length - 1);
+					map.removeItemAt(map.length - 1);
+					if(validators.length > 0 && validators.length >= mandatoryPerRow) 
+						validators.splice(validators.length - mandatoryPerRow);
+				}
+				refreshButton();
+			}
+			
+			private function isRemoveButton():Boolean {
+				return ((grid.getChildren().length > 2) ? true : false);
+			}
+			
+			private function refreshButton():void {
+				if(isRemoveButton())
+					removeline.enabled = true;
+				else
+					removeline.enabled = false;
+			}
+			
+			private function initButton():void{
+				var buttonBar:ButtonBar = new ButtonBar();
+				buttonBar.setStyle("right", "0");
+				//buttonBar.percentWidth = 100;
+				var obj:Object = null;
+				var buttons:ArrayCollection = new ArrayCollection();
+				
+				buttons.addItem({label: CANCEL_STR, icon: ImageUtils.cancelIcon}); 
+				buttons.addItem({label: CREATE_STR, icon: ImageUtils.acceptIcon});
+				buttonBar.dataProvider = buttons;
+				
+				buttonBar.addEventListener(ItemClickEvent.ITEM_CLICK, handleButtonBar);
+				actionCanvas.addChild(buttonBar);
+				
+				refreshButton();
+			}
+			
+			private function handleButtonBar(e:ItemClickEvent):void{
+				var close:Boolean = true;
+				if (e.label == CREATE_STR) {
+					close = batchInsert();				
+				}
+				if (close) {
+					this.close();
+				}
+			}
+			
+			
+			private function addChilds(fields:ArrayCollection, type:String):GridRow{
+				if (type == "Row") {
+					items.addItem(new Object());
+				}
+				var gridRow:GridRow = new GridRow();
+				var count:int = 0;
+				var functions:Object = new Object();
+				var currentRow:int = rowCount; // we need to keep the row count value in a local variable
+				functions._finderClick = function (event:MouseEvent):void { 
+					finderClick(event, currentRow);	
+				};
+				functions._referenceClick = function (event:MouseEvent):void { 
+					referenceClick(event, currentRow);	
+				};	
+				var mapField:ArrayCollection = new ArrayCollection();
+				
+				for (var i:int = 0; i < fields.length; i++) {
+					
+					var displayObj:DisplayObject;
+					if (fields[i].custom == null) {
+						var fieldInfo:Object = FieldUtils.getField(entity, fields[i].column_name);
+						var gridItem:GridItem = new GridItem();
+						count++;
+						if(type=="Row" && count <=10){
+							var childObj:DisplayObject;
+							if(fieldInfo.data_type != PICTURE_STR && fieldInfo.data_type != '{' + CustomLayout.GOOGLEMAP_CODE + '}'){
+								childObj = GUIUtils.getInputField(true, functions, entity, items[rowCount], fieldInfo, fields[i].readonly, true);
+							}
+							if(childObj!=null){
+								validators = validators.concat(FieldUtils.getValidators(fieldInfo, childObj));
+								
+								childObj.width = 100;
+								childObj.name = fields[i].column_name;
+								fields[i].component = childObj;
+								
+								var objectField:Object = new Object();
+								objectField[fields[i].column_name] = fields[i];
+								mapField.addItem(objectField);
+								
+								gridItem.addChild(childObj);
+								gridRow.addChild(gridItem);
+								numOfComponents ++;
+							}
+						}else if(type=="Header" && count <=10){
+							var labelHeader:Label = new Label();
+							labelHeader.text = fieldInfo.display_name;
+							gridItem.addChild(labelHeader);
+							gridRow.addChild(gridItem);
+						}
+					}
+				}
+				map.addItem(mapField);
+				if(type=="Row") {
+					if(isFirstTime) {
+						mandatoryPerRow = validators.length;
+						isFirstTime = false;
+					}
+					rowCount++;
+				}
+				return gridRow;
+			}
+			
+			private function batchInsert():Boolean{
+				var validatorErrorArray:Array = Validator.validateAll(validators);
+				var validatorMap:Dictionary = Database.validationDao.selectByEntityAsMap(entity);
+				//for each(var gridRow:GridRow in grid.getChildren()){
+				for(var i:int = 1; i < grid.getChildren().length; i++){
+					var gridRow:GridRow = grid.getChildAt(i) as GridRow;
+					//var item:Object = new Object();
+					for(var j:int=0; j<gridRow.getChildren().length; j ++ ){// in ){
+						var gridItem:GridItem = gridRow.getChildAt(j) as GridItem;
+						var displayObject:DisplayObject = gridItem.getChildAt(0);
+						var mapField:ArrayCollection = map.getItemAt(i) as ArrayCollection;
+						var field:Object = mapField.getItemAt(j)[displayObject.name];
+						var fieldInfo:Object = FieldUtils.getField(entity, field.column_name);
+						//item[fieldInfo.element_name] = GUIUtils.getInputFieldValue(field.component, fieldInfo);
+						items[i-1][fieldInfo.element_name] = GUIUtils.getInputFieldValue(field.component, fieldInfo);
+						FieldUtils.readValidationRule(validatorErrorArray, field, entity,validatorMap);
+					}
+					if (validatorErrorArray.length != 0) {
+						var errorMessageArray:Array = [];
+						for each (var err:Object in validatorErrorArray) {
+							var errField:String = ''; 
+							if (err.currentTarget) {
+								var gridItemError:GridItem = (err.currentTarget.source.parent as GridItem);
+								errField = Database.fieldDao.findFieldByPrimaryKey(entity, gridItemError.getChildAt(0).name).display_name + " : ";
+							}
+							errorMessageArray.push(errField + Utils.getTranslatedValidation(err.message));
+						}
+						//CRO 05.01.2011
+						Alert.show(errorMessageArray.join("\n"), i18n._('GLOBAL_INVALID_FORM'), Alert.OK, this);
+						return false;
+					}
+					// Save to db
+					items[i-1]["deleted"] = false;
+					items[i-1]["error"] = false;
+					items[i-1]["OwnerId"] = Database.userDao.read().id;
+					Database.getDao(entity).insert(items[i-1]);
+					items[i-1] = Database.getDao(entity).selectLastRecord()[0];
+					// by default, sets the OracleId as gadget_id
+					items[i-1][DAOUtils.getOracleId(entity)] = "#" + items[i-1].gadget_id;
+					Database.getDao(entity).update(items[i-1]);
+				}
+				mainWindow.updateTransactions();
+				return true;
+			}
+			
+			
+			private function finderClick(event:MouseEvent, i:int):void {
+				var finder:GenericFinder = new GenericFinder();
+				finder.textInput = (event.currentTarget as TextInput);
+				finder.item = items[i];
+				finder.reload = null;
+				finder.dataQuery = event.target.document.data;
+				WindowManager.openModal(finder);
+			}
+			
+			private function referenceClick(event:MouseEvent, i:int):void {
+				var itemFinder:ItemFinder = new ItemFinder();
+				itemFinder.relation = (event.currentTarget as TextInput).data;
+				itemFinder.textInput = (event.currentTarget as TextInput);
+				itemFinder.item = items[i];
+				itemFinder.reload = null;
+				WindowManager.openModal(itemFinder);
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	
+	<mx:Canvas horizontalScrollPolicy="off" id="mainCanvas" width="1115" styleName="main" left="0" top="0" height="450" right="0" bottom="0">
+		<control:TitleBar id="barTitle" icon="@Embed(source='/assets/add.png')"/>
+		<!--  horizontalScrollPolicy="off" -->
+		<mx:Canvas id = "innerConvas" top="32" left="16" right="16" bottom="16" horizontalScrollPolicy="off">
+			<mx:Grid id="grid" verticalGap="5"  height="365" horizontalGap="5" borderStyle="solid" paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5" />
+		</mx:Canvas>
+		
+		<mx:Canvas id="buttonCanvas" left="8" right="8" bottom="8" height="30">
+			<mx:HBox left="8" right="8">
+				<mx:Button icon="@Embed('/assets/add.png')" click="addLine()" label="{i18n._('BATCHINSERT_BUTTON_LABEL_ADD_LINE')}" id="addline" />
+				<mx:Button icon="@Embed('/assets/delete.png')" click="removeLine()" label="{i18n._('BATCHINSERT_BUTTON_LABEL_REMOVE_LINE')}" id="removeline" />
+				<mx:HBox horizontalAlign="right" width="100%">
+					<mx:HBox id="actionCanvas" horizontalAlign="right"/>	
+				</mx:HBox>					
+			</mx:HBox>
+		</mx:Canvas>
+		
+	</mx:Canvas>
+</mx:Window>

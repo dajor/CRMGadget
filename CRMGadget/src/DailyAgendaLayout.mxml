@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="480" height="340" verticalAlign="middle"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init();" 
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.control.AccountListImageRenderer;
+			import gadget.control.ContactListImageRenderer;
+			import gadget.control.RequireFieldRenderer;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.util.DashboardUtils;
+			import gadget.util.FieldUtils;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.DragEvent;
+			import mx.formatters.SwitchSymbolFormatter;
+			import mx.managers.DragManager;
+			
+			[Bindable] private var selectedCols:ArrayCollection;
+			[Bindable] private var availableCols:ArrayCollection;
+			//CRO 05.01.2011
+			private const LISTLAYOUT_TITLEBAR_TITLE_LAYOUT:String = 'GLOBAL_LAYOUT';
+			private const LISTLAYOUT_DATAGRIDCOLUMN_HEADERTEXT_AVAILABLE_COLUMNS:String = 'GLOBAL_AVAILABLE_COLUMNS';
+			private const LISTLAYOUT_DATAGRIDCOLUMN_HEADERTEXT_SELECTED_COLUMNS:String = 'GLOBAL_SELECTED_COLUMNS';
+			private const LISTLAYOUT_BUTTON_RESET_TO_DEFAULTS:String = 'GLOBAL_RESET_TO_DEFAULTS';
+			private const LISTLAYOUT_DETAILBUTTONBAR_BUTTONLABEL_SAVE:String = 'GLOBAL_SAVE';
+			
+			[Bindable] public var entity:String;
+			[Bindable] public var dailyAgenda:DailyAgenda;
+			[Bindable] public var refreshLayout:Function;
+			[Bindable] public var item:Object;
+			private function init():void{
+				
+				
+				title= i18n._("GLOBAL_" + entity.replace(/\s/gi,"_").toUpperCase()) + " " + i18n._(LISTLAYOUT_TITLEBAR_TITLE_LAYOUT);
+				barTitle.title = i18n._("GLOBAL_" + entity.replace(/\s/gi,"_").toUpperCase())+ " " + i18n._(LISTLAYOUT_TITLEBAR_TITLE_LAYOUT);
+				
+				// Selected Column
+				initColsGridRight();
+				 
+				// Available Columns
+				initColsGridLeft();
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function getDefaultColumns():ArrayCollection{
+				var records:ArrayCollection ;
+				switch(entity)
+				{
+					case "Activity":
+					{
+						records = FieldUtils.ACTIVITY_DEFAULT_DAILY_AGENDA;		
+						break;
+					}
+					case "Contact":
+					{
+						records = FieldUtils.CONTACT_DEFAULT_DAILY_AGENDA;
+						break;
+					}
+					case "Account":
+					{
+						records = FieldUtils.ACCOUNT_DEFAULT_DAILY_AGENDA
+						break;
+					}
+				}
+				return records;
+			}
+			private function initColsGridRight():void{
+				var records:ArrayCollection = Database.dailyAgendaColumnLayoutDao.selFieldByEntity(entity);
+				// Get Default filter
+				if(records.length==0){
+					
+					records = getDefaultColumns();
+				}
+				selectedCols = new ArrayCollection();
+				for each(var record:Object in records) {
+					// SC20110608
+					var field:Object =  FieldUtils.getField(entity, record.element_name);
+					if(field==null) field =  FieldUtils.getField(entity, record.element_name, false, true); // read custom field
+					if(field){
+						record.display_name = field.display_name;
+						//record.required = field.required;
+						selectedCols.addItem(record);
+					}
+				}
+			}
+			
+			private function initColsGridLeft():void{
+				availableCols = new ArrayCollection();
+				var colsFields:ArrayCollection = FieldUtils.allFields(entity,false,true);
+				for each (var field:Object in colsFields){	
+					if (!checkObjectSelected(field.element_name)){
+						availableCols.addItem(field);
+					}
+				}	
+			}
+			
+			private function checkObjectSelected(s:String):Object{
+				for each (var field:Object in selectedCols) {
+					if (s == field.element_name){
+						return true;
+					}
+				}
+				return false;
+			}
+			
+			
+			private function save():void{
+				Database.dailyAgendaColumnLayoutDao.deleteColumnLayout(entity);
+				var rows:Object = selectedColumns.dataProvider;
+				var index:int=1;
+				for each(var o:Object in rows) {
+					
+					var obj:Object = new Object();
+					obj.order_index = index;
+					obj.element_name = o.element_name;
+					obj.entity =entity;
+					Database.dailyAgendaColumnLayoutDao.insert(obj);
+					index += 1;
+				}
+				refreshLayout(item);
+				this.close();
+			}
+			
+			private function reset():void {
+				var records:ArrayCollection = getDefaultColumns();
+				selectedCols = new ArrayCollection();
+				for each(var record:Object in records) {
+					// SC20110608
+					var field:Object =  FieldUtils.getField(entity, record.element_name);
+					if(field==null) field =  FieldUtils.getField(entity, record.element_name, false, true); // read custom field
+					if(field){
+						record.display_name = field.display_name;
+						//record.required = field.required;
+						selectedCols.addItem(record);
+					}
+				}
+				initColsGridLeft();
+			}
+			
+			private function dropItem(event:DragEvent):void {
+				var gridDrag:DataGrid = event.dragInitiator as DataGrid;
+				if(gridDrag.id == 'selectedColumns'){
+					var index:int = gridDrag.selectedIndex;
+					selectedCols.removeItemAt(index);
+					initColsGridLeft();
+				}
+
+			}
+			
+			private function checkColumnName(event:DragEvent):void{
+				var gridRight:DataGrid = event.dragInitiator as DataGrid;
+				
+				var field:Object =  FieldUtils.getField(entity, gridRight.selectedItem.element_name);
+				if(field /*&& field.required != true*/ ){
+					DragManager.acceptDragDrop(event.target as DataGrid);
+				}
+				
+			}
+			
+		]]>
+	</mx:Script>   
+    <mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="480" height="340" right="0" bottom="0">
+		<control:TitleBar id="barTitle" icon="@Embed(source='/assets/customize.png')"/>
+		<mx:VBox top="40" left="16" right="16" bottom="16">
+		    <mx:HBox width="100%">
+		    	<mx:DataGrid id="availableColumns" rowCount="10" dataProvider="{availableCols}" width="50%"
+					dragEnabled="true"
+					dragMoveEnabled="true"
+					dragDrop="dropItem(event)"
+		            dragEnter="checkColumnName(event)">
+					<mx:columns>
+						<mx:DataGridColumn headerText="{i18n._(LISTLAYOUT_DATAGRIDCOLUMN_HEADERTEXT_AVAILABLE_COLUMNS)}" dataField="display_name" itemRenderer="gadget.control.RequireFieldRenderer" />
+					</mx:columns>
+				</mx:DataGrid>
+				<mx:DataGrid id="selectedColumns" rowCount="10" width="50%"
+					dataProvider="{selectedCols}"
+					dragEnabled="true"
+		            dragMoveEnabled="true"
+		            dropEnabled="true">
+					<mx:columns>
+						<mx:DataGridColumn headerText="{i18n._(LISTLAYOUT_DATAGRIDCOLUMN_HEADERTEXT_SELECTED_COLUMNS)}" dataField="display_name" itemRenderer="gadget.control.RequireFieldRenderer" />
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Canvas>
+					<mx:Button label="{i18n._(LISTLAYOUT_BUTTON_RESET_TO_DEFAULTS)}" click="reset()" top="8"/>	
+				</mx:Canvas><!--CRO 05.01.2011 LISTLAYOUT_DETAILBUTTONBAR_BUTTONLABEL_SAVE-->		
+				<control:DetailButtonBar buttonLabel="GLOBAL_SAVE" action="save"/>
+			</mx:HBox>			
+		</mx:VBox>
+
+	</mx:Canvas>
+</mx:Window>

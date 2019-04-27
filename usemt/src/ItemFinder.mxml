@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--CRO 05.01.2011-->
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="460" height="468"
+	title="{Database.customLayoutDao.getDisplayName(relation.entityDest) +' '+ i18n._('GLOBAL_FINDER')}" 
+	showFlexChrome="false" transparent="true" systemChrome="none" creationComplete="updateInfo(); init()">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.BaseDAO;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+
+			[Bindable] public var item:Object;
+			[Bindable] public var relation:Object; 
+			[Bindable] private var allItems:ArrayCollection;
+			public var textInput:TextInput;
+			public var reload:Function;
+			public var filter:String;
+			public var mainWindow:MainWindow;
+			private function init():void {
+				var dao:BaseDAO = Database.getDao(relation.entityDest);
+				var objRel:Object = dao.findByOracleId(item[relation.keySrc]);
+				if(relation.entityDest==Database.productDao.entity){
+					optionItem.setVisible(true);
+					//this.height = 448;
+				}
+				else if(relation.entitySrc == Database.activityDao.entity && Database.contactDao.entity == dao.entity){
+					optionItem.setVisible(true);
+					if(!StringUtils.isEmpty(item["AccountId"]) && StringUtils.isEmpty(filter)){
+						filter = "AccountId=" + "'" + item["AccountId"] + "'";
+					}
+				}else if(relation.entityDest == Database.opportunityDao.entity){					
+					chkOption.selected = true;
+					optionItem.setVisible(true);
+					if(StringUtils.isEmpty(filter)){
+						filter = "Status != 'Closed'";
+					}
+					
+				}else{
+					optionItem.setVisible(false);
+					
+					//this.height = 428;
+				}
+				optionItem.includeInLayout=optionItem.visible;
+				if(objRel){
+					searchInput.text = objRel["uppername"];
+					searchInput.setSelection(searchInput.text.length, searchInput.text.length);
+					doSearch();
+				} else if (filter != null) {
+					doSearch();
+				}				
+				searchInput.setFocus();
+				searchInput.selectionBeginIndex =0;
+				searchInput.selectionEndIndex = searchInput.text.length;
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+	
+			
+			private function doSearch():void {				
+				var currentFilter:String = filter;
+				var langCode:String = Database.allUsersDao.ownerUser()['LanguageCode'];
+				var minLenght:int = 2;
+				if(langCode == 'CHS'){
+					minLenght=1;
+				}
+				if (StringUtils.replaceAll_(searchInput.text,"*","").length >= minLenght || currentFilter != null) {
+					
+					if(optionItem.visible){
+						
+						if(chkOption.selected){
+							if(relation.entityDest==Database.productDao.entity){//bug#5069--orderable
+								currentFilter = "Orderable='true'";	
+							}else if(relation.entityDest == Database.opportunityDao.entity){
+								currentFilter = "Status != 'Closed'";
+							}else{
+								currentFilter = null;
+							}
+						}else{
+							if(Database.contactDao.entity == relation.entityDest && !StringUtils.isEmpty(item["AccountId"])){
+								currentFilter = "AccountId=" + "'" + item["AccountId"] + "'";
+							}else{
+								currentFilter = null;
+							}
+						}
+						
+					}
+					
+					
+					allItems = Database.linkDao.allItemFinders(new ArrayCollection([relation.entityDest]), 
+						searchInput.text.toUpperCase(), currentFilter);
+					
+					if(relation.entityDest ==  Database.contactDao.entity && (allItems == null || allItems.length<1)){
+						btnAdd.visible = true;
+					}else {
+						btnAdd.visible = false;
+					}
+					
+				} else {
+					allItems = null;
+				}
+				updateInfo();
+			}
+			
+			private function updateInfo():void {
+				if (allItems != null && allItems.length == 1000) {
+					//CRO 05.01.2011
+					info.text = i18n._('GLOBAL_ONLY_THE_FIRST_1000_MATCHING_ITEMS_ARE_SHOWN');
+				}  else if (allItems != null) {
+					info.text = allItems.length + " " + i18n._('ITEM_FINDER_LABEL_ITEMS_FOUNDS');
+				} else if (filter == null) {
+					//CRO 05.01.2011
+					info.text = i18n._('GLOBAL_PLEASE_ENTER_AT_LEAST_TWO_CHARACTERS_FOR_SEARCH');
+				}
+			}
+			
+			private function selectItem(selected:Object):void {
+				if (selected==null) return;
+				var other:Object = Database.getDao(relation.entityDest).findByGadgetId(selected.gadget_id);
+				item[relation.keySrc] = other[relation.keyDest];
+				for(var i:int=0; i<relation.labelDest.length; i++){
+					item[relation.labelSrc[i]] = other[relation.labelDest[i]];
+				}
+				if (textInput != null) {
+					textInput.text = other[relation.labelDest[0]];
+				}
+				selectPrimaryContact(item,other["PrimaryContactId"],item["gadget_type"]);
+				selectPrimaryAccount(item,other["AccountId"],item["gadget_type"]);
+				if (reload != null) {
+					reload(); // refresh detail input fields
+				}
+				close();
+			}
+			//cr 4733 select primary contact when account was selected
+			private function selectPrimaryContact(itemSource:Object,oracleId:String,entity:String):void{
+				if(entity == Database.activityDao.entity && oracleId != null){
+					if(Database.preferencesDao.isAutoSetPrimaryContact()){
+						var con:Object = Database.contactDao.findByOracleId(oracleId);
+						if(con != null){
+							itemSource["PrimaryContactId"] = oracleId;
+							itemSource["PrimaryContact"] = con["ContactFullName"];
+							itemSource["PrimaryContactFirstName"] = con["ContactFirstName"];
+							itemSource["PrimaryContactLastName"] = con["ContactLastName"];
+						}
+					}
+				}
+			}
+			//CR #6664 select primary contact code was selected account 
+			private function selectPrimaryAccount(itemSource:Object,oracleId:String,entity:String):void{
+				if(entity == Database.activityDao.entity && oracleId != null){
+					var con:Object = Database.accountDao.findByOracleId(oracleId);
+					if(con != null){
+						itemSource["AccountId"] = oracleId;
+						itemSource["AccountName"] = con["AccountName"];
+						}
+				}
+			}
+			private function getOptionDiplayName():String{
+				if(relation.entitySrc == Database.activityDao.entity && Database.contactDao.entity == relation.entityDest){
+					return i18n._('ALL@All');
+				}else if(relation.entityDest == Database.opportunityDao.entity){
+					return i18n._("OPEN_OPPORTUNITIES@Open Opportunities");				
+				}
+				var fieldInfo:Object = FieldUtils.getField(Database.productDao.entity, "Orderable");
+				
+				return fieldInfo.display_name;
+			}
+			private function refreshFunction(item:Object):void{
+				var list:ArrayCollection = new ArrayCollection();
+				item['name'] = item['ContactFirstName'] + ' ' + item['ContactLastName'];
+				list.addItem(item);
+				allItems = list;
+					
+			}
+			private function addNewEntity():void{
+				var item:Object = new Object();
+				item["PrimaryContact"] = textInput.text;
+				GUIUtils.openDetailScreen(true,mainWindow,"Contact",refreshFunction, item,false,  0);
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="460" height="468" right="0" bottom="0"><!--CRO 05.01.2011-->
+		<control:TitleBar icon="@Embed(source='/assets/search.png')" title="{GUIUtils.getItemFinderLabel(Database.customLayoutDao.getDisplayName(relation.entityDest) , ' ' + i18n._('GLOBAL_FINDER'))}"/>
+		<mx:VBox top="32" left="16" right="16">
+			<mx:Form width="100%" paddingBottom="8">
+				<mx:Label id="info" left="0"/><!--CRO 05.01.2011 ITEM_FINDER_FORM_ITEM_SEARCH-->
+				<mx:FormItem label="{i18n._('GLOBAL_SEARCH')}">
+					<mx:HBox>
+						<mx:TextInput width="200" id="searchInput" change="doSearch()"/>
+						<mx:Button visible="false" id="btnAdd" label="{i18n._('GLOBAL_CREATE')}" click="addNewEntity()" right="0"/>	
+					</mx:HBox>
+				</mx:FormItem>				
+				<mx:FormItem label="{getOptionDiplayName()}" id="optionItem">
+					<mx:CheckBox width="200" id="chkOption" click="doSearch()" />
+				</mx:FormItem>
+				<!--CRO 05.01.2011-->
+				<mx:FormItem label="{i18n._('GLOBAL_RESULTS')}" width="100%">
+					<mx:List id="resultList" width="100%" dataProvider="{allItems}" rowHeight="27" rowCount="10" click="selectItem(resultList.selectedItem)">
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox horizontalScrollPolicy="off" horizontalAlign="left" horizontalGap="0">
+									<mx:Script>
+										<![CDATA[
+											import gadget.util.ImageUtils;
+										]]>
+									</mx:Script>
+									<mx:Image id="albumImage" source="{ImageUtils.getImage(data.gadget_type)}"/>
+									<mx:Label text="{data.name}" width="100%"/>
+								</mx:HBox>								
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:List>
+				</mx:FormItem>
+			</mx:Form>
+			<mx:Canvas width="100%">
+				<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="this.close()" right="0"/>	
+			</mx:Canvas>		
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

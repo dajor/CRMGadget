@@ -1,0 +1,1 @@
+"D:\flex_sdk_4.1.0.16076\bin\adt" -migrate -storetype pkcs12 -keystore "C:\Documents and Settings\Geaesys\Adobe Flash Builder 4\CRMGadget\cert.p12" D:\CRMGadget_1135.air D:\CRMGadget_1135a.air

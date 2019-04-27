@@ -1,0 +1,2122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas creationComplete="init()"
+		   xmlns:list="gadget.lists.*"
+		   xmlns:control="gadget.control.*"
+		   xmlns:mx="http://www.adobe.com/2006/mxml" 
+		   xmlns:code="http://code.google.com/p/flexlib/"
+		   xmlns:containers="flexlib.containers.*" xmlns:local="*">
+	<mx:Script>
+		<![CDATA[
+			import gadget.control.AccountListImageRenderer;
+			import gadget.control.CalendarIlog;
+			import gadget.control.ContactListImageRenderer;
+			import gadget.control.GridColumnRenderFactory;
+			import gadget.control.ImageListRenderer;
+			import gadget.control.PriorityListImageRenderer;
+			import gadget.control.WebsiteListRenderer;
+			import gadget.dao.BaseDAO;
+			import gadget.dao.BookDAO;
+			import gadget.dao.DAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.dao.SupportDAO;
+			import gadget.dao.SupportRegistry;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.service.RightService;
+			import gadget.util.ActivityDataUtils;
+			import gadget.util.CSVUtils;
+			import gadget.util.DateUtils;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.LayoutUtils;
+			import gadget.util.MenuUtils;
+			import gadget.util.NetbreezeService;
+			import gadget.util.OOPS;
+			import gadget.util.PDFUtil;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.ICollectionView;
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+			import mx.containers.Canvas;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.ComboBox;
+			import mx.controls.LinkBar;
+			import mx.controls.TextInput;
+			import mx.controls.ToggleButtonBar;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.AdvancedDataGridEvent;
+			import mx.events.CloseEvent;
+			import mx.events.IndexChangedEvent;
+			import mx.events.ItemClickEvent;
+			import mx.utils.ObjectUtil;
+			import mx.utils.StringUtil;
+			
+			[Bindable] private var records:ArrayCollection;
+			[Bindable] public var entity:String;
+			[Bindable] public var displayName:String;
+			[Bindable] public var mainwindow:MainWindow;
+			public var filter:Object = null;
+			[Bindable] private var bShowWarning:Boolean = false;
+			
+			[Embed(source='/assets/pdficon.gif')] [Bindable] private static var pdfIcon:Class;
+			[Embed(source='/assets/csvicon.gif')] [Bindable] private static var csvIcon:Class;
+			[Embed(source='/assets/customize.png')] [Bindable] private static var customIcon:Class;
+			[Embed(source='/assets/link.png')] [Bindable] private static var linkIcon:Class;
+			[Embed(source='/assets/link_add.png')] [Bindable] private static var linkAddIcon:Class;
+			[Embed(source='/assets/delete.png')] [Bindable] private static var deleteIcon:Class;
+			[Embed(source='/assets/mindmap.png')] [Bindable] private static var mindmapIcon:Class;
+			
+			[Embed(source='/assets/calendar.png')] [Bindable] private static var calendarIcon:Class;
+			[Embed(source='/assets/table.png')] [Bindable] private static var tableIcon:Class;
+			[Embed(source='/assets/netbreeze.png')] [Bindable] private static var netbreezeIcon:Class;
+			
+			
+			private static const LIST_ALERT_MSG_PLEASE_SELECT_THE:String = 'LIST_ALERT_MSG_PLEASE_SELECT_THE';
+			private static const LIST_ALERT_MSG_TO_EDIT:String = 'LIST_ALERT_MSG_TO_EDIT';
+			private static const LIST_ALERT_MSG_TO_LINK:String = 'LIST_ALERT_MSG_TO_LINK';
+			private static const LIST_LABEL_VIEW_LIST:String = 'LIST_LABEL_VIEW_LIST';
+			private static const LIST_LABEL_VIEW_CALENDAR:String = 'LIST_LABEL_VIEW_CALENDAR';
+			private static const LIST_LABEL_EDIT_LAYOUT:String = 'GLOBAL_EDIT_LAYOUT';
+			private static const GLOBAL_NEW:String = 'GLOBAL_NEW';
+			private static const GLOBAL_NEW_TASK:String = 'GLOBAL_NEW_FOR_TASK';
+			//CRO 05.01.2011
+			private static const LIST_LABEL_PDF_EXPORT:String = 'GLOBAL_PDF_EXPORT';
+			private static const LIST_LABEL_CSV_EXPORT:String = 'GLOBAL_CSV_EXPORT';
+			private static const LIST_ALERT_MSG_PLEASE_SELECT_AN_ITEM:String = 'LIST_ALERT_MSG_PLEASE_SELECT_AN_ITEM';
+			private static const LIST_ALERT_MSG_TO_SHOW_ITS_DASHBOARD:String = 'LIST_ALERT_MSG_TO_SHOW_ITS_DASHBOARD';
+			// CH 24-July-2013
+			private static const LIST_ALERT_MSG_TO_SHOW_ITS_DASHBOARD_REPORT:String = 'LIST_ALERT_MSG_TO_SHOW_ITS_DASHBOARD_REPORT';
+			
+			private static const LIST_ALERT_MSG_TITLE_INVALID:String = 'GLOBAL_INVALID';
+			private static const LIST_ALERT_MSG_PLEASE_CREATE_A_NETBREEZE_ACCOUNT:String = 'LIST_ALERT_MSG_PLEASE_CREATE_A_NETBREEZE_ACCOUNT';
+			private static const LIST_ALERT_MSG_TO_UPDATE:String = 'LIST_ALERT_MSG_TO_UPDATE';
+			private static const LIST_ALERT_MSG_FILTER_IS_NULL:String = 'LIST_ALERT_MSG_FILTER_IS_NULL';
+			private static const LIST_ADVANDEDDATAGRIDCOLUMN_HEADERTEXT_MOD:String = 'LIST_ADVANDEDDATAGRIDCOLUMN_HEADERTEXT_MOD';
+			private static const LIST_ADVANDEDDATAGRIDCOLUMN_HEADERTEXT_PARENT_ACTIVITY_ID:String = 'LIST_ADVANDEDDATAGRIDCOLUMN_HEADERTEXT_PARENT_ACTIVITY_ID';
+			private static const LIST_ALERT_MSG_TO_DELETE:String = 'LIST_ALERT_MSG_TO_DELETE';
+			private static const LIST_ALERT_MSG_ARE_YOU_SURE:String = 'GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE';
+			private static const GLOBAL_DELETE:String = 'GLOBAL_DELETE';
+			private static const LIST_ALERT_MSG_PLEASE_DO_SYNCHRONIZE:String = 'LIST_ALERT_MSG_PLEASE_DO_SYNCHRONIZE';
+			private static const LIST_ALERT_MSG_TITLE_ERROR_INIT_FORM:String = 'LIST_ALERT_MSG_TITLE_ERROR_INIT_FORM';
+			//CRO 05.01.2011
+			private static const LIST_BUTTON_LABEL_LINK:String = 'GLOBAL_LINK';
+			private static const GLOBAL_RELATION_ORDER:String = 'GLOBAL_RELATION_ORDER';
+			private static const LIST_BUTTON_LABEL_DASKBOARD:String = 'LIST_BUTTON_LABEL_DASKBOARD';
+			private static const LIST_BUTTON_LABEL_MINDMAP:String = 'LIST_BUTTON_LABEL_MINDMAP';
+			private static const GLOBAL_EDIT:String = 'GLOBAL_EDIT';
+			//CRO 05.01.2011
+			private static const LIST_BUTTON_LABEL_PDF_EXPORT:String = 'GLOBAL_PDF_EXPORT';
+			private static const LIST_BUTTON_LABEL_CSV_EXPORT:String = 'GLOBAL_CSV_EXPORT';
+			private static const LIST_BUTTON_LABEL_EDIT_LAYOUT:String = 'GLOBAL_EDIT_LAYOUT';
+			//CRO 05.01.2011
+			private static const LIST_TABAR_BUTTON_LIST:String = 'GLOBAL_LIST';
+			private static const LIST_TABAR_BUTTON_CALENDAR:String = 'GLOBAL_CALENDAR';
+			private static const LIST_ALERT_MSG_ONLY_THE_1000_FIRST:String = 'LIST_ALERT_MSG_ONLY_THE_1000_FIRST';
+			private static const LIST:String = 'GLOBAL_LIST';
+			
+			
+			private static const LIST_BUTTON_LABEL_SYNC_SR_NOW:String = 'GLOBAL_SYNC_NOW';
+			//Mony 31-01-11 need translate
+			private static const LIST_BUTTON_LABEL_ACCEPT:String="Accept";
+			private static const LIST_BUTTON_LABEL_UNACCEPT:String="Unaccept";
+			private static const LABEL_ACCEPT:String=" = 'Initial' or 'Empty'";
+			private static const LABEL_UNACEPT:String=" = 'Accept Job'";
+			private static const LABEL_COMPLET:String=" different 'Accept Job', 'Initial', or 'Empty'";
+			
+			private static const acceptType:String="ACPT";
+			private static const initType:String="STND";
+			private static const onSiteType:String="ONST";
+			private static const completeType:String="WKCP";
+			private static const LABEL_SERVICE_ACTION:Array=[{display:'',type:''},{display:i18n._("Accept Job"),type:acceptType}
+				,{display:i18n._("OnSite"),type:onSiteType}];
+			private static const LABEL_FAVORITE:String="Add to favorite";
+			private static const LABEL_UNFAVORITE:String="Remove from Favorites";
+			public var calendar:Calendar;
+			public var calendarIlog:CalendarIlog;
+			private var selectedId:String;
+			private var bShowCalendarILog:Boolean = true; //true : to show the IBM Calendar, false : to show the tilelist calendar
+			private var limited:int = 1001;
+			private var cboService:ComboBox;
+			private var fieldsDB:ArrayCollection;
+			private static const MS_EXCHANGE:String = 'MS Exchange';
+			public static  var sortedColumn:String;
+			public var visibleHomeTask:Boolean = false;
+			[Bindable] public var backHistory:Object;
+			[Bindable]private var isLstVisibleHomeTask:Boolean;
+			private var mapSortColHeader:Object = new Object();
+			
+			//Bug #1728 CRO
+			public function showListTasks():void{
+				homeTask.visible = false;
+				homeTask.height = 0;
+				homeTask.width =0 ;
+				listTab.visible = true;
+				listTab.percentWidth = 100;
+				listTab.percentHeight = 100;
+			}
+			private function showHomeTasks(refreshData:Boolean = true):void{
+				var hTask:HomeTasks = null;
+				if(homeTask.getChildren().length>0){
+					hTask = homeTask.getChildAt(0) as HomeTasks;
+				}
+				if(hTask==null){
+					hTask = new HomeTasks();
+					homeTask.addChild(hTask);
+				}				
+				hTask.list = this;
+				
+				homeTask.visible = true;
+				homeTask.percentWidth = 100;
+				homeTask.percentHeight = 100; 
+				listTab.visible = false;
+				listTab.height = 0;
+				listTab.width =0 ;
+				visibleHomeTask = true;
+				if(refreshData){
+					hTask.loadDataOfSelectedUser();
+				}
+			}
+			private static function sortNumberic(obj1:Object, obj2:Object,entity:String):int
+			{
+				//#1253 CRO
+				if(entity == Database.opportunityDao.entity && sortedColumn == "Revenue") sortedColumn= "Revenue_sorting";
+				return ObjectUtil.numericCompare(parseFloat(obj1[sortedColumn]),parseFloat(obj2[sortedColumn]));
+			}
+			public function eventSortClick(event:AdvancedDataGridEvent):void{
+		
+				sortedColumn = event.dataField;
+				//#7694 CRO
+				var sortValue:String = mapSortColHeader[sortedColumn];
+				var obj:Object = Database.sortColumnDao.find(entity);
+				var col:AdvancedDataGridColumn = list.columns[event.columnIndex] as AdvancedDataGridColumn;
+				if(obj != null && !StringUtils.isEmpty(obj.column_order) && obj.column_order == sortedColumn && sortValue == null){
+					mapSortColHeader[sortedColumn]=  obj.order_type;
+				}
+				if(mapSortColHeader[sortedColumn] == null){
+					mapSortColHeader[sortedColumn]= "ASC";
+				}else if( mapSortColHeader[sortedColumn] != null && obj != null && sortedColumn == obj.column_order){
+					if(mapSortColHeader[sortedColumn] == "ASC"){
+						mapSortColHeader[sortedColumn]= "DESC";
+					}else{
+						mapSortColHeader[sortedColumn]= "ASC";
+					}
+				}
+				if(obj == null){
+					obj = new Object();
+				}
+				obj.order_type = mapSortColHeader[sortedColumn];
+				obj.column_order = sortedColumn;
+				obj.entity = entity;
+				Database.sortColumnDao.replace(obj);
+				
+			}
+			private static function sortDateTime(obj1:Object, obj2:Object):int
+			{
+				var dateFormat:Object = DateUtils.getCurrentUserDatePattern();
+				var date1:Date = DateUtils.guessAndParse(obj1[sortedColumn]);
+				var date2:Date = DateUtils.guessAndParse(obj2[sortedColumn]);
+				if (date1==null){
+					return 1;
+				}
+				if (date2 == null){
+					return -1;
+				}
+				
+				
+				var d1:Number = date1.getTime();
+				var d2:Number = date2.getTime();
+				
+				if(d1 < d2) {
+					return -1;
+				} else if(d1 == d2) {
+					return 0;
+				}
+				return 1;
+			}
+			private static function sortDate(obj1:Object, obj2:Object):int
+			{
+				var dateFormat:Object = DateUtils.getCurrentUserDatePattern();
+				var date1:Date = DateUtils.guessAndParse(obj1[sortedColumn]);
+				var date2:Date = DateUtils.guessAndParse(obj2[sortedColumn]);
+				if(date1==null && date2 == null){
+					return 0;
+				}
+				if (date1==null){
+					return 1;
+				}
+				if (date2 == null){
+					return -1;
+				}
+				
+				
+				var d1:Number = date1.getTime();
+				var d2:Number = date2.getTime();
+				if(d1 < d2) {
+					return -1;
+				} else if(d1 == d2) {
+					return 0;
+				}
+				return 1;
+			}
+			
+			private function init():void {
+				//bug #1679 CRO add new tab
+				if(entity == MainWindow.DASHBOARD){
+					var dashboard:Dashboard = new Dashboard();
+					dashboard.list = this;
+					boxList.removeAllChildren();
+					boxList.addChild(dashboard);
+					mainwindow.refreshDashboard = dashboard.reload;
+				}else if(entity == MainWindow.REVENUE_REPORT){
+					var dashboardRevenue:DashboardRevenue = new DashboardRevenue();
+					dashboardRevenue.list = this;
+					boxList.removeAllChildren();
+					boxList.addChild(dashboardRevenue);
+					mainwindow.refreshDashboard = dashboardRevenue.reload;
+				}else if(entity == MainWindow.CHAT){
+					boxList.removeAllChildren();
+					mainwindow.chatClientControl = new ChatClientControl(); 
+					mainwindow.chatClientControl.selectList = mainwindow.selectList;
+					boxList.addChild(mainwindow.chatClientControl);
+				}else if(entity == MainWindow.DAILY_AGENDA){ //bug #1728 CRO
+					boxList.removeAllChildren();
+					boxList.addChild(new DailyAgenda());
+				} else if(entity == MainWindow.DASHBOARD_REPORT){ // CH 24-July-2013
+					var dashboardReport:DashboardReport = new DashboardReport();
+					dashboardReport.mainWindow = mainwindow;
+					boxList.removeAllChildren();
+					boxList.addChild(dashboardReport);
+				}else if(entity == MainWindow.VISIT_CUSTOMER){ //bug #1728 CRO
+					boxList.removeAllChildren();
+					var visitCustomer:VisitCustomer =new VisitCustomer()
+					visitCustomer.list = this;
+					boxList.addChild(visitCustomer);
+				}
+				
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_HOME_TASK) && entity =='Activity' ){
+					isLstVisibleHomeTask = true ;
+					homeTask.visible = true;
+					visibleHomeTask = true;
+				}else{
+					homeBox.width =0;
+					homeBox.height =0;
+				} 
+				
+				list.addEventListener(AdvancedDataGridEvent.SORT, function(event:AdvancedDataGridEvent):void {
+					sortedColumn = event.dataField;
+				});
+				
+				
+				addContextMenuList(); 
+				//				filterData(); //no need to load data at the first time
+				initGridColumns(); 
+				initAlternateView(); 
+				(parentApplication as MainWindow).notifyList();
+				var entityLinkListStatus:String = Database.preferencesDao.getValue(entity + ".linklist.show") as String;
+				var entityListDetailStatus:String = Database.preferencesDao.getValue(entity + ".listdetail.show") as String;
+				if(entityLinkListStatus == "0") switchLinkList();
+				if(entityListDetailStatus == "0") switchDetailTab();	
+				
+				// hide survery result 
+				var v:Boolean = Database.transactionDao.isHideRelation(entity);
+				linkList.visible = !v;
+				switchLinks.visible = !v;
+				if(v){
+					
+					linkList.width = 0;
+					
+				}
+				
+			}
+			
+			
+			public function loadData():void{
+				if(mainwindow.getSelectedList()==this){
+					if(entity == MainWindow.DAILY_AGENDA){
+						var adc:DisplayObject = boxList.getChildAt(0);
+						if(adc!=null && adc is DailyAgenda){
+							var colTitle:DataGridColumn =DailyAgenda(adc).dateSetPanel.tileList.columns[0] as DataGridColumn;
+							colTitle.headerRenderer = colTitle.headerRenderer;
+							DailyAgenda(adc).loadDataOfSelectedDate();
+						}
+					}else{
+						if( viewStack.selectedIndex==1){
+							if(calendarIlog != null){
+								calendarIlog.changeStartDayOfWeek();
+								calendarIlog.loadData();
+								
+							}	
+							if(calendar!=null){
+								calendar.loadData();
+							}
+							detail.loadData();	
+						}else{
+							
+							if(visibleHomeTask && homeTask.visible){
+								showHomeTasks();
+							}else{
+								filterData(); 
+								initGridColumns();
+								detail.loadData();	
+							}
+						}
+					}
+				}
+				
+			}
+			
+			public function filterData():void {
+				//bug #1679 CRO add new tab
+				if(MainWindow.mapCustomTab[entity] != null) return;
+				//clear select item after sync.
+				if(cboService!=null){
+					cboService.selectedIndex=0;
+				}
+				detail.clearData();
+				linkList.linkListGrid.dataProvider = null;
+				
+				bShowWarning = false // reset record count
+				var startCriteria:String = null;
+				var endCriteria:String = null;
+				if (entityFilterInput.text == "") {
+					if (entityLetterBar.selectedIndex!=-1){
+						var letter:String = (entityLetterBar.getChildAt(entityLetterBar.selectedIndex) as Button).label;
+						if (letter.indexOf("#")!=-1) {
+							startCriteria = "0";
+							endCriteria = "9";
+						} else if (letter != i18n._("ALL")) {
+							startCriteria = letter;	
+							endCriteria = letter;
+						}
+					}
+				} 
+				
+				//				else {
+				//					startCriteria = entityFilterInput.text.toUpperCase();
+				//					endCriteria = entityFilterInput.text.toUpperCase();
+				//				}
+				
+				var dao:DAO = Database.getDao(entity);
+				
+				// columns required for the list
+				var columns:ArrayCollection = Utils.getColumn(entity);
+				//this column for dsiplay (Currency + Revenue) change request 1603
+				if(entity == Database.opportunityDao.entity)
+					columns.addItem({element_name:"CurrencyCode"});
+				// add column favorite
+				columns.addItem({element_name:"favorite"});
+				var order_by:String=null;
+				var filterQuery:String = FieldUtils.computeFilter(filter);
+				if(filter!=null && (filter.type>0||filter.type<-7)){
+					var criteria:Object = Database.criteriaDao.find(filter.id, "" + 5);
+					if(criteria!=null ){
+						var colName:String=criteria.column_name;						
+						
+						if(colName!=null && colName.length>0){
+							order_by=colName+" "+ criteria.param;
+						}
+					}
+					
+				}
+				var obj:Object = Database.sortColumnDao.find(entity);
+				if(obj != null && !StringUtils.isEmpty(obj.column_order) && FieldUtils.getField(entity,obj.column_order)!=null){
+					order_by = " " + obj.column_order + " " + obj.order_type;
+				}
+				//bug#8712
+				if(filter && filter.type == Database.FAVORITE) {
+					filterQuery = " favorite = 1 ";
+				}else if(filter && filter.type == Database.IMPORTANT) {
+					var num:String = Database.preferencesDao.getValue('important_length',"").toString();
+					if( !StringUtils.isEmpty(num) && num != 'unlimited'){
+						imLimit = parseInt(num);
+					}
+					filterQuery = " important IS NOT NULL AND important > 0";
+					order_by = " important DESC";
+				}else if(filter && filter.type == Database.MISSING_PDF && filter.entity == Database.serviceDao.entity){
+					filterQuery = "(CustomPickList10='SUSP' OR CustomPickList10='AWPT' OR CustomPickList11='TECO') And gadget_id Not In (Select gadget_id from attachment where entity='Service Request' And gadget_id is not null and (filename like '%.pdf' or filename like '%.doc' or filename like '%.docx'))";
+				}				
+				// SC20110613
+				if (startCriteria == null) {
+					var imLimit:int = 1001;
+					
+					records = dao.findAll(columns, filterQuery, selectedId, imLimit,order_by);
+				} else {
+					startCriteria =  startCriteria + "%";
+					var searchFeilds:String = "(uppername LIKE " + StringUtils.sqlStrArg(startCriteria) + ")";
+					
+					if(entity=="Account"){
+						searchFeilds += " OR (uppername3 LIKE " + StringUtils.sqlStrArg(startCriteria) + ")";
+					}
+					//#1010 CRO search German characters (Ä or AE)
+					searchFeilds = Utils.replaceGermanCharacter(searchFeilds,Utils.charUpperGermanAccents,Utils.charGerman);
+					if(!StringUtils.isEmpty(filterQuery)){
+						searchFeilds="("+searchFeilds+")"+" AND " + filterQuery
+					}
+					records = dao.findAll(columns, searchFeilds,selectedId, limited,order_by);
+				}
+				//Mony---------use labelfunction instead
+				//Utils.parseDateTime(entity, columns, records);
+				//Utils.parsePicklistValues(entity, columns, records);				
+				
+				if(!StringUtils.isEmpty(entityFilterInput.text)){
+					filterDataGrid();
+				}
+				//				if(entity == "Account" && records.length > 0){
+				//					for each(var item:Object in records){
+				//						item.isSync = item.Reference=="true" ? true : false;
+				//						item. editabled = false;
+				//					}
+				//				}
+				if (records.length == limited) {
+					records.removeItemAt(records.length-1); // we remove the 1001th element
+					bShowWarning = true;
+				}
+				
+				warningIcon.visible = bShowWarning;
+				warningIcon.includeInLayout = bShowWarning;
+				
+			}
+			
+			public function editScreenDetail(item:Object,seletedEntity:String =null,refreshFunction:Function=null,isRefreshList:Boolean=true,isCopy:Boolean=false):void {
+				if (item != null) {
+					if(seletedEntity==null){
+						seletedEntity = entity;
+					}
+					
+					var baseDOA:BaseDAO = Database.getDao(seletedEntity);
+					var screenDetail:Detail = new Detail();
+					screenDetail.list = this;
+					if(refreshFunction==null){
+						refreshFunction = selectItem;
+						isRefreshList = false;
+					}
+					screenDetail.isRefreshList = isRefreshList;
+					if(viewStack.selectedIndex==1){//refresh on calendar view
+						screenDetail.calendar = calendar;
+						screenDetail.calendarIlog = calendarIlog;	
+					}
+					screenDetail.item = baseDOA.findByGadgetId(item.gadget_id); 
+					screenDetail.entity = seletedEntity;
+					baseDOA.increaseImportant(screenDetail.item);
+					screenDetail.mainWindow = parentApplication as MainWindow;
+					screenDetail.refreshFunction = refreshFunction;
+					// screenDetail.closeRecordTypePopup = closeRecordType;
+					if(isCopy){
+						screenDetail.create = true;
+						screenDetail.item.gadget_id = null;
+						screenDetail.subtype = screenDetail.item.Activity == "Appointment" ? 1 : 0;
+					}
+					WindowManager.openModal(screenDetail);
+				}else{
+					Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_THE) + " " + displayName + " " + i18n._(LIST_ALERT_MSG_TO_EDIT),"" , Alert.OK ,this.parentApplication as MainWindow);
+				}
+			}
+			
+			
+			public function batchUpdate():void {
+				var batchUpdate:BatchUpdate = new BatchUpdate();
+				batchUpdate.records = records;
+				batchUpdate.entity = entity;
+				batchUpdate.refreshFunction = filterData;
+				WindowManager.openModal(batchUpdate);
+			}
+			
+			public function openLinkTo(item:Object):void {
+				if(item == null){
+					Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_THE) + " " + displayName + " " + i18n._(LIST_ALERT_MSG_TO_LINK) ,"" , Alert.OK,this.parentApplication as MainWindow);
+					return;
+				}  
+				var linkTo:LinkTo = new LinkTo();
+				linkTo.item = item;
+				linkTo.linkList = linkList;
+				WindowManager.openModal(linkTo);
+			}
+			
+			public function openScreenCreate(model:Object = null, subtype:int = 0, 
+											 item:Object=null,refreshFunction:Function=null,  preEntity:String=null,refreshList:Boolean=true,executeFormula:Boolean=true):void {
+				var screenCreate:Detail = new Detail();
+				screenCreate.list = this;
+				var obj:Object = list.selectedItem;
+				if(viewStack.selectedIndex==1){//refresh only calendar view
+					screenCreate.calendar = calendar;
+					screenCreate.calendarIlog = calendarIlog;
+				}
+				
+				if(refreshFunction==null){
+					refreshFunction = selectItem;
+					refreshList = false;
+				}
+				screenCreate.isRefreshList = refreshList;
+				screenCreate.item = Utils.copyModel(model);
+				var dao:BaseDAO = null;
+				if(MainWindow.VISIT_CUSTOMER == entity){
+					dao = Database.getDao("Activity");
+				}else{
+					dao = Database.getDao(entity);
+				}
+				
+				if(dao!=null){
+					for each(var temp:Object in dao.getOwnerFields()){						
+						screenCreate.item [temp.entityField] = Database.allUsersDao.ownerUser()[temp.userField];
+					}
+				}
+				// for #4981 Data are not linked
+				/*if(item != null && entity == "Activity"){
+				screenCreate.item['AccountName'] = item['AccountName'];
+				screenCreate.item['PrimaryContact'] = item['PrimaryContact'];
+				screenCreate.item['Date'] = item['Date'];
+				screenCreate.item['Type'] = item['Type'];
+				}*/
+				
+				// for CH #5653 Next - Link
+				if(item != null){ // link Account for next contact and next appointment.
+					screenCreate.item['AccountId'] = item['AccountId'];
+					screenCreate.item['AccountName'] = item['AccountName'];
+					if(entity == "Activity"){
+						// link current appointment data to next appointment data.
+						if(preEntity == "Contact"){
+							screenCreate.item['PrimaryContactId'] = item['ContactId'];
+						}else{
+							screenCreate.item['PrimaryContact'] = item['PrimaryContact'];
+							screenCreate.item['PrimaryContactId'] = item['PrimaryContactId'];
+							screenCreate.item['Date'] = item['Date'];
+							screenCreate.item['Type'] = item['Type'];
+						}
+					}
+				}
+				
+				//screenCreate.closeRecordTypePopup = closeRecordType;
+				//screenCreate.recordTypeSelected = recordTypeSelected;
+				// set default values as described in field management service
+				
+				/*var userDataList:ArrayCollection=null;
+				if(currentUser!=null){
+				userDataList= Database.allUsersDao.findAll(new ArrayCollection([{element_name:"*"}]), "userSignInId = '" + currentUser.user_sign_in_id + "'");
+				}
+				
+				
+				if (userDataList!=null && userDataList.length > 0) {
+				userData = userDataList.getItemAt(0);	
+				}*/ 
+				/*
+				var fields:ArrayCollection = Database.layoutDao.selectLayout(entity, subtype);
+				var fieldsManagement:Array = Database.fieldManagementServiceDao.readAll(entity);
+				
+				var currentUser:Object = Database.userDao.fetch()[0];
+				var userData:Object = Database.allUsersDao.ownerUser();
+				for each (var tmpField:Object in fields) { 
+				if (tmpField.custom == null) {
+				var fieldInfo:Object = FieldUtils.getField(entity, tmpField.column_name);
+				if(!fieldInfo) continue;
+				for each(var fieldManagement:Object in fieldsManagement){
+				if(SupportService.match(fieldManagement.Name, fieldInfo.element_name) && fieldManagement.DefaultValue != null
+				&& fieldManagement.DefaultValue != ''){
+				var defaultValue:String = fieldManagement.DefaultValue;
+				if (defaultValue.indexOf("(") == -1 && defaultValue.indexOf("{") == -1) {
+				if( defaultValue.indexOf("CreatedDate")!=-1){
+				screenCreate.item[fieldInfo.element_name] =new Date();
+				}else{
+				screenCreate.item[fieldInfo.element_name] = defaultValue;
+				}
+				
+				} else {
+				// functions
+				var val:String = evaluateExpression(fieldInfo.element_name, defaultValue,userData,screenCreate.item);
+				// if we are in a combo, we need to convert the value to the code
+				//Bug fixing 687
+				
+				if (fieldInfo.data_type == "Picklist") {
+				var v:String = PicklistService.getId(entity,fieldInfo.element_name,val,userData.LanguageCode);
+				val = v == null ? val : v;
+				}
+				if(val=='-1' && entity==Database.customObject1Dao.entity && fieldInfo.element_name=='CustomInteger0'){
+				val="";
+				}
+				screenCreate.item[fieldInfo.element_name] =val; 
+				}
+				}
+				}
+				
+				if(userData!=null){					
+				if(entity==Database.contactDao.entity){
+				if(screenCreate.item["AlternateCountry"]==null&& fieldInfo.element_name=='AlternateCountry')
+				screenCreate.item["AlternateCountry"]=userData.PersonalCountry;
+				if(screenCreate.item["PrimaryCountry"]==null && fieldInfo.element_name=='PrimaryCountry')
+				screenCreate.item["PrimaryCountry"]=userData.PersonalCountry;
+				}else if(entity==Database.leadDao.entity ){
+				if(fieldInfo.element_name=='Status'){
+				screenCreate.item['Status']='Qualifying';
+				}else if(fieldInfo.element_name=='LeadOwner'){
+				screenCreate.item['LeadOwner']=currentUser.full_name;									
+				}
+				
+				}else if(entity==Database.accountDao.entity){
+				if(fieldInfo.element_name=='PrimaryShipToCountry' && screenCreate.item["PrimaryShipToCountry"]==null){
+				screenCreate.item["PrimaryShipToCountry"]=userData.PersonalCountry;
+				}else if(fieldInfo.element_name=='PrimaryBillToCountry' && screenCreate.item["PrimaryBillToCountry"]==null){
+				screenCreate.item["PrimaryBillToCountry"]=userData.PersonalCountry;
+				}
+				
+				
+				}
+				
+				
+				}
+				
+				}
+				
+				
+				
+				
+				}
+				*/
+				if(executeFormula){
+					var tempId:String = Utils.generateId();
+					screenCreate.item['Id'] = tempId;//create tempory id for execute formular
+					try{
+						Utils.doFomulaField(entity,screenCreate.item,false,subtype);
+					}finally{
+						delete screenCreate.item['Id'];
+					}
+					
+				}
+				
+				// setup a default oracle Id for embedded items.
+				if(entity == MainWindow.VISIT_CUSTOMER){
+					screenCreate.item[DAOUtils.getOracleId("Activity")] = Detail.DUMMY_OID;
+					screenCreate.entity = "Activity";
+				}else{
+					screenCreate.item[DAOUtils.getOracleId(entity)] = Detail.DUMMY_OID;
+					screenCreate.entity = entity;
+				}
+				
+				screenCreate.item['subtype'] = subtype;
+				// screenCreate.item.subtype = subtype;
+				//
+				
+				
+				screenCreate.subtype = subtype;
+				screenCreate.mainWindow = parentApplication as MainWindow;
+				screenCreate.showMessageSynchronize = showMessageSynchronize;
+				screenCreate.refreshFunction = refreshFunction;
+				screenCreate.create = true;
+				WindowManager.openModal(screenCreate);
+			}
+			private var mod:Object;
+			// public var rec:RecordTypeLayout;
+			/*
+			public function closeRecordType():void{
+			if(rec != null){
+			recordTypeSelected = null;
+			rec.close();
+			}
+			}
+			public function checkLayoutRecordType(model:Object = null, subtype:int = 0):void{
+			
+			mod = model;
+			if(entity =='Activity' && mod != null && mod['Activity'] !='Task'){
+			openScreenCreate(model,subtype);
+			return ;
+			}
+			var condition:ArrayCollection = Database.customLayoutConditionDAO.listRecordType(entity);
+			//var columns:ArrayCollection = Utils.getColumns(entity);
+			var listValue :ArrayCollection = new ArrayCollection();
+			var colName:String = '';
+			for each (var obj:Object in condition){
+			if(colName == ''){
+			colName = obj.column_name;
+			}
+			if(colName == obj.column_name && obj.operator=='=' || obj.operator=='contains'){
+			checkMapRecordTypeVal(listValue,obj);
+			}
+			
+			}
+			
+			if(listValue.length>0){
+			
+			rec = new RecordTypeLayout();
+			rec._listValue = listValue;
+			rec.onChangeRecordType = onChangeRecordType;
+			var fieldInfo:Object = FieldUtils.getField(entity, colName);
+			rec.field = fieldInfo==null?'':fieldInfo.display_name;
+			rec.entity = entity;
+			WindowManager.openModal(rec);
+			
+			}else{
+			//subtype = LayoutUtils.getSubtypeIndex(item);
+			//fields = Database.layoutDao.selectLayout(entity, subtype);
+			//initForm();
+			recordTypeSelected = null;
+			openScreenCreate(model,subtype);
+			}
+			
+			// field with list value
+			
+			//mapField['AccountType']= listRecordTypeName;
+			}
+			private var recordTypeSelected:Object ;
+			private function onChangeRecordType(combo:ComboBox):void{
+			var obj:Object = combo.selectedItem;
+			if(obj != null && obj.data != null){
+			recordTypeSelected = obj.data;
+			//fields = Database.layoutDao.selectLayout(entity, recordTypeSelected.subtype);
+			//initForm();
+			
+			var sub:int = 0;
+			if(recordTypeSelected!=null && entity !='Activity'){
+			sub = recordTypeSelected.subtype;
+			}
+			rec.visible = false;
+			openScreenCreate(mod,sub);
+			}
+			
+			}
+			private function checkMapRecordTypeVal(listValue :ArrayCollection,val:Object):void{
+			var existed:Boolean=false;
+			for each(var obj:Object in listValue){
+			if(obj.label == val.params){
+			existed = true;
+			break;
+			}
+			}
+			if(!existed){
+			listValue.addItem({label:val.params,data:val}); 
+			}
+			
+			}
+			*/
+			private function evaluateExpression(element_name:String, value:String,userData:Object,entityOject:Object):String{
+				
+				//bug fixing 436 PicklistService.getId
+				//return Evaluator.evaluate(value, userData, entity, element_name, entityOject, PicklistService.getValue,PicklistService.getId,null,false,Utils.doJoninFieldValue);
+				return Utils.doEvaluate(value, userData, entity, element_name, entityOject,null);
+				
+			}
+			
+			private function splitSymbol(value:String, s:String, e:String):String{
+				if(value.indexOf(s)>-1){
+					value = value.substring(value.indexOf(s)+1, value.length);
+				}
+				if(value.indexOf(e)>-1){
+					value = value.substring(0,value.indexOf(e));
+				}
+				return value;
+			}
+			
+			public function addActivity(item:Object , subtype:int = 0):void {
+				var screenCreate:Detail = new Detail();
+				screenCreate.calendar = calendar;
+				screenCreate.calendarIlog = calendarIlog;
+				screenCreate.item = item;
+				screenCreate.entity = "Activity";
+				screenCreate.subtype = subtype;
+				screenCreate.mainWindow = parentApplication as MainWindow;
+				screenCreate.refreshFunction = selectItem;
+				screenCreate.create = true;
+				WindowManager.openModal(screenCreate);
+			}		
+			
+			public function addNote(item:Object):void{
+				//TODO
+				
+				if(item==null){
+					if(entity == MainWindow.DASHBOARD){
+						Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_THE) + " " + displayName + " " + i18n._(LIST_ALERT_MSG_TO_SHOW_ITS_DASHBOARD),i18n._(LIST_ALERT_MSG_TITLE_INVALID), Alert.OK, this);
+						return;
+					}else if(entity == MainWindow.DASHBOARD_REPORT){
+						Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_THE) + " " + displayName + " " + i18n._(LIST_ALERT_MSG_TO_SHOW_ITS_DASHBOARD_REPORT),i18n._(LIST_ALERT_MSG_TITLE_INVALID), Alert.OK, this);
+						return;
+					}
+				}
+				var parentEntity:String = item.gadget_type;
+				var subDao:SupportDAO = SupportRegistry.getSupportDao(parentEntity,Database.noteDao.entity);
+				function newItem():Object{					
+					var pOrId:String = DAOUtils.getOracleId(parentEntity);				
+					var obj:Object = new Object();					
+					obj[pOrId] = item[pOrId];
+					return obj;
+				}
+				
+				
+				var miniDetail:MiniDetail = new MiniDetail();
+				
+				miniDetail.entity = subDao.entity;
+				miniDetail.fields = subDao.getLayoutFields();
+				miniDetail.item = newItem();
+				miniDetail.newItem = newItem;
+				miniDetail.arrayDefaultObject = [];
+				miniDetail.create = true;	
+				WindowManager.openModal(miniDetail);
+				
+				
+			}
+			
+			private function openListLayout():void{
+				var listLayout:ListLayout = new ListLayout();
+				listLayout.list = this;
+				listLayout.filter = filter;
+				WindowManager.openModal(listLayout);
+			}
+			
+			private var buttonCSV:LinkButton;			
+			private function upperBarHandler(event:ItemClickEvent):void {
+				if(event.label == i18n._(LIST_LABEL_VIEW_LIST)) {
+					//					viewStack.selectedIndex = 0;
+				}
+				if(event.label == i18n._(LIST_LABEL_VIEW_CALENDAR)) {
+					//					viewStack.selectedIndex = 1;
+					//					MenuUtils.getContextMenu(parentApplication as MainWindow, calendar.tilelist, openLinkTo, deleteItem, editScreenDetail, addLeadToCampaign, addActivity, entity);
+				}
+				
+				if(event.label == i18n._("GLOBAL_GOOGLE_CALENDAR")){
+					//					var gCalendar:GCalendarUtils = new GCalendarUtils(calendarIlog);
+					//					gCalendar.getEvents();
+					var googleSync:GoogleSynchronize = new GoogleSynchronize();
+					googleSync.calendarIlog = calendarIlog;
+					WindowManager.openModal(googleSync);
+				}
+				
+				if(event.label == i18n._(LIST_LABEL_EDIT_LAYOUT)) {
+					openListLayout();
+					return;
+				}
+				
+				if (StringUtils.startsWith(event.label, i18n._(GLOBAL_NEW) + " ") || StringUtils.startsWith(event.label, i18n._(GLOBAL_NEW_TASK) + " ")) {
+					openScreenCreate(event.item.data, event.item.subtype);
+					// checkLayoutRecordType(event.item.data, event.item.subtype);
+					return;
+				}
+				
+				//				if(event.label==i18n._(LIST_BUTTON_LABEL_SYNC_SR_NOW)){
+				//					updateServiceToServer();
+				//					return;
+				//				}
+				//				if(event.label==LIST_BUTTON_LABEL_ACCEPT){
+				//					updateServiceToServer("ACPT");
+				//					return;
+				//				}
+				//				if(event.label==LIST_BUTTON_LABEL_UNACCEPT){
+				//					updateServiceToServer("STND");
+				//					return;
+				//				}
+				
+				if (event.label == i18n._(LIST_LABEL_PDF_EXPORT) || event.label == i18n._(LIST_LABEL_CSV_EXPORT)) {
+					//					showLoadingIndicator(event.label);
+					if(event.label == i18n._(LIST_LABEL_CSV_EXPORT)){
+						var butLinkBar:LinkBar = event.target as LinkBar; 
+						
+						if(butLinkBar != null) buttonCSV = butLinkBar.getChildAt(event.index) as LinkButton;
+					} 
+					//var exportFunction:Function= exportToPDF;
+					if(event.label == i18n._(LIST_LABEL_CSV_EXPORT)){
+						exportToCSV();
+					}else{				
+						Utils.showLoadingProgressWindow(exportToPDF, i18n._(StringUtils.LOADING_STR), i18n._(StringUtils.ATTACHMENTS_STR));
+					}
+				}
+				// Add OrgChat
+				/*
+				if(event.label == "Hierarchy"){
+				openHierarchy();
+				}*/
+				
+				if(event.label == ""){
+					openTimeLine();
+				}
+				
+				if (event.label == i18n._(MS_EXCHANGE)){
+					var msProcess:MSExchangeSynchronize = new MSExchangeSynchronize();
+					msProcess.loadData = filterData;
+					msProcess.entity = entity;
+					WindowManager.openModal(msProcess);
+				}
+				
+			}
+			
+			
+			/*
+			<person 
+			layout             // constant: don't translate  
+			name               // Name 
+			email              // Email (first letter of the first name followed by last name + @company.com)     
+			phone              // Only numbers: will be formatted with a localized formatter
+			mobilePhone        // Phone number should be fakes (for example 555 is used in the US)
+			fax                // number should be consistent if possible with location
+			instantMessager    // ID built like the email.            
+			position           // key: don't translate    
+			location           // office location
+			businessUnit       // key: don't translate 
+			timeZone           // time zone must be consistent with location
+			presenceIndicator  // constant: don't translate  
+			picture            // constant: don't translate
+			> 
+			*/
+			
+			/*
+			private function openHierarchy():void{
+			var orgchart:WindowOrgChart = new WindowOrgChart();
+			WindowManager.openModal(orgchart);
+			}
+			*/
+			
+			private function openTimeLine():void{
+				//				var timeline:WindowTimeline = new WindowTimeline();
+				//				WindowManager.openModal(timeline);
+			}
+			
+			private function lowerBarHandler(event:ItemClickEvent):void {
+				var selectedItem:Object = list.selectedItem;
+				
+				if(selectedItem == null && calendarIlog != null) selectedItem = calendarIlog.selectedItem;
+				var strItemClick:String = event.label;
+				if (strItemClick.toLowerCase().indexOf(i18n._(GLOBAL_EDIT).toLowerCase()) == 0) {
+					editScreenDetail(selectedItem);
+				}
+				if (strItemClick.toLowerCase() == i18n._(GLOBAL_DELETE).toLowerCase()) {
+					deleteItem(selectedItem);
+				}
+				if (strItemClick.toLowerCase() == i18n._(LIST_BUTTON_LABEL_LINK).toLowerCase()) {
+					openLinkTo(selectedItem);
+				}
+				if(strItemClick.toLowerCase() == i18n._(LIST_BUTTON_LABEL_DASKBOARD).toLowerCase())
+				{
+					if(selectedItem == null)
+					{
+						Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_AN_ITEM));
+						return;
+					}
+					openDashboard(selectedItem);
+				}
+				if (strItemClick.toLowerCase() == i18n._(LIST_BUTTON_LABEL_MINDMAP).toLowerCase()) {
+					if(selectedItem == null){
+						if(entity == MainWindow.DASHBOARD){
+							Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_THE) + " " + displayName + " " + i18n._(LIST_ALERT_MSG_TO_SHOW_ITS_DASHBOARD),i18n._(LIST_ALERT_MSG_TITLE_INVALID), Alert.OK, this);
+							return;
+						}else if(entity == MainWindow.DASHBOARD_REPORT){
+							Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_THE) + " " + displayName + " " + i18n._(LIST_ALERT_MSG_TO_SHOW_ITS_DASHBOARD_REPORT),i18n._(LIST_ALERT_MSG_TITLE_INVALID), Alert.OK, this);
+							return;
+						}
+					}
+					if(selectedItem){
+						var mindmap:Mindmap = new Mindmap();
+						mindmap.item = selectedItem;
+						mindmap.entities = linkList.getEntities();
+						WindowManager.openModal(mindmap);
+					}else{
+						Alert.show("Please select one row to view mind map.", "", 4, mainwindow);
+					}
+				}
+				if(i18n._(GLOBAL_RELATION_ORDER).toLowerCase() == strItemClick.toLowerCase().toLowerCase()){
+					var relManage:RelationManagementWindow = new RelationManagementWindow();
+					relManage.entity = entity;
+					relManage.redrawSubTab = detail.init;
+					WindowManager.openModal(relManage);
+				}
+			}
+			
+			public function openDashboard(item:Object):void
+			{
+				if(item)
+				{
+					var accountId: String = item.AccountId;
+					var accountName: String = item.AccountName;
+					var user: Object = Database.userDao.read();
+					var netbreezeUser: Object = Database.netbreezeDao.findByUserId(user);
+					
+					var netbreezeWindow: NetbreezeDashboard;
+					var netbreezeService: NetbreezeService;
+					if(netbreezeUser)
+					{
+						var obj:Object = {account_id: accountId, account_name: accountName, user_id: user.id, Netbreeze_id: netbreezeUser.netbreeze_id};
+						var netbreezeAccount: Object = Database.netbreezeAccountDao.findByAccountID(obj);
+						if(!netbreezeAccount)
+						{		
+							netbreezeService = new NetbreezeService(obj); //netbreezeService.deleteMonitoringJob(); 
+							netbreezeService.createMonitoringJob();    
+						}else
+						{
+							//Database.netbreezeAccountDao.deleteByAccountId({account_id: netbreezeAccount.account_id});
+							netbreezeWindow = new NetbreezeDashboard();
+							var url: String = netbreezeAccount.dashboard_url;
+							netbreezeWindow.dashboardUrl = url;
+							WindowManager.openModal(netbreezeWindow); 
+						}	
+					}
+					else
+						Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_CREATE_A_NETBREEZE_ACCOUNT),i18n._(LIST_ALERT_MSG_TITLE_INVALID), Alert.OK, this);	
+				}else{
+					if(entity == MainWindow.DASHBOARD){
+						Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_THE) + " " + displayName + " " + i18n._(LIST_ALERT_MSG_TO_SHOW_ITS_DASHBOARD),i18n._(LIST_ALERT_MSG_TITLE_INVALID), Alert.OK, this);
+					}else if(entity == MainWindow.DASHBOARD_REPORT){
+						Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_THE) + " " + displayName + " " + i18n._(LIST_ALERT_MSG_TO_SHOW_ITS_DASHBOARD_REPORT),i18n._(LIST_ALERT_MSG_TITLE_INVALID), Alert.OK, this);
+					}
+				}
+			}
+			
+			private function addContextMenuList():void {
+				// list.contextMenu = ListUtils.getContextMenu(openScreenDetail, openLinkTo, deleteItem, editScreenDetail);
+				MenuUtils.getContextMenu(aboutRecord,recordCount,parentApplication as MainWindow, list, openLinkTo, deleteItem, editScreenDetail, batchUpdate, addLeadToCampaign, addActivity, openDashboard, exportDetailPDF,addNote, entity);
+			}	
+			private function getSelectedItem(selectedId:String,entity:String):Object{
+				var dao:DAO = Database.getDao(entity);
+				var columns:ArrayCollection = new ArrayCollection([{element_name:"CreatedDate"},
+					{element_name:"CreatedBy"},
+					{element_name:"ModifiedDate"},
+					{element_name:"ModifiedBy"}]);
+				var filterQuery:String = FieldUtils.computeFilter(filter);
+				var lst:ArrayCollection = dao.findAll(columns, filterQuery, selectedId, limited);
+				if(lst.length >0) {
+					return lst.getItemAt(0);
+				}
+				
+				return null;
+			}
+			
+			private function recordCount():void{
+				var m:CountRecords = new CountRecords();
+				m.count(records.length);
+				WindowManager.openModal(m);
+			}
+			//Bug fixing 368 CRO
+			private function aboutRecord():void{
+				var about:AboutRecord = new AboutRecord();
+				var item:Object=list.selectedItem;
+				if(item == null) {
+					Alert.show(i18n._("GLOBAL_PLEASE_SELECT_A_RECORD"),"", Alert.OK, this);
+					return ;
+				}
+				about.doAbout(getSelectedItem(item.gadget_id,entity),item.gadget_id);
+				WindowManager.openModal(about);
+				
+				
+			}
+			private function sendEmailToContact():void{
+				//Utils.sendEmail();
+			}
+			// #256
+			private function exportDetailPDF(item:Object):void{
+				var subtype:int = LayoutUtils.getSubtypeIndex(item);
+				Utils.showLoadingProgressWindow(function():void{
+					PDFUtil.detailToPDF(entity, subtype, item, false, logo_error_message);
+				}, i18n._(StringUtils.LOADING_STR), i18n._(StringUtils.ATTACHMENTS_STR));
+			}
+			
+			private function logo_error_message():void {
+				Alert.show(i18n._('GLOBAL_ALERT_MSG_LOGO_ERROR'), "", Alert.OK, this);	
+			}			
+			
+			//sync service request
+			private function updateServiceToServer(type:String=null):void{
+				
+				if(type!=null){					
+					outGoing(type);
+					
+				}else{
+					mainwindow.openSyncWindow(true);
+				}
+				
+			}
+			
+			private function showMesage(type:String):void{
+				var typeMes:String=LABEL_ACCEPT;
+				if(type==initType|| type==onSiteType) {
+					typeMes=LABEL_UNACEPT;
+				}else if(type==completeType){
+					typeMes=LABEL_COMPLET;
+				}
+				cboService.selectedIndex=0;
+				//Mony need to translate
+				Alert.show("Please select only records with Order User Status "+typeMes+".", "Info.", 4, this);
+			}
+			private function outGoing(type:String):void {
+				var acceptRecords:Array=new Array();
+				var dao:BaseDAO=Database.getDao(entity);
+				//				var listError:ArrayCollection = new ArrayCollection();
+				var isUpdateRecords:Boolean = !(type==acceptType);
+				for each(var obj:Object in records) {
+					if(obj.isSync){						
+						var item:Object=dao.findByGadgetId(obj.gadget_id);
+						
+						//						if(!Utils.isSRHasPdfAtt(item,entity)){
+						//							listError.addItem(item);
+						//							continue;
+						//						}						
+						
+						
+						if(type==acceptType  &&(item.CustomPickList10==''||item.CustomPickList10==null)){
+							item.CustomPickList10=type;
+							acceptRecords.push(item);
+							continue;
+						}
+						
+						
+						if(type == item.CustomPickList10){
+							showMesage(type);				
+							return;
+						} 
+						
+						if(type==initType){
+							if(acceptType != item.CustomPickList10){
+								showMesage(type);				
+								return;								
+							}
+						}else if(type==onSiteType){
+							if(acceptType != item.CustomPickList10){
+								showMesage(type);
+								return;
+							}
+							//#1118 CRO
+							item.CustomDate2 = DateUtils.format(new Date(),DateUtils.DATABASE_DATETIME_FORMAT);	
+						}else if(type==completeType){
+							if(item.CustomPickList10==''||item.CustomPickList10==null
+								|| item.CustomPickList10==acceptType ||item.CustomPickList10==initType
+							){
+								showMesage(type);
+								return;
+							}
+							//technecally completed
+							item.CustomPickList11='TECO';
+							
+						}else if(type==acceptType){
+							if(initType != item.CustomPickList10){
+								showMesage(type);
+								return;
+							}
+						}
+						
+						
+						item.CustomPickList10=type;
+						acceptRecords.push(item);
+					}
+				}
+				//check requre att
+				//				if(listError.length>0){
+				//					var msg:String = i18n._("SERVICE_JD_REQUIRE_PDF_ATT");
+				//					var colsName:Array = DAOUtils.getNameColumns(entity);
+				//					for each(var o:Object in listError){
+				//						msg= msg + "\n - ";
+				//						msg = msg+ ObjectUtils.joinFields(o,colsName);
+				//					}
+				//					Alert.show(msg, "Error.", 4, this);
+				//					return ;
+				//				}
+				
+				
+				if(acceptRecords.length<1){
+					cboService.selectedIndex=0;
+					Alert.show("Please select at least one record.", "Info.", 4, this);
+					return;
+				}else{
+					if(isUpdateRecords){
+						Database.begin();					
+						for each(var sr:Object in acceptRecords){
+							sr.local_update = new Date().getTime();
+							dao.update(sr);
+						}
+						Database.commit();
+					}
+					
+				}
+				
+				
+				mainwindow.openSyncWindow(true, acceptRecords);
+				
+			}
+			
+			private function addLeadToCampaign(item:Object):void{
+				var leadWindow:AddLead = new AddLead();
+				if(item == null){
+					Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_THE) + " " + displayName + " " + i18n._(LIST_ALERT_MSG_TO_UPDATE));
+					return;
+				}
+				leadWindow.detail = detail;
+				leadWindow.item = item;
+				WindowManager.openModal(leadWindow);
+			}			
+			
+			public static function displayDataTime(item:Object,col:AdvancedDataGridColumn,entityName:String):String{
+//				if(entityName==null){
+//					entityName = entity;
+//				}
+				if(MainWindow.VISIT_CUSTOMER ==entityName){
+					entityName = "Activity";
+				}
+				var fieldInfo:Object = FieldUtils.getField(entityName,col.dataField);
+				if(fieldInfo==null){
+					//bug#8718 try to read custom field
+					fieldInfo = FieldUtils.getField(entityName,col.dataField,false,true);
+				}
+				var isDateTime:Boolean = fieldInfo.data_type == 'Date/Time';
+				var fieldValue:String = item[col.dataField];	
+				if(!StringUtils.isEmpty(fieldValue)){
+					var date:Date = DateUtils.guessAndParse(fieldValue);
+					if(date!=null){
+						var currentUserDatePattern:Object = DateUtils.getCurrentUserDatePattern();
+						
+						if(!isDateTime){
+							return DateUtils.format(date, currentUserDatePattern.dateFormat);
+						}else{
+							date = new Date(date.getTime()+DateUtils.getCurrentTimeZone(date)*GUIUtils.millisecondsPerHour);
+							var format:String = currentUserDatePattern.dateFormat + ' ' + currentUserDatePattern.timeFormat ;
+							return DateUtils.format(date, format);
+						}
+						
+						
+						
+					}
+				}
+				return "";
+			}
+			
+			public static function displayPicklistValue(item:Object,col:AdvancedDataGridColumn,entityName:String):String{
+				var code:String = item[col.dataField];
+				if(StringUtils.isEmpty(code)){
+					return "";
+				}else{
+//					if(entityName==null){
+//						entityName = entity;
+//					}
+					if(MainWindow.VISIT_CUSTOMER ==entityName){
+						entityName = "Activity";
+					}
+					var value:String= PicklistService.getValue(entityName,col.dataField,code);
+					
+					if(StringUtils.isEmpty(value)){
+						return item[col.dataField];
+					}else{
+						
+						return value;
+					}
+					
+				}
+			}
+			
+			private static function updateDataOnColumnChange(obj:Object,col:AdvancedDataGridColumn):void{
+				
+				var dao:BaseDAO = Database.getDao(obj.gadget_type,false);
+				if(dao!=null){
+					
+					obj.local_update = new Date().getTime();
+					obj.deleted = 0;
+					obj.modified = i18n._("UPD");
+					dao.updateByField([col.dataField],obj);
+				}
+				
+			}
+			
+			public static function createColumn(field:Object,dispDateTime:Function,dispPickVal:Function,editable:Boolean = false):AdvancedDataGridColumn{
+				var child:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+				child.editable = editable;
+				if (field.element_name == "AccountName" ){
+					child.itemRenderer = new ClassFactory(AccountListImageRenderer);
+				}
+				if (field.element_name == "ContactFirstName" ){
+					child.itemRenderer = new ClassFactory(ContactListImageRenderer);
+				}
+				if (field.element_name == "Priority" ){
+					child.itemRenderer = new ClassFactory(PriorityListImageRenderer);
+				}
+				if (field.element_name == "WebSite" ){
+					child.itemRenderer = new ClassFactory(WebsiteListRenderer);
+				}
+				//				if (field.element_name == "Reference" ){
+				//					child.itemRenderer = new ClassFactory(CheckBoxColRender);
+				//				}
+				
+				var obj:Object = FieldUtils.getField(field.entity, field.element_name);
+				// SC20110608
+				if(obj==null) {
+					obj = FieldUtils.getField(field.entity, field.element_name, false, true); // read custom field
+				}
+				if (obj) {
+					
+					child.headerText = obj.display_name;
+					if("Activity.SampleDropped" == field.entity && field.element_name == "Product"){
+						child.dataField = obj.element_name;
+					}else if (obj.data_type == "Picklist" || obj.data_type == "Multi-Select Picklist") { // Change Request #460
+						// for picklists, we display the value, not the id
+						//child.dataField = obj.element_name + "Value";//---change to use label function instead of parse
+						
+						child.labelFunction = dispPickVal;
+						
+					}else if(obj.data_type == "Date" || obj.data_type == "Date/Time"){
+						child.labelFunction = dispDateTime;
+					}
+					
+					child.dataField = obj.element_name;
+					
+					if(obj.hasOwnProperty("fieldImage")) {
+						var iListRenderer:ClassFactory = new ClassFactory(ImageListRenderer);
+						iListRenderer.properties = { fieldImage: obj.fieldImage };
+						child.itemRenderer = iListRenderer;
+					}
+					if (obj.data_type == "Checkbox" ){
+						var chkRenderer:ClassFactory = new ClassFactory(CheckBoxColRender);
+						//bug#8893---Could we trigger this by xml tag, which is N by default? "enable_checkbox_inlist" 
+						editable =(editable || Database.preferencesDao.isEnableCheckBoxInList());
+						chkRenderer.properties={chkEnable:editable,onChkChange:updateDataOnColumnChange};
+						child.itemRenderer=chkRenderer;
+						
+					}
+					
+					if((obj.data_type != "Text (Short)" && obj.data_type != "Text (Long)") || obj.element_name == 'Activity' || obj.element_name == 'CreatedBy'){
+						child.editable = false;
+					}						
+					
+					//#1124 CRO
+					if(obj.data_type == "Integer" || obj.data_type == "Number" || obj.data_type == "Currency") {
+						child.sortCompareFunction = function(obj1:Object,obj2:Object):int{
+							return sortNumberic(obj1,obj2,this.entity);
+						}
+					}else if(obj.data_type == "Date/Time"){
+						child.sortCompareFunction = sortDateTime;	
+					}else if(obj.data_type == "Date"){
+						child.sortCompareFunction = sortDate;
+					}
+					
+					
+				}
+				return child;
+			}
+			
+			public function initGridColumns():void{
+				var sort:Sort = new Sort();
+				//bug #1679 CRO add new tab
+				if(MainWindow.mapCustomTab[entity] != null) return ;
+				//VAHI emergency bugfix
+				if (filter==null) {
+					OOPS("=bug",i18n._(LIST_ALERT_MSG_FILTER_IS_NULL), entity);
+					return;
+				}
+				
+				// var fieldsDB:ArrayCollection = Database.columnsLayoutDao.fetchColumnLayout(entity, filter.type.toString());
+				// if (fieldsDB.length == 0) fieldsDB = Database.columnsLayoutDao.fetchColumnLayout(entity);
+				// SC 20110602
+				fieldsDB = Database.columnsLayoutDao.getColumnLayout(entity, filter.type);
+				var child:AdvancedDataGridColumn;
+				var treeColumn:AdvancedDataGridColumn;
+				var columns:Array = new Array();
+				var ParentActivityIdFound:Boolean = false;
+				var editable:Boolean = Database.preferencesDao.getValue("editableList") == 1? true:false;
+				
+				// Change Request #226
+				// SC20110613
+				if(PreferencesDAO.enableSyncSRStatus() && entity==Database.serviceDao.entity){
+					child = new AdvancedDataGridColumn();				
+					child.headerText = "";
+					child.dataField = "isAccept";
+					
+					//child.styleFunction = Utils.styleFunction;				
+					child.itemRenderer=new GridColumnRenderFactory(CheckBoxColRender);
+					child.width = 40;		
+					
+					columns.push(child);					
+				}
+				if(Database.preferencesDao.isEnableFavorite()){
+					// add column favorite
+					child = new AdvancedDataGridColumn();
+					child.headerText = "";
+					child.dataField = "favorite";
+					child.itemRenderer = new GridColumnRenderFactory(ImageFavoriteColRender);
+					child.width = 40;
+					child.editable = false;
+					columns.push(child);
+				}
+				
+				
+				child = new AdvancedDataGridColumn();
+				child.headerText = i18n._(LIST_ADVANDEDDATAGRIDCOLUMN_HEADERTEXT_MOD);
+				child.dataField = "modified";
+				child.styleFunction = Utils.styleFunction;
+				child.width = 40;
+				child.editable = false;
+				columns.push(child);
+				//#7694 CRO
+				var obj:Object = Database.sortColumnDao.find(entity);
+				var customReadOnlyFields:Dictionary =new Dictionary();
+				var oodReadOnlyFields:Dictionary = new Dictionary();
+				if(editable){
+					customReadOnlyFields = Database.layoutDao.getReadOnlyField(entity);
+					oodReadOnlyFields = Database.fieldManagementServiceDao.getReadOnlyField(entity);
+				}
+				
+				
+				for each (var field:Object in fieldsDB){
+					
+					var colEditable:Boolean = editable && !(customReadOnlyFields.hasOwnProperty(field.element_name)||oodReadOnlyFields.hasOwnProperty( field.element_name));
+					
+					
+					child = createColumn(field,function(item:Object,col:AdvancedDataGridColumn):String{
+						return List.displayDataTime(item,col,entity);
+					},function(item:Object,col:AdvancedDataGridColumn):String{
+						return List.displayPicklistValue(item,col,entity);
+					},colEditable);
+					if (field.element_name == 'Subject') {
+						treeColumn = child;
+					}
+					if (field.element_name == 'CustomText31' || field.element_name == 'ParentActivityId') {
+						ParentActivityIdFound = true;
+					}	
+					
+					if(obj != null && !StringUtils.isEmpty(obj.column_order) && obj.column_order == field.element_name ){
+						var sortField:SortField = new SortField(obj.column_order, true, obj.order_type == "ASC" ? false : true);
+						sort.fields =[sortField];
+//						list.dataProvider.sort = sort;
+						//refresh list after set sort
+						var collection:ICollectionView = list.dataProvider as ICollectionView;
+						collection.sort = sort;
+						collection.refresh();
+					}
+					
+					columns.push(child);
+				}
+				
+				if (entity == 'Activity') {
+					list.treeColumn = treeColumn;
+					
+					// if ParentActivityId is not selected in 'Edit Layout'
+					// we add it (invisible) here so we are able to use it later
+					if (!ParentActivityIdFound) {
+						child = new AdvancedDataGridColumn();
+						child.headerText = i18n._(LIST_ADVANDEDDATAGRIDCOLUMN_HEADERTEXT_PARENT_ACTIVITY_ID);
+						child.dataField = "ParentActivityId";
+						child.styleFunction = Utils.styleFunction;
+						child.visible = false;
+						
+						columns.push(child);
+					}
+				}
+				editableGrid(editable);				
+				list.columns = columns;
+				list.validateNow();
+				computeColumnList();
+				
+			}
+			
+			private function editableGrid(editable:Boolean):void{
+				if(editable){
+					list.removeEventListener(KeyboardEvent.KEY_DOWN, keyboardDeleteHandler);
+					list.addEventListener(AdvancedDataGridEvent.ITEM_EDIT_END, itemEditEndListener);
+					list.addEventListener(AdvancedDataGridEvent.ITEM_EDIT_BEGIN, itemBeginListener);
+				}else{
+					list.addEventListener(KeyboardEvent.KEY_DOWN, keyboardDeleteHandler);
+					list.removeEventListener(AdvancedDataGridEvent.ITEM_EDIT_END, itemEditEndListener);
+					list.removeEventListener(AdvancedDataGridEvent.ITEM_EDIT_BEGIN, itemBeginListener);
+				}
+				list.doubleClickEnabled = !editable;
+				list.editable= editable.toString();
+			}
+			
+			private function itemEditEndListener(e:AdvancedDataGridEvent):void{
+//				if(e.reason == "newRow"){ 
+//					var datagrid:AdvancedDataGrid = (e.target as AdvancedDataGrid)
+//					if(datagrid){
+//						
+//						
+//						
+//						var oldValue:String = (datagrid.dataProvider as ArrayCollection).getItemAt(e.rowIndex)[e.dataField];
+//						var newValue:String = (datagrid.itemEditorInstance as TextInput).text;
+//						var object:Object;
+//						if(newValue!="" && newValue!=" " && oldValue != newValue){
+//							object = e.itemRenderer.data;
+//							object[e.dataField] = newValue;
+//							object.local_update = new Date().getTime();
+//							object.deleted = 0;
+//							object.modified = i18n._("UPD");
+//							Database.getDao(entity).update(object);
+//							(datagrid.dataProvider as ArrayCollection).setItemAt(object, e.rowIndex);
+//						}
+//					}
+//				}else{
+//					
+//				}
+				
+				var component:Object  = e.currentTarget.itemEditorInstance;
+				if(component is TextInput){
+					// Get the cell editor and cast it to TextInput.
+					var myEditor:TextInput = TextInput(component);
+					
+					// Get the new value from the editor.
+					var newValue:String =StringUtil.trim(myEditor.text);
+					var data:Object = e.itemRenderer.data;
+					// Get the old value.
+					var oldValue:String = data[e.dataField];
+					if(oldValue != newValue){
+						data[e.dataField] = newValue;
+						
+						updateDataOnColumnChange(data,list.columns[e.columnIndex]);
+					}
+				}
+				
+				
+			}
+			
+			private function itemBeginListener(e:AdvancedDataGridEvent):void{
+				var grid:AdvancedDataGrid = e.currentTarget as AdvancedDataGrid;
+				var dataField:String = grid.columns[e.columnIndex].dataField;
+				if(dataField == "AccountName" || dataField == "ContactFirstName"){
+					e.preventDefault();
+					grid.createItemEditor(e.columnIndex,e.rowIndex);
+					grid.itemEditorInstance.data = grid.editedItemRenderer.data[dataField];
+				}
+			}
+			
+			public function deleteItem(selectedItem:Object):void {
+				
+				if(selectedItem == null){
+					Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_SELECT_THE) + " " + displayName + " " + i18n._(LIST_ALERT_MSG_TO_DELETE) ,"" , Alert.OK,this.parentApplication as MainWindow);
+					return;
+				}
+				
+				var canDelete:Boolean = RightService.canDelete(selectedItem.gadget_type);
+				if (!canDelete) return;
+				Alert.show(i18n._(LIST_ALERT_MSG_ARE_YOU_SURE),i18n._(GLOBAL_DELETE) + " " + Utils.getName(selectedItem), Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+					if (event.detail==Alert.YES){
+						if (selectedItem[DAOUtils.getOracleId(entity)] == null || StringUtils.startsWith(selectedItem[DAOUtils.getOracleId(entity)], "#")){
+							Database.getDao(entity).delete_(selectedItem);
+							//Bug #1504 CRO						
+							Database.attachmentDao.deleteByGadgetId(selectedItem.gadget_id);
+							// delete tree value
+							Database.customPicklistValueDAO.deleteByGadgetId(selectedItem);
+							
+							//delete child
+							Utils.deleteChild(selectedItem,selectedItem.gadget_type);
+							//remove relation
+							Utils.removeRelation(selectedItem,selectedItem.gadget_type);						
+							
+						}else
+							Database.getDao(entity).deleteTemporary(selectedItem);
+						
+						
+						filterData(); 
+						if(bShowCalendarILog){
+							if(calendarIlog && entity == 'Activity') calendarIlog.init(true);	
+						}else{
+							if(calendar && entity == 'Activity') calendar.init();	
+						}
+						
+						
+						
+						// CH : Clear detail list and link list when deleted
+						detail.clearData();
+						linkList.source = null; 
+						linkList.listLinks();
+						
+					}    	 
+				});				
+			}		
+			
+			
+			public function showMessageSynchronize():void {
+				Alert.show(i18n._(LIST_ALERT_MSG_PLEASE_DO_SYNCHRONIZE),i18n._(LIST_ALERT_MSG_TITLE_ERROR_INIT_FORM), Alert.OK, this);
+			}
+			public function selectItem(selectedItem:Object):void {
+				selectedId = selectedItem.gadget_id;
+				entityLetterBar.selectedIndex = 0;
+				entityFilterInput.text = '';
+				//filterQuery = FieldUtils.computeFilter(null);
+				entityLetterBar.validateNow();
+				
+				filterData(); 
+				
+				
+				//list.validateNow();
+				var i:Number = 0;
+				
+				for each (var obj:Object in list.dataProvider) {
+					if (obj.gadget_id == selectedItem.gadget_id) {
+						list.validateNow();
+						list.selectedIndex = i;
+						list.scrollToIndex(i);
+						linkList.source = selectedItem;
+						linkList.listLinks();
+						if(backHistory != null){
+							backHistory.gadget_id = selectedItem.gadget_id;
+							backHistory.listIndex = i;
+						}
+
+						break; 
+					}
+					i++;
+				}
+				computeColumnList();
+				detail.item = selectedItem;
+				detail.loadData();
+				detail.validateNow();
+				//list.validateNow();
+			}
+//			public function selList(var i:String):void{
+//				list.validateNow();
+//				list.selectedIndex = 0;
+//				list.scrollToIndex(0);
+//			}
+			
+			private function keyboardDeleteHandler(event:KeyboardEvent):void {
+				switch (event.keyCode) {
+					case Keyboard.DELETE:
+						deleteItem(list.selectedItem);
+						break;
+					case Keyboard.D:
+						deleteItem(list.selectedItem);
+						break;
+					case Keyboard.E:
+						editScreenDetail(list.selectedItem);
+						break;
+					case Keyboard.L:
+						openLinkTo(list.selectedItem);
+						break;
+					case Keyboard.B:
+						batchUpdate();
+						break;
+					
+				}
+			}
+			
+			
+			
+			public function doFilter(newFilter:Object):void {
+				//filterQuery = FieldUtils.computeFilter(filter);
+				if (newFilter) {
+					filter = newFilter;
+				}
+				filterData(); 
+			}
+			
+			private const LINK_LIST_WIDTH:int = 264;
+			
+			private function switchLinkList():void {
+				linkList.width = LINK_LIST_WIDTH - linkList.width;
+				if (linkList.width == 0) {
+					switchLinks.setStyle("icon", ImageUtils.leftIcon);
+					// write into the prefs with format: account.linklist.show, contact.linklist.show and so on.
+					Database.preferencesDao.setValue(entity + ".linklist.show", "0");
+				} else {
+					switchLinks.setStyle("icon", ImageUtils.rightIcon);
+					// write into the prefs with format: account.linklist.show, contact.linklist.show and so on.
+					Database.preferencesDao.setValue(entity + ".linklist.show", "1");
+				}
+			}
+			
+			private const DETAIL_HEIGHT:int = 214;
+			private var showHide:Boolean = false;
+			private function switchDetailTab():void {
+				// detail.height = DETAIL_HEIGHT - detail.height;
+				
+				if (!showHide) {
+					showHide = true;
+					contract.end(); contract.play();
+					switchDetail.setStyle("icon", ImageUtils.upIcon);
+					// write into the prefs with format: account.listdetail.show, contact.listdetail.show and so on.
+					Database.preferencesDao.setValue(entity + ".listdetail.show", "0");
+				} else {
+					showHide = false;
+					expand.end(); expand.play();					
+					switchDetail.setStyle("icon", ImageUtils.downIcon);
+					// write into the prefs with format: account.listdetail.show, contact.listdetail.show and so on.
+					Database.preferencesDao.setValue(entity + ".listdetail.show", "1");
+				}
+			}
+			
+			private function getButtons():ArrayCollection {
+				var canDelete:Boolean = RightService.canDelete(entity)
+				var canUpdate:Boolean = RightService.canUpdate(entity);
+				var buttons:ArrayCollection = new ArrayCollection();
+				buttons.addItem({label:i18n._(GLOBAL_RELATION_ORDER), icon:linkAddIcon, disabled: false});
+				if (FieldUtils.linkableEntities(entity).length != 0) {
+					buttons.addItem({label:i18n._(LIST_BUTTON_LABEL_LINK), icon:linkAddIcon, disabled: !canUpdate});
+				}
+				if(entity == "Account" && Database.preferencesDao.getValue("netbreeze_tab", 0) == 1)
+					buttons.addItem({label:i18n._(LIST_BUTTON_LABEL_DASKBOARD), icon: netbreezeIcon});
+				buttons.addItem({label:i18n._(LIST_BUTTON_LABEL_MINDMAP), icon:mindmapIcon});
+				var labelName:String = displayName;
+				if(entity==Database.activityDao.entity){
+					labelName =  (displayName==entity? i18n._("GLOBAL_TASK"):displayName);
+				}
+				buttons.addItem({label:i18n._(GLOBAL_EDIT) + " " + labelName, icon:ImageUtils.getImage(entity), disabled: !canUpdate});
+				buttons.addItem({label:i18n._(GLOBAL_DELETE), icon:deleteIcon, disabled: !canDelete});
+				return buttons;
+			}
+			
+			private function getListButtons():ArrayCollection {
+				var canCreate:Boolean = RightService.canCreate(entity);
+				var disabledPDFExport:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_PDF_EXPORT);
+				var disabledCVSExport:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_CVS_EXPORT);
+				
+				var buttons:ArrayCollection = new ArrayCollection();
+				//buttons.addItem({label: "", icon: ImageUtils.favorite});
+				var isMsExchangeEnable:Boolean = Database.preferencesDao.getBooleanValue("ms_exchange_enable");
+				if (entity == Database.contactDao.entity && isMsExchangeEnable ) {
+					buttons.addItem({label:i18n._(MS_EXCHANGE), icon:ImageUtils.getImage(entity), disabled: !canCreate, subtype:0});
+				}
+				if(!disabledPDFExport){
+					buttons.addItem({label:i18n._(LIST_BUTTON_LABEL_PDF_EXPORT), icon:pdfIcon});
+				}
+				if(!disabledCVSExport){
+					buttons.addItem({label:i18n._(LIST_BUTTON_LABEL_CSV_EXPORT), icon:csvIcon});
+				}
+				// Change Request #226
+				//				if(entity=="Service Request" && Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_SR_SYNC_ORDER_STATUS)){
+				//					// buttons.addItem({label:i18n._(LIST_BUTTON_LABEL_SYNC_SR_NOW),icon:ImageUtils.synIcon}); // Bug #108
+				//					buttons.addItem({label:LIST_BUTTON_LABEL_ACCEPT,icon:ImageUtils.tickIcon});
+				//					buttons.addItem({label:LIST_BUTTON_LABEL_UNACCEPT,icon:ImageUtils.crossIcon});
+				//					
+				//				}
+				
+				if (entity == Database.activityDao.entity) {
+					if(isMsExchangeEnable){
+						buttons.addItem({label:i18n._(MS_EXCHANGE), icon:ImageUtils.getImage(entity, 1), disabled: !canCreate});
+					}
+					var labelName:String = displayName;
+					if(entity==Database.activityDao.entity){
+						labelName =  (displayName==entity? i18n._("GLOBAL_TASK"):displayName);
+					}
+					buttons.addItem({label:i18n._(GLOBAL_NEW_TASK) + " " + labelName, icon:ImageUtils.getImage(entity), disabled: !canCreate, subtype:0, 
+						data:ActivityDataUtils.getActivityData(ActivityDataUtils.TASK_SUBTYPE)});
+					buttons.addItem({label:i18n._(GLOBAL_NEW) + " " + Database.customLayoutDao.getDisplayName(entity, 1), icon:ImageUtils.getImage(entity,1), disabled: !canCreate, subtype:1, 
+						data:ActivityDataUtils.getActivityData(ActivityDataUtils.APPOINTMENT_SUBTYPE)});
+					// Change Request #440
+					if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_BUTTON_ACTIVITY_CREATE_CALL)) {
+						buttons.addItem({label:i18n._(GLOBAL_NEW) + " " + Database.customLayoutDao.getDisplayName(entity, 2), icon:ImageUtils.getImage(entity,2), disabled: !canCreate, subtype:2, 
+							data:ActivityDataUtils.getActivityData(ActivityDataUtils.CALL_SUBTYPE)});
+					}
+				} else {
+					buttons.addItem({label:i18n._(GLOBAL_NEW_TASK) + " " + displayName, icon:ImageUtils.getImage(entity), disabled: !canCreate, subtype:0});
+				} 
+				// disable_list_layout = disable List Layout, View Layout and Edit Layout 
+				var disable_list_layout:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_LIST_LAYOUT);
+				
+				buttons.addItem({label:i18n._(LIST_BUTTON_LABEL_EDIT_LAYOUT), icon:customIcon, disabled: disable_list_layout});
+				// Add OrgChat
+				/*
+				if (entity == "Account") {
+				buttons.addItem({label:"Hierarchy", icon:ImageUtils.getImage(entity)});
+				}*/
+				return buttons; 
+			}
+			
+			private function getComboxServiceAction():ComboBox{
+				if(entity==Database.serviceDao.entity && PreferencesDAO.enableSyncSRStatus()){
+					cboService=new ComboBox();
+					cboService.dataProvider=LABEL_SERVICE_ACTION;
+					cboService.labelField='display';
+					cboService.addEventListener(Event.CHANGE,serviceEvent);
+					return cboService;
+				}
+				return null;
+			}
+			
+			
+			private function serviceEvent(e:Event):void{
+				var cbo:ComboBox=e.currentTarget as ComboBox;
+				if(cbo.selectedItem==null) return;
+				var selectedItem:Object=cbo.selectedItem;
+				if(selectedItem.type=='') return;
+				//trace (selectedItem)	
+				updateServiceToServer(selectedItem.type);
+				
+				
+				
+			}
+			
+			private function getCalendarButtons():ArrayCollection {
+				var canCreate:Boolean = RightService.canCreate(entity);
+				var buttons:ArrayCollection = new ArrayCollection();
+				if (entity == "Activity") {
+					if (Database.preferencesDao.getBooleanValue("ms_exchange_enable")){
+						buttons.addItem({label:i18n._(MS_EXCHANGE), icon:ImageUtils.getImage(entity, 1), disabled: !canCreate});
+					}
+					
+					if(Database.preferencesDao.getValue("enable_google_calendar", 0) == 1)
+						buttons.addItem({label:i18n._("GLOBAL_GOOGLE_CALENDAR"), icon:ImageUtils.gCalendarIcon, disabled: !canCreate});
+					var labelName:String = displayName;
+					if(entity==Database.activityDao.entity){
+						labelName =  (displayName==entity? i18n._("GLOBAL_TASK"):displayName);
+					}
+					buttons.addItem({label:i18n._(GLOBAL_NEW_TASK) + " " + labelName, icon:ImageUtils.getImage(entity), disabled: !canCreate, subtype:0, data:ActivityDataUtils.getActivityData(ActivityDataUtils.TASK_SUBTYPE)});
+					buttons.addItem({label:i18n._(GLOBAL_NEW) + " " + Database.customLayoutDao.getDisplayName(entity, 1), icon:ImageUtils.getImage(entity, 1), disabled: !canCreate, subtype:1, data:ActivityDataUtils.getActivityData(ActivityDataUtils.APPOINTMENT_SUBTYPE)});
+					if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_BUTTON_ACTIVITY_CREATE_CALL)) {
+						buttons.addItem({label:i18n._(GLOBAL_NEW) + " " + Database.customLayoutDao.getDisplayName(entity, 2), icon:ImageUtils.getImage(entity, 2), disabled: !canCreate, subtype:2, data:ActivityDataUtils.getActivityData(ActivityDataUtils.CALL_SUBTYPE)});
+					}
+					
+				}
+				return buttons;
+			}
+			
+			
+			
+			private function clickEvt(event:ItemClickEvent):void {
+				viewStack.selectedIndex = event.index;
+			}                			
+			
+			private function initAlternateView():void {
+				manageViewTabBar(entity == "Activity");
+				if (entity == "Activity") {
+					if(bShowCalendarILog == false){
+						calendar = new Calendar();
+						calendar.refreshFunction = selectItem;
+						calendar.percentHeight = 100;
+						calendar.percentWidth = 100;
+					}else {
+						calendarIlog = new CalendarIlog();
+						calendarIlog.refreshFunction = selectItem;
+					}
+					bShowCalendarILog ? activityCalendar.addChild(calendarIlog) : activityCalendar.addChild(calendar);
+				}
+			}
+			
+			// Bug #213
+			public function initCalendar():void {
+				if(entity == 'Activity' && (calendarIlog != null || calendar != null)) {
+					if(bShowCalendarILog){
+						if(calendarIlog && entity == 'Activity') calendarIlog.init();	
+					}else{
+						if(calendar && entity == 'Activity') calendar.init();	
+					}
+				}
+			}
+			
+			public function manageViewTabBar(bVisible:Boolean):void {
+				tabNavigator.visible = bVisible;
+				tabNavigator.includeInLayout = bVisible;
+				
+				if(mainwindow.isActivityCalendar ){
+					listTab.visible = true;
+					listTab.percentHeight = 100;
+					listTab.percentWidth =100;
+					homeTask.visible = false;
+					homeTask.percentHeight = 0;
+					homeTask.percentWidth =0;
+				}else if(visibleHomeTask && ! mainwindow.isActivityCalendar && entity=="Activity"){ 
+					listTab.visible = false;
+					listTab.height = 0;
+					listTab.width =0;
+					homeTask.visible = true;
+					homeTask.percentHeight = 100;
+					homeTask.percentWidth =100;
+				}
+				
+				
+				
+			}
+			
+			private function exportToPDF():void {
+				var noneLimitedRecords:ArrayCollection = Utils.getNoneLimitedRecords(entity,filter,selectedId);
+				var columns:ArrayCollection = Utils.getColumn(entity);
+				Utils.parseDateTime(entity, columns, noneLimitedRecords);
+				Utils.parsePicklistValues(entity, columns, noneLimitedRecords);
+				PDFUtil.listToPDF(entity, filter.type.toString(), noneLimitedRecords);			
+			}
+			private function disableButtonCsv(b:Boolean):void{
+				if(buttonCSV != null) buttonCSV.enabled = b;
+			}
+			private function exportToCSV():void {
+				
+				var noneLimitedRecords:ArrayCollection = Utils.getNoneLimitedRecords(entity,filter,selectedId);
+				var columns:ArrayCollection = Utils.getColumn(entity);
+				Utils.parseDateTime(entity, columns, noneLimitedRecords);
+				Utils.parsePicklistValues(entity, columns, noneLimitedRecords);
+				
+				CSVUtils.listToCSV(entity,filter.type.toString(), noneLimitedRecords,disableButtonCsv);
+			}
+			
+			private function columnStretchHandler(evt:AdvancedDataGridEvent):void {
+				var filter_index:int = mainwindow.filterList.filterGrid.selectedIndex;
+				var column:AdvancedDataGridColumn = list.columns[evt.columnIndex];
+				var col:Object = {"filter_id":filter_index, "entity":entity, "field_name":column.dataField,"width":int(column.width)};
+				var rst:Object = Database.customTableWidthConfigurationDao.find(col);
+				if(rst == null){
+					Database.customTableWidthConfigurationDao.insert(col);
+				}else{
+					Database.customTableWidthConfigurationDao.update(col);
+				}				
+			}
+			
+			public function computeColumnList():void {
+				var filter_index:int = mainwindow.filterList.filterGrid.selectedIndex;
+				var criteria:Object = {"filter_id":filter_index, "entity":entity};
+				var rsts:ArrayCollection = Database.customTableWidthConfigurationDao.select(criteria);
+				if(rsts == null || rsts.length == 0) return;
+				var mapColWidth:Object = new Object;
+				for each(var rst:Object in rsts){
+					mapColWidth[rst.field_name] = rst.width;
+				}				
+				//loop in the columnheader of list --> change each column's width to rst's width
+				var columns:Array = list.columns; //#1215 CRO
+				for(var i:int=0; i<columns.length; i++){
+					var column:AdvancedDataGridColumn = columns[i];
+					if(!mapColWidth.hasOwnProperty(column.dataField)) continue;
+					column.width = mapColWidth[column.dataField];
+					
+				}
+				if(columns.length >0 ){
+					list.columns = columns;
+				}
+				list.validateNow();
+			}
+			
+			
+			protected function headerShiftHandler(event:IndexChangedEvent):void
+			{
+				var mapOrder:Object = new Object;
+				var index:int=1;
+				for(var i:int=0; i<list.columns.length; i++){
+					var column:AdvancedDataGridColumn = list.columns[i];
+					if(column.dataField != 'isAccept' && column.dataField != 'modified'){
+						var dataField:String = column.dataField.replace("Value","");
+						mapOrder[dataField] = index;
+						index++;
+					}
+				}
+				
+				var records:ArrayCollection = Database.columnsLayoutDao.fetchColumnLayout(entity, filter.type); //To get the customlayout element_name for an entity
+				if(records.length==0) records = Database.columnsLayoutDao.fetchColumnLayout(entity); //To get the customlayout element_name default for an entity
+				
+				for each(var record:Object in records){
+					record.num = mapOrder[record.element_name];
+				}
+				
+				Database.columnsLayoutDao.deleteColumnLayout(entity, filter.type);
+				for each(record in records){
+					Database.columnsLayoutDao.insert(record);
+				}
+				
+				FieldUtils.allFields(entity,true); //refresh 'Service Request's field in the cache.
+			}
+			
+			// SC 20110602
+			private function filterDataGrid():void {
+				records.filterFunction = filterDataGridResult;
+				records.refresh();
+				bShowWarning = records.length != limited ? false : true;
+			}
+			private function onGridChange():void{
+				detail.loadData(); 
+				linkList.source = list.selectedItem; 
+				if(linkList.visible) {
+					linkList.listLinks();
+				}
+				//#7689 CRO
+				addHistory();
+					
+			}
+			private function addHistory():void{
+				if(backHistory != null && list.selectedItem != null){
+					backHistory.listIndex = list.selectedIndex;
+					backHistory.gadget_id = list.selectedItem.gadget_id;
+				}
+			}
+			private function filterDataGridResult(item:Object):Boolean {
+				var key:Array = Utils.replaceGermanCharacter(entityFilterInput.text, Utils.charUpperGermanAccents, Utils.charGerman).toUpperCase().split(/\sOR\s/);
+				for each(var o:Object in fieldsDB) {
+					var value:String = item.hasOwnProperty(o.element_name) ? item[o.element_name] : "";
+					if(!StringUtils.isEmpty(value) && (value.toUpperCase().indexOf(key[0]) != -1 || value.toUpperCase().indexOf(key[1]) != -1))
+						return true;
+				}
+				return false;
+			}
+			// Bug #1840 CRO
+			private function advanceSearch():void{
+				var dao:DAO = Database.getDao(entity);
+				if(entityFilterInput.text != ""){
+					
+					// columns required for the list
+					var columns:ArrayCollection = Utils.getColumn(entity);
+					//this column for dsiplay (Currency + Revenue) change request 1603
+					if(entity == Database.opportunityDao.entity)
+						columns.addItem({element_name:"CurrencyCode"});
+					// add column favorite
+					columns.addItem({element_name:"favorite"});
+					var filter:String ="";
+					var germanChars:Array = Utils.replaceGermanChar(entityFilterInput.text,Utils.charUpperGermanAccents,Utils.charLowerGermanAccents, Utils.charGerman);
+					for (var i:int = 0 ;i<fieldsDB.length ;i++) {
+						for (var j:int = 0 ;j<germanChars.length ;j++) {
+							if(j ==0) {
+								filter = filter + fieldsDB[i].element_name + " Like '%" + germanChars[j] + "%'";
+							}else{
+								filter =  filter + " OR " + fieldsDB[i].element_name + " Like '%" + germanChars[j] + "%'";
+							}
+						}
+						
+						if(i<fieldsDB.length -1){
+							filter = filter + " OR ";
+						}
+						
+					}	
+					
+					records = dao.findAll(columns, filter, null, 1001,null);
+					Utils.parseDateTime(entity, columns, records);
+					Utils.parsePicklistValues(entity, columns, records);
+				}
+				
+			}
+			
+		]]>
+	</mx:Script>
+	
+	
+	<mx:Resize duration="150" id="expand" target="{detail}"  heightTo="192"/>
+	<mx:Resize duration="150" id="contract" target="{detail}" heightTo="0"/>
+	
+	<mx:HBox top="0" left="8" right="8" bottom="8" verticalAlign="middle" horizontalGap="0" id="boxList">
+		<mx:Canvas  id="homeTask"  visible="false" top="10" width="0" height="0"/>
+		<mx:VBox id="listTab" width="100%" height="100%" horizontalAlign="center" verticalGap="0">
+			<mx:HBox width="100%" horizontalAlign="left">
+				<mx:TabBar id="tabNavigator" visible="false" includeInLayout="false" itemClick="clickEvt(event);" paddingBottom="-1" paddingLeft="16" styleName="tabBar">
+					<mx:dataProvider>
+						<mx:String>{i18n._(LIST_TABAR_BUTTON_LIST)}</mx:String>
+						<mx:String>{i18n._(LIST_TABAR_BUTTON_CALENDAR)}</mx:String>
+					</mx:dataProvider>
+				</mx:TabBar>
+			</mx:HBox>
+			<mx:ViewStack id="viewStack" width="100%" height="100%" >				
+				<!--CRO 11.01.2011 bug fixing 364 -->
+				<control:ButtonPanel id="mainPanel" titleIcon="{ImageUtils.getImage(entity)}" titleStyleName="panelHeader" dataProvider="{getListButtons()}" width="100%" height="100%"
+									 itemClick="{upperBarHandler}" borderStyle="solid" backgroundColor="#F3F3F3" cboService="{getComboxServiceAction()}"
+									 title="{Database.customLayoutDao.getPlural(entity)} ({bShowWarning ? '>1000':records.length})"><!-- Bug fixing 251 CRO-->
+					<mx:HBox width="100%" horizontalAlign="right" id="homeBox">
+						<mx:LinkButton  label="{i18n._('GLOBAL_TASKS_HOME')}" left="0" right="0" id="btnHomeTask" textAlign="left" icon="@Embed('/assets/home.png')" toolTip="{i18n._('GLOBAL_HOME_TASK')}" visible="{isLstVisibleHomeTask}" click="showHomeTasks(true)"/>
+					</mx:HBox>
+					<mx:VBox width="100%" height="100%">
+						<mx:HBox width="100%" height="24" paddingLeft="0" paddingRight="0">
+							<mx:Image id="warningIcon" toolTip="{i18n._(LIST_ALERT_MSG_ONLY_THE_1000_FIRST)}" source="{ImageUtils.warningIcon}"/>
+							<mx:ToggleButtonBar id="entityLetterBar" horizontalGap="0" buttonWidth="20" buttonStyleName="buttonLetter" dataProvider="{Utils.letterData()}" 
+												itemClick="entityFilterInput.text = ''; filterData();"/>
+							<code:PromptingTextInput prompt="[{i18n._('GLOBAL_TYPE_FILTER_HERE')}]" id="entityFilterInput" width="150" change="entityLetterBar.selectedIndex = 0; filterDataGrid();" />
+							<mx:Button icon="@Embed('/assets/search.png')" id="btnAdvanceSearch" toolTip="{i18n._('GLOBAL_ADVANCE_SEARCH')}" click="advanceSearch();" paddingLeft="0" paddingRight="0"/>
+						</mx:HBox>
+						<mx:HBox width="100%" height="100%" horizontalGap="0" verticalAlign="middle">
+							<list:ListAdvanceGrid sort="eventSortClick(event)" headerShift="headerShiftHandler(event)" columnStretch="columnStretchHandler(event)" id="list" 
+												 change="onGridChange()"
+												 sortExpertMode="true"
+												 doubleClickEnabled="true" doubleClick="editScreenDetail(list.selectedItem)" 
+												 dataProvider="{records}" variableRowHeight="true"
+												 defaultLeafIcon="{null}" displayItemsExpanded="true"
+												 width="100%" height="100%"/>
+							<mx:LinkButton id="switchLinks" width="12" height="24" icon="{ImageUtils.rightIcon}" click="switchLinkList()"/>
+							<list:LinkList id="linkList" list="{this}" width="{LINK_LIST_WIDTH}" height="100%" horizontalScrollPolicy="off" parentEntity="{entity}"/>
+						</mx:HBox>					
+					</mx:VBox>
+				</control:ButtonPanel>
+				<control:ButtonPanel label="{i18n._(LIST_TABAR_BUTTON_CALENDAR)}" id="activityCalendar" titleIcon="{ImageUtils.getImage(entity)}" titleStyleName="panelHeader" 
+									 dataProvider="{getCalendarButtons()}" 
+									 width="100%" height="100%"
+									 itemClick="{upperBarHandler}" borderStyle="solid" backgroundColor="#F3F3F3"
+									 title="{i18n._(LIST_TABAR_BUTTON_CALENDAR)}"/>
+			</mx:ViewStack>
+			<mx:LinkButton id="switchDetail" width="24" height="12" icon="{ImageUtils.downIcon}" click="switchDetailTab()"/>
+			<list:ListDetail id="detail" dataProvider="{getButtons()}" titleIcon="{ImageUtils.getImage(entity)}"  filter="{filter}" list="{this}"
+							 entity="{entity}" itemClick="{lowerBarHandler}" item="{MainWindow.mapCustomTab[entity] != null  ? null : Database.getDao(entity).findByGadgetId(list.selectedItem.gadget_id)}" height="{DETAIL_HEIGHT}" width="100%" paddingBottom="-10"/>	
+		</mx:VBox>	
+	</mx:HBox>
+	
+</mx:Canvas>

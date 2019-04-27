@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true" height="100%">
+	<fx:Script>
+		<![CDATA[
+			import gadget.assessment.AssessmentSectionTotal;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid;
+			private var list:ArrayCollection ;
+					
+			 override public function set data(value:Object):void{		
+				 super.data = value;
+				 if(data.isHeader && data.isHeader=='1'){
+				  	txtVal.setStyle("backgroundColor",0x92B8FF);
+					hbcell.setStyle("backgroundColor",0x92B8FF);
+					txtVal.setStyle("fontWeight","bold");
+				 }else{
+					if(!(data is AssessmentSectionTotal)){
+						if(data.odd){
+							hbcell.setStyle("backgroundColor", 0xECECEC);
+						}else{
+							hbcell.setStyle("backgroundColor", 0xF5F5F5);
+						}
+					}
+				 }
+				 txtVal.setStyle("fontSize","10"); 
+				 txtVal.text = data[column.dataField];
+				 if(data.isFooter){
+					 txtVal.setStyle("fontWeight","bold");
+					 hbcell.setStyle("backgroundColor", 0x92B8FF);
+				 }
+			 }
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];						
+					}
+					
+				}
+			}
+			
+		]]>
+		
+	</fx:Script>
+
+	<mx:HBox id="hbcell" backgroundColor="0xFFFF00"  verticalAlign="middle" width="100%" height="100%" paddingLeft="5" paddingBottom="3">
+		<s:Label id="txtVal"    visible="true"   />
+	</mx:HBox>	
+</s:MXAdvancedDataGridItemRenderer>

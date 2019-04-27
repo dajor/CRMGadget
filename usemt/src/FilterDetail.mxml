@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="730" height="415" resizable="false"
+	title="{filter.name}" 
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.lists.FilterList;
+			import gadget.lists.List;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			
+			[Bindable] public var filter:Object;
+			[Bindable] public var criteria1:Object;
+			[Bindable] public var criteria2:Object;
+			[Bindable] public var criteria3:Object;
+			[Bindable] public var criteria4:Object;
+			[Bindable] public var criteria5:Object;
+			[Bindable] public var filterList:FilterList;
+			public var list:List;
+			public var filterName:String ;
+			private function doEvaluate(criteria:Object,entity:String):Boolean{
+				var param:String=Utils.doEvaluateForFilter(criteria,entity);
+					if(param == "<ERROR>") return false;
+
+				return true;
+			}
+			
+			private function update():Boolean {
+				var validatorErrorArray:Array = filterForm.validate(false);
+				
+				if (validatorErrorArray.length == 0) {
+					//filter.name = filterForm.nameInput.text;	
+					Database.filterDao.update(filter);
+					
+					criteria1.column_name = filterForm.filterCol1.selectedItem.column;
+					criteria1.operator = filterForm.filterOp1.selectedItem.data;
+					//criteria1.param = filterForm.filterParam1.visible?filterForm.filterParam1.text:filterForm.cboFilterParam1.selectedItem.data;
+					criteria1.conjunction = filterForm.filterConj1.selectedValue;
+					criteria1.param = filterForm.filterParam1.visible?filterForm.filterParam1.text:filterForm.cboFilterParam1.selectedItem.data;
+					if(!doEvaluate(criteria1,filter.entity)) {
+						Alert.show(i18n._("GLOBAL_FUNCTION_IS_ERROR"), i18n._('GLOBAL_ERROR'), Alert.OK, filterForm);
+						return false;
+					}
+					Database.criteriaDao.update(criteria1);
+					
+					criteria2.column_name = filterForm.filterCol2.selectedItem.column;
+					criteria2.operator = filterForm.filterOp2.selectedItem.data;
+					//criteria2.param = filterForm.filterParam2.visible?filterForm.filterParam2.text:filterForm.cboFilterParam2.selectedItem.data;
+					criteria2.conjunction = filterForm.filterConj2.selectedValue;
+					criteria2.param = filterForm.filterParam2.visible?filterForm.filterParam2.text:filterForm.cboFilterParam2.selectedItem.data;
+					if(!doEvaluate(criteria2,filter.entity)) {
+						Alert.show(i18n._("GLOBAL_FUNCTION_IS_ERROR"), i18n._('GLOBAL_ERROR'), Alert.OK, filterForm);
+						return false;
+					}
+					Database.criteriaDao.update(criteria2);
+					
+					criteria3.column_name = filterForm.filterCol3.selectedItem.column;
+					criteria3.operator = filterForm.filterOp3.selectedItem.data;
+					//criteria3.param = filterForm.filterParam3.visible?filterForm.filterParam3.text:filterForm.cboFilterParam3.selectedItem.data;
+					criteria3.conjunction = filterForm.filterConj3.selectedValue;
+					criteria3.param = filterForm.filterParam3.visible?filterForm.filterParam3.text:filterForm.cboFilterParam3.selectedItem.data;
+					if(!doEvaluate(criteria3,filter.entity)) {
+						Alert.show(i18n._("GLOBAL_FUNCTION_IS_ERROR"), i18n._('GLOBAL_ERROR'), Alert.OK, filterForm);
+						return false;
+					}
+					Database.criteriaDao.update(criteria3);
+					
+					criteria4.column_name = filterForm.filterCol4.selectedItem.column;
+					criteria4.operator = filterForm.filterOp4.selectedItem.data;
+					//criteria4.param = filterForm.filterParam4.visible?filterForm.filterParam4.text:filterForm.cboFilterParam4.selectedItem.data;
+					criteria4.param = filterForm.filterParam4.visible?filterForm.filterParam4.text:filterForm.cboFilterParam4.selectedItem.data;
+					if(!doEvaluate(criteria4,filter.entity)) {
+						Alert.show(i18n._("GLOBAL_FUNCTION_IS_ERROR"), i18n._('GLOBAL_ERROR'), Alert.OK, filterForm);
+						return false;
+					}
+					Database.criteriaDao.update(criteria4);
+					
+					
+					
+					criteria5.column_name = filterForm.filterCol5.selectedItem.column;
+					criteria5.operator = "orderby";
+					//criteria4.param = filterForm.filterParam4.visible?filterForm.filterParam4.text:filterForm.cboFilterParam4.selectedItem.data;
+					criteria5.conjunction = "";
+					criteria5.param= filterForm.sortbyasc.selected?"asc":"desc";					
+					Database.criteriaDao.update(criteria5);
+					
+					filterList.listFilters();
+					list.doFilter(filter);
+					updateTranslation();
+					
+					return true;
+				} else {
+					var errorMessageArray:Array = [];
+					for each (var err:Object in validatorErrorArray) {
+						var errField:String = ''; 
+						if (err.currentTarget) {
+							errField = FormItem(err.currentTarget.source.parent).label + " : ";
+						}
+						errorMessageArray.push(errField + Utils.getTranslatedValidation(err.message));
+					}
+					//CRO 05.01.2011
+					Alert.show(errorMessageArray.join("\n"), i18n._('GLOBAL_INVALID_FORM'), Alert.OK, filterForm);
+					return false;
+				}
+			}
+			//CRO #1345
+			private function updateTranslation():void{
+				var translate:Object = new Object();
+				translate["entity"] =filter.entity;
+				translate["filter_name"] = filterName;
+				translate["displayName"] = filterForm.nameInput.text;
+				translate["languageCode"] = filterForm.cboLanguage.selectedItem.data;
+				Database.customFilterTranslatorDao.updateFilter(translate);	
+				
+			}
+			private function openListLayout(event:Event):void{
+				var listLayout:ListLayout = new ListLayout();
+				listLayout.list = list;
+				listLayout.filter = filter;
+				WindowManager.openModal(listLayout);
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="730" height="415" right="0" bottom="0">
+		<control:TitleBar title="{filter.name}"/>
+		<mx:VBox top="32" left="16" right="16">
+			<form:FilterForm id="filterForm"  filterName="{filterName}" filter="{filter}" criteria1="{criteria1}" criteria2="{criteria2}" criteria3="{criteria3}" criteria4="{criteria4}" criteria5="{criteria5}" isCreated="false" width="100%"/>
+			<mx:HBox width="100%">
+				<mx:HBox paddingTop="7" enabled="{filterForm.cboLanguage.selectedItem.data == 'ENU' ? true : false}"><!--CRO 05.01.2011-->
+					<mx:Button label="{i18n._('GLOBAL_COLUMN_LAYOUT')}" icon="@Embed('/assets/customize.png')" click="openListLayout(event);" />
+				</mx:HBox>
+				<control:DetailButtonBar buttonLabel="GLOBAL_UPDATE" buttonIcon="@Embed('/assets/edit.png')" action="update"/>	
+			</mx:HBox>
+		</mx:VBox>	
+	</mx:Canvas>
+</mx:Window>

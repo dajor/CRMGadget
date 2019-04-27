@@ -1,0 +1,525 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window
+		xmlns:mx="http://www.adobe.com/2006/mxml"
+		xmlns:control="gadget.control.*"
+		showFlexChrome="false" systemChrome="none" 
+		resizable="false"	
+		layout="absolute" width="800" height="600" creationComplete="init()"  showStatusBar="false">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.BaseDAO;
+			import gadget.dao.CustomRecordTypeServiceDAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.service.PicklistService;
+			import gadget.util.DateUtils;
+			import gadget.util.FieldUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.NumberLocaleUtils;
+			import gadget.util.ObjectUtils;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.FormItem;
+			import mx.containers.HBox;
+			import mx.containers.Panel;
+			import mx.controls.Image;
+			import mx.controls.Label;
+			import mx.controls.TextInput;
+			
+			
+			[binable]public var syncEnd:Function;
+			[binable]public var datas:ArrayCollection;
+			
+			public var startSyn:Function;
+			private var currentIndex:int=0;
+			private var isStop:Boolean=true;
+			
+			private function dispose():void{
+
+				if(syncEnd!=null && isStop){
+					syncEnd(false);					
+				}
+				this.close();
+				
+				
+			}
+			private function save():void{
+
+				Database.begin();
+				for each (var obj:Object in datas){
+					var isCRMWin:Boolean = obj.crm;
+					var localeObj:Object = obj.localeRec;
+					var serverObj:Object = obj.serverRec;
+					if(isCRMWin){
+						//reset mark as update
+						localeObj.deleted = false;
+						localeObj.local_update = null;
+						localeObj.error = false;
+						for(var f:String in serverObj){
+							localeObj[f] = serverObj[f];
+						}
+						var dao:BaseDAO = Database.getDao(localeObj.gadget_type);
+						dao.updateByOracleId(localeObj);
+					}
+					
+					
+				}
+				
+				
+				Database.commit();
+				isStop=false;
+				startSyn();
+				this.close();
+				
+			}
+			
+		
+		   private function checkDiferrent(val1:Object,val2:Object,fieldInfo:Object):Boolean{
+			   if(val1==val2){
+				   return false;
+			   }
+			   if((val1==null && val2=='') ||(val1=='' && val2==null)){
+				   return false;
+			   } 
+			   
+			  if(fieldInfo.data_type=="Integer" || fieldInfo.data_type=="Number"||fieldInfo.data_type=="Currency"){
+				  var str1:String = NumberLocaleUtils.format(val1);
+				  var str2:String = NumberLocaleUtils.format(val2);
+				  
+				  return str1!=str2;
+			   }
+			   
+			   return true;
+		   }
+			
+			private function init():void{
+				currentIndex=0;
+//				//init default select to crm
+//				for each(var obj:Object in datas){
+//					//default is crm selected
+//					obj.crm=true;
+//				}
+				createScreen();
+			}
+			
+			
+			private function createLableHeader(text:String,paddingleft:int=0):Label{
+				var label:Label = new Label();
+				label.text=text;
+				label.percentWidth=100;
+				label.setStyle("fontSize","15");
+				label.setStyle("fontWeight","bold");
+				label.setStyle("paddingLeft",paddingleft);
+				return label;
+			}
+			
+			private function enableDisableButton():void{
+				if(datas.length==1){
+					btnNext.enabled=false;
+					btnPreviouse.enabled=false;		
+					return;
+				}
+				
+				if(currentIndex==0){
+					btnNext.enabled=true;
+					btnPreviouse.enabled=false;
+					return;				
+				}
+				if(currentIndex==datas.length-1){
+					btnNext.enabled=false;
+					btnPreviouse.enabled=true;
+					return;
+				}
+				
+				btnNext.enabled=true;
+				btnPreviouse.enabled=true;
+				
+			}
+			
+			private function createLabelFormItem(label:String, info:String, isShowLabel:Boolean=true):FormItem {
+				var frmItm:FormItem = new FormItem();
+				var lblInfo:Label = new Label();
+				if(isShowLabel) frmItm.label = label; //show label only if it's local side
+				lblInfo.toolTip = info;
+				lblInfo.text = info;
+				lblInfo.width=170;
+				lblInfo.setStyle("fontWeight","bold");				
+				frmItm.addChild(lblInfo);
+				return frmItm;
+			}
+
+			private function createConflictFormItem(label:String, displayObject:DisplayObject, isShowLabel:Boolean=true):FormItem {
+				var frmItm:FormItem = new FormItem();
+				if(isShowLabel){ 
+					frmItm.label = label;
+				}
+				frmItm.addChild(displayObject);
+				return frmItm;
+			}
+
+			protected function getCurrentObject():Object{
+				return datas.getItemAt(currentIndex);
+			}
+			
+			private function createScreen():void{
+				
+				
+				var item:Object = getCurrentObject();
+				var serverRec:Object = item.serverRec;
+				var localeRec:Object = item.localeRec;
+				var entity:String = item.gadget_type;
+				
+				var titleDetail:String = Utils.getTitle(entity,0,localeRec,false);
+				setTitle(titleDetail);
+				setIcon(entity);
+				
+				enableDisableButton();
+				
+				//clear all controls
+				frmLocal.removeAllChildren();
+				frmServer.removeAllChildren();
+				hboxUndo.removeAllChildren();
+				
+				
+				
+				numberof.text = (currentIndex+1) + i18n._("GLOBAL_OF@ of ") + datas.length;
+				var name2FieldInfo:Dictionary = FieldUtils.allFieldsAsMap(entity);
+				var fields:ArrayCollection = Database.layoutDao.selectAllFields(entity);
+				var listDifferencts:ArrayCollection = new ArrayCollection();
+				var owner:Object = Database.allUsersDao.ownerUser();
+				
+				var serModifiedBy:String = serverRec.ModifiedBy;
+				serModifiedBy = serModifiedBy.substr(0,serModifiedBy.indexOf(','));
+				
+				var locModifiedBy:String = owner['FirstName']+" " + owner['LastName'];
+				var mdBy:String = FieldUtils.getFieldDisplayName(entity,"ModifiedBy");
+				var mdDate:String = FieldUtils.getFieldDisplayName(entity,"ModifiedDate");
+				var nameRec:String = i18n._("GLOBAL_RECORD_NAME@Record name");
+				var rowIdDisplay:String = i18n._("GLOBAL_ROWID@Row id");
+				var serverName:String = ObjectUtils.joinFields(serverRec, DAOUtils.getNameColumns(entity));
+				var localName:String = ObjectUtils.joinFields(localeRec, DAOUtils.getNameColumns(entity));
+				frmLocal.addChild( createLabelFormItem(rowIdDisplay, localeRec[DAOUtils.getOracleId(entity)]) );
+				frmServer.addChild( createLabelFormItem(rowIdDisplay, serverRec[DAOUtils.getOracleId(entity)], false) );
+				frmLocal.addChild( createLabelFormItem(nameRec, localName) );
+				frmServer.addChild( createLabelFormItem(nameRec, serverName, false) );
+				
+				frmLocal.addChild( createLabelFormItem(mdBy, locModifiedBy) );
+				frmServer.addChild( createLabelFormItem(mdBy, serModifiedBy, false) );
+				frmLocal.addChild( createLabelFormItem(mdDate, item.localeModified) );
+				frmServer.addChild( createLabelFormItem(mdDate, item.serverModified, false) );
+				
+				//show conflict fields
+				for each (var field:Object in fields){
+
+					if (field.custom != null) continue;
+
+					var element_name:String=field.column_name;					
+					var fieldInfo:Object= name2FieldInfo[element_name];					
+					if(fieldInfo!=null && fieldInfo.data_type!="ID"){//hiden id field
+						if(!checkDiferrent(localeRec[element_name],serverRec[element_name],fieldInfo)) continue;
+//						if(localeRec.listFieldMerg==null) localeRec.listFieldMerg=new Object();
+//						localeRec.listFieldMerg[element_name] = element_name;
+						
+						var txtInputLocal:TextInput = createTextInput(entity,localeRec,localeRec.serverMergFields,fieldInfo);											
+						var txtInputServer:TextInput = createTextInput(entity,serverRec,serverRec.localeMergFields,fieldInfo);;
+						
+						listDifferencts.addItem({local:txtInputLocal,server:txtInputServer});
+						
+//						var nextImage:Image = new Image();
+//						nextImage.width = 16;
+//						nextImage.height = 16;
+//						nextImage.source = ImageUtils.nextDayIcon;
+//						nextImage.data = {'localComponent':txtInputLocal,'entity':entity, 'field':fieldInfo, 'serverComponent':txtInputServer, 'serverObj':serverRec, 'localeObj':localeRec};
+//						nextImage.addEventListener(MouseEvent.CLICK, function(event:MouseEvent):void{
+//							var image:Image = Image(event.currentTarget);
+//							var obj:Object = image.data;
+//							var fieldObj:Object = obj.field;
+//							var serverObj:Object = obj.serverObj;
+//							if(serverObj.localeMergFields==null){
+//								serverObj.localeMergFields=new Object();
+//							}
+//							setMerg(obj.serverComponent,serverObj.localeMergFields,obj.localComponent.text,obj.entity,fieldObj,obj.localeObj);
+//						});
+//
+//						var prevImage:Image = new Image();
+//						prevImage.width = 16;
+//						prevImage.height = 16;
+//						prevImage.source = ImageUtils.previousDayIcon;
+//						prevImage.data = {'localComponent':txtInputLocal,'entity':entity, 'field':fieldInfo, 'serverComponent':txtInputServer,'serverObj':serverRec, 'localeObj':localeRec};
+//						prevImage.addEventListener(MouseEvent.CLICK, function(event:MouseEvent):void{
+//							var image:Image = Image(event.currentTarget);
+//							var obj:Object = image.data;
+//							var fieldObj:Object = obj.field;
+//							var localeObj:Object = obj.localeObj;
+//							if(localeObj.serverMergFields == null){
+//								localeObj.serverMergFields = new Object();
+//							}							
+//							setMerg(obj.localComponent,localeObj.serverMergFields,obj.serverComponent.text,obj.entity,fieldObj,obj.serverObj);							
+//						});
+//						
+						var localDisplayObject:HBox = new HBox();
+						var serverDisplayObject:HBox = new HBox();
+						
+						localDisplayObject.addChild(txtInputLocal);
+						//localDisplayObject.addChild(prevImage);
+						//serverDisplayObject.addChild(nextImage);
+						serverDisplayObject.addChild(txtInputServer);
+						
+						var lblConflict:String = fieldInfo.display_name;
+						frmLocal.addChild( createConflictFormItem(lblConflict, localDisplayObject) );
+						frmServer.addChild( createConflictFormItem(lblConflict, serverDisplayObject, false) );
+
+					}
+				}
+				
+				//add undo button
+//				var btnUndo:Button = new Button();				
+//				btnUndo.label = "Undo";
+//				btnUndo.data = {localeObj:localeRec,serverObj:serverRec,listDef:listDifferencts};
+//				btnUndo.addEventListener(MouseEvent.CLICK,function(e:MouseEvent):void{
+//					var btn:Button = Button(e.currentTarget);
+//					var obj:Object = btn.data;
+//					obj.localeObj.serverMergFields = null;
+//					obj.serverObj.localeMergFields = null;
+//					//refref textbox
+//					for each(var o:Object in obj.listDef){
+//						var localComp:TextInput = o.local;
+//						var serverComp:TextInput = o.server;
+//						var entity:String = localComp.data.type;
+//						var field:Object =  localComp.data.objField;
+//						var localTxt:String = getDisplayValue(entity,field,obj.localeObj);
+//						var serverTxt:String = getDisplayValue(entity,field,obj.serverObj);
+//						localComp.text = localTxt;
+//						localComp.toolTip = localTxt;
+//						serverComp.text = serverTxt;
+//						serverComp.toolTip = serverTxt;
+//						
+//					}
+//				});
+//								
+//				hboxUndo.addChild(btnUndo);
+				
+			}
+			
+			private function createTextInput(entity:String,obj:Object,mergFields:Object, field:Object):TextInput{
+				var element_name:String=field.element_name;	
+				var valMerg:String = null;
+				var isMerged:Boolean =false;
+				if(mergFields!=null){
+					var fieldMergs:Object = mergFields[element_name];
+					if(fieldMergs!=null){
+						valMerg = fieldMergs.val;
+						isMerged = fieldMergs.merg;
+					}
+					
+				}
+				if(valMerg == null && !isMerged){
+					valMerg = getDisplayValue(entity,field,obj);
+				}
+				
+				var textbox:TextInput = new TextInput();
+				textbox.editable=false;
+				textbox.toolTip=valMerg;
+				textbox.text = valMerg;
+				textbox.data = {type:entity, objField:field};
+				textbox.width = 170;
+				return textbox;
+			}
+			
+			private function getDisplayValue(entity:String,field:Object,obj:Object):String{
+				
+				var valMerg:String = obj[field.element_name];
+				if(field.data_type == 'Picklist'){
+					var pickval:String =	PicklistService.getValue(entity,field.element_name,valMerg,obj);
+					if( pickval !=null){
+						valMerg = pickval; 
+					}
+				}else if(field.data_type=='Multi-Select Picklist'){
+					var multiPicklist:Object = PicklistService.getMultiSelectPicklist(entity, obj, field.element_name);
+					var val:String = '';
+					var i:int = 0;
+					for each(var selectObj:Object in multiPicklist.selectedItems){
+						if(i>0){
+							val=val+", ";
+						}
+						val=val+ selectObj.label;
+					}
+					if(val!=''){
+						valMerg = val;
+					}
+				}else if(field.data_type=="Integer"){
+					valMerg = NumberLocaleUtils.format(valMerg,0)
+				}else if(field.data_type=="Number"||field.data_type=="Currency"){
+					valMerg = NumberLocaleUtils.format(valMerg)
+				}else if("Date/Time"==field.data_type || field.data_type=="Number"){
+					valMerg= List.getDateTimeFormat(valMerg,field);
+				}
+				return valMerg;
+			}
+			
+			private function setMerg(inputText:TextInput, mergFields:Object,valMerg:String,entity:String,fieldInfo:Object,item:Object):void{
+				mergFields[fieldInfo.element_name] ={val:valMerg,merg:true} ;							
+				inputText.text = valMerg;
+				inputText.toolTip=valMerg;
+				if(fieldInfo.data_type=='Picklist'){
+					var relation:Object = Relation.getFieldRelation(entity, fieldInfo.element_name);
+					if (relation != null) {	
+						//copy relation field
+						mergFields[relation.keySrc] = {val:item[relation.keySrc],merg:true} ;
+						for each(var f:String in relation.labelSrc){
+							mergFields[f] = {val:item[f],merg:true};
+						}
+					}else{
+						var finderName:String = Database.fieldFinderDAO.getFinderTableName({'entity':entity, 'element_name':fieldInfo.element_name});
+						if(!StringUtils.isEmpty(finderName)){
+							var fields:ArrayCollection = Database.finderMapDAO.findById(finderName);
+							if(fields!=null){
+								for each(var map:Object in fields){
+									mergFields[map.field] = {val:item[map.field],merg:true};;
+								}
+							}
+						}
+					}
+				}
+				
+			}
+			private function enableBtnContinue():void{
+				var enable:Boolean = true;
+				for each(var obj:Object in datas){
+					if(!obj.hasOwnProperty('crm')){
+						enable = false;
+						break;
+					}
+				}
+				btnOk.enabled = enable;
+			}
+			
+			private function chkClieckEvent(event:MouseEvent):void{
+				var target:CheckBox = event.currentTarget as CheckBox;
+				var obj:Object = getCurrentObject();
+				if(target.selected){
+					
+					
+					if(chkCRM!=target){
+						chkCRM.selected=!target.selected;
+					}
+					if(chkG2G!=target){
+						chkG2G.selected=!target.selected;
+					}
+					obj['crm']=chkCRM.selected;
+					
+				}else{
+					delete obj['crm'];
+				}
+				enableBtnContinue();
+			}
+			
+			private function next():void{
+				
+				currentIndex=currentIndex+1;
+				if(currentIndex>datas.length-1){
+					currentIndex=datas.length-1;
+				}
+				
+				selectCheckBoxByCurrentRecord();
+				
+				createScreen();
+			}
+			
+			private function selectCheckBoxByCurrentRecord(){
+				var obj:Object= getCurrentObject();
+				if(obj.hasOwnProperty('crm')){
+					chkCRM.selected = obj.crm;
+					chkG2G.selected = !obj.crm;
+					
+				}else{
+					chkCRM.selected =false;
+					chkG2G.selected = false;
+				}
+			}
+			
+			private function previouse():void{
+				
+				
+				currentIndex=currentIndex-1;
+				if(currentIndex<0){
+					currentIndex=0;
+				}
+				selectCheckBoxByCurrentRecord();
+				createScreen();
+			}
+			
+			private function setTitle(title:String):void {
+				this.title = title;
+				titlebar.title=title;
+			}
+			
+			private function setIcon(entity:String):void {
+				var customLayout:Object = Database.customLayoutDao.readSubtype(entity, 0);
+				var iconName:String = customLayout.custom_layout_icon;
+				titlebar.icon = ImageUtils.getIconByName(iconName);
+				
+				if(CustomRecordTypeServiceDAO.isCustomObject(entity) || Database.preferencesDao.isModernIcon()){
+					var oodIcon:Class =  Database.customRecordTypeServiceDao.readIcon(entity);
+					if(oodIcon){
+						titlebar.icon = oodIcon;
+					}
+				}
+				
+				if(!StringUtils.isEmpty(customLayout.background_color)){
+					titlebar.setStyle("backgroundColor", customLayout.background_color);
+				}else{
+					var titleBarColor:String = Database.preferencesDao.getValue(PreferencesDAO.BACKGROUND_COLOR) as String; 
+					if(!StringUtils.isEmpty(titleBarColor)) titlebar.setStyle('backgroundColor',titleBarColor);					
+				}
+			} 
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	
+	<mx:Canvas width="100%" height="100%" horizontalScrollPolicy="off" styleName="main" left="0" top="0" bottom="0">
+		<control:TitleBar id="titlebar" y="2" x="25" closeable="false"/>
+		<mx:VBox width="100%" height="100%" paddingTop="35" paddingBottom="10" paddingLeft="10" paddingRight="10">
+			<mx:Panel title="{i18n._('SELECT_MOST_ACCURATE_DATA_SET@Select the most accurate data set')}" width="100%" fontSize="16" fontWeight="bold" height="100%">
+				<mx:VBox width="100%" height="100%" fontSize="10" fontWeight="normal">
+					<mx:HBox width="100%" height="100%">
+						<mx:VBox width="50%" height="100%">
+							
+								<mx:CheckBox id="chkG2G" label="{i18n._('YOURS_G2G@Your G2G')}" color="#87CEEB" textAlign="center"  width="100%" fontSize="16" fontWeight="bold" click="chkClieckEvent(event)"/>							
+							
+								<mx:Form id="frmLocal" width="100%" height="100%"/>
+						</mx:VBox>						
+						<mx:VRule height="100%"/>
+						<mx:VBox width="50%" height="100%">
+							<mx:CheckBox id="chkCRM"  label="{i18n._('CRM (The main system)')}"  color="#87CEEB" textAlign="center" width="100%" fontSize="16" fontWeight="bold" click="chkClieckEvent(event)"/>
+							<mx:Form id="frmServer" width="100%" height="100%"/>
+						</mx:VBox>
+						
+					</mx:HBox>
+					<mx:HBox id="hboxUndo" width="100%" horizontalAlign="center"/>
+				</mx:VBox>
+			</mx:Panel>
+			<mx:HBox width="100%" >
+				<mx:HBox width="100%" horizontalAlign="left" paddingTop="4" paddingRight="0">
+					<mx:Button id = "btnPreviouse" label="{i18n._('GLOBAL_PREVIOUS@Previous')}" click="previouse()" />
+					<mx:Button id = "btnNext" label="{i18n._('GLOBAL_NEXT@Next')}" click="next()" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center" paddingTop="4" paddingRight="0">
+					<mx:Label id ="numberof"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="right" paddingTop="4" paddingRight="8">
+					<mx:Button label="{i18n._('GLOBAL_CANCEL@Cancel')}" click="dispose()" />
+					<mx:Button id = "btnOk" label="{i18n._('CONTINUE@Continue')}" click="save()" enabled="false" />
+				</mx:HBox>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

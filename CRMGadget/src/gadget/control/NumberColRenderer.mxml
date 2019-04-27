@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+	<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+									  xmlns:s="library://ns.adobe.com/flex/spark" 
+									  xmlns:mx="library://ns.adobe.com/flex/mx" 
+									  focusEnabled="true">
+<fx:Script>
+		<![CDATA[
+			import gadget.util.CurrencyUtils;
+			import gadget.util.NumberUtils;
+			
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridItemRenderer;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+
+		public var column:AdvancedDataGridColumn;
+		private var grid:AdvancedDataGrid;
+		
+		override public function set data(value:Object):void{		
+			super.data = value;
+			if(column!=null && value){
+				var currency:String = super.data[column.dataField];
+				var val:String = "";
+				if(currency != "" ){
+					val = NumberUtils.format(super.data[column.dataField]);
+				}
+				
+				labelShow.text = val;
+			}
+		}
+		override public function set listData(value:BaseListData):void{
+			super.listData = value;
+			if(value!=null){
+				grid= value.owner as AdvancedDataGrid;
+				var listData:AdvancedDataGridListData = value as AdvancedDataGridListData;
+				if(listData!=null){					
+					column = grid.columns[listData.columnIndex];						
+				}
+				
+			}
+		}
+		
+	
+	]]>
+	</fx:Script>
+		<mx:Label id="labelShow" textAlign="right" width="100%" />
+	
+	</s:MXAdvancedDataGridItemRenderer>

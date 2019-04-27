@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:control="gadget.control.*" 
+		   xmlns:MyValidate="gadget.util.*"
+		   width="500" height="400" verticalAlign="middle"
+		   resizable="false"
+		   title="{i18n._('REPORTLIST_TITLEBAR_TITLE_REPORT_LIST')}" 
+		   creationComplete="init();"
+		   showFlexChrome="false" transparent="true" systemChrome="none">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.ButtonBar;
+			import mx.events.ItemClickEvent;
+			
+			private static var EDIT_STR:String = i18n._('GLOBAL_EDIT');
+			private static var CLOSE_STR:String = i18n._('GLOBAL_CLOSE');
+			private static var DELETE_STR:String = i18n._('GLOBAL_DELETE');
+			private static var NEW_STR:String = i18n._('GLOBAL_NEW');
+			
+			private static var DELETE_DIALOG_MSG_STR:String = i18n._('REPORTLIST_DELETE_DIALOG_MSG_STR');
+			//CRO 05.01.2011
+			private static var MISSING_FILTER_DIALOG_MSG_STR:String = i18n._('GLOBAL_FILTER_HAS_DELETED_REPORT_CAN_NOT_PROGRESS');
+			
+			private function init():void{
+				initData();
+				initButtons();
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			public function initData():void{
+				reportGrid.dataProvider= Database.reportDAO.selectAll();
+			}
+			
+			private function initButtons():void {
+				actionButton.removeAllChildren();
+				var buttonBar:ButtonBar = new ButtonBar();
+				buttonBar.setStyle("right", "0");
+				var obj:Object = null;
+				var buttons:ArrayCollection = new ArrayCollection();
+				
+				buttons.addItem({label: CLOSE_STR, icon:ImageUtils.cancelIcon}); 
+				buttons.addItem({label: NEW_STR, icon: ImageUtils.addIcon});
+				buttons.addItem({label: EDIT_STR, icon: ImageUtils.editIcon});
+				buttons.addItem({label: DELETE_STR, icon: ImageUtils.deleteIcon});
+				
+				buttonBar.dataProvider = buttons;
+				buttonBar.addEventListener(ItemClickEvent.ITEM_CLICK, handleButtonBar);
+				
+				actionButton.addChild(buttonBar);
+			}
+			
+			private function handleButtonBar(event:ItemClickEvent):void{
+				if(event.label == CLOSE_STR){
+					this.close();
+				}else if(event.label == DELETE_STR){
+					deleteReportItem();
+				}else{
+					openReportDetail(event.label);
+				}
+			}
+			
+			private function deleteReportItem():void{
+				if(reportGrid.selectedItems.length > 0){
+					var reportSelected:Object = reportGrid.selectedItem;
+					var criteria:Object = new Object();
+					// CH : SelectedItem of DataGrid have include mx_uid in the object
+					criteria.id = reportSelected.id;
+					Database.reportDAO.delete_(criteria);
+					Database.reportFieldsDAO.delete_(criteria);
+					initData();
+				}else{
+					Alert.show(DELETE_DIALOG_MSG_STR, "", Alert.OK, this);
+				}
+			}
+			
+			private function openReportDetail(mode:String = "update"):void{
+				var reportDetail:ReportDetail = new ReportDetail();
+				reportDetail.reportList = this;
+				if(mode == NEW_STR){
+					reportDetail.isCreate = true;
+					reportDetail.reportItem = new Object();
+				}else{
+					if(reportGrid.selectedItems.length == 0) return;
+					reportDetail.isCreate = false;
+					var object:Object = reportGrid.selectedItem;
+					var objectReport:Object = new Object();
+					objectReport.id = object.id;
+					objectReport.name = object.name;
+					objectReport.entity = object.entity;
+					objectReport.filter_id = object.filter_id;
+					reportDetail.reportItem = objectReport;
+				}
+				WindowManager.openModal(reportDetail);
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="500" height="400" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/report_builder.png')" title="{i18n._('REPORTLIST_TITLEBAR_TITLE_REPORT_LIST')}"/>
+		<mx:VBox top="40" left="8" right="8" bottom="8" width="100%" height="100%">
+			<mx:DataGrid id="reportGrid" width="100%" height="100%" doubleClickEnabled="true" doubleClick="openReportDetail()">
+				<mx:columns><!--CRO 05.01.2011-->
+					<mx:DataGridColumn headerText="{i18n._('GLOBAL_NAME')}" dataField="name" width="190" minWidth="190" />
+					<mx:DataGridColumn headerText="{i18n._('GLOBAL_ENTITY')}" dataField="entity" />
+					<mx:DataGridColumn sortable="false" width="100" minWidth="100" textAlign="center">
+						<mx:headerText>{i18n._('REPORTLIST_DATAGRIDCOLUMN_HEADERTEXT_PROCESS_REPORT')}</mx:headerText>
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox paddingLeft="22" horizontalGap="20">
+									<mx:Script>
+										<![CDATA[
+											import gadget.dao.Database;
+											import gadget.i18n.i18n;
+											import gadget.util.CSVUtils;
+											import gadget.util.FieldUtils;
+											import gadget.util.PDFUtil;
+											import gadget.util.StringUtils;
+											import gadget.util.Utils;
+											
+											import mx.collections.ArrayCollection;
+											import mx.controls.Alert;
+
+											protected function runReport(event:MouseEvent):void{
+												var image:Image = event.currentTarget as Image;
+												if(Database.filterDao.findFilter(data.filter_id))
+													exportTo(image.data.toString());
+												else{
+													var reportList:ReportList = image.parentApplication as ReportList;
+													//CRO 05.01.2011
+													Alert.show(i18n._('GLOBAL_FILTER_HAS_DELETED_REPORT_CAN_NOT_PROGRESS'), "", Alert.OK, reportList);
+												}
+											}
+											private function buttonExportClick(b:Boolean):void{
+												expCSV.enabled = b;
+											}
+											private function exportTo(label:String):void{
+												var filterObject:Object = Database.filterDao.findFilter(data.filter_id);
+												var criteria:Object = new Object();
+												criteria.id = data.id;
+												var columns:ArrayCollection = new ArrayCollection(Database.reportFieldsDAO.fetch(criteria));
+												var dataSource:ArrayCollection = Database.getDao(data.entity).findAll(columns, FieldUtils.computeFilter(filterObject), null, 0);
+												Utils.parseDateTime(data.entity, columns, dataSource);
+												Utils.parsePicklistValues(data.entity, columns, dataSource);
+												if(label=="pdf"){
+													Utils.showLoadingProgressWindow(function ():void{
+														PDFUtil.listToPDF(
+															data.entity,
+															filterObject.type.toString(),
+															dataSource,
+															columns.toArray()
+														)
+													}, i18n._(StringUtils.LOADING_STR), i18n._(StringUtils.ATTACHMENTS_STR));
+												}else{
+													Utils.showLoadingProgressWindow(function ():void{
+														CSVUtils.listToCSV(
+															data.entity,
+															filterObject.type.toString(),
+															dataSource,
+															buttonExportClick,
+															columns.toArray()
+															
+														)
+													}, i18n._(StringUtils.LOADING_STR), i18n._(StringUtils.ATTACHMENTS_STR));
+												}
+											}
+										
+										]]>
+									</mx:Script>
+									<mx:Image source="@Embed(source='/assets/pdficon.gif')" data="pdf" click="runReport(event)" toolTip="{i18n._('REPORTLIST_IMAGE_TOOLTIP_RUN_AS_PDF')}" />
+									<mx:Image id="expCSV" source="@Embed(source='/assets/csvicon.gif')" data="csv" click="runReport(event)" toolTip="{i18n._('REPORTLIST_IMAGE_TOOLTIP_RUN_AS_CSV')}" />	
+								</mx:HBox>
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox id="actionButton" horizontalAlign="right" width="100%"/>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

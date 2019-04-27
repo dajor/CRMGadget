@@ -1,0 +1,2385 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:list="gadget.lists.*"
+	xmlns:control="gadget.control.*" 
+	xmlns:containers="flexlib.containers.*"
+	layout="absolute" 
+	alwaysInFront="false"
+	title="CRM Gadget"
+	showFlexChrome="false" transparent="true" systemChrome="none" 
+	showStatusBar="false" 
+	width="1060" height="700" 
+	cornerRadius="0"
+	windowResize="checkTips()"
+	initialize="initial()"
+	creationComplete="createCompletedAction()"
+	visible="true" xmlns:s="library://ns.adobe.com/flex/spark" xmlns:layout="flexlib.scheduling.scheduleClasses.layout.*" xmlns:code="http://code.google.com/p/flexlib/"
+	close="OOPSwindow.bye();"
+	resizable="true"
+	minHeight ="640" 
+	minWidth="1020"
+	> 
+	<mx:Script>
+		<![CDATA[
+			import air.update.ApplicationUpdaterUI;
+			import air.update.events.UpdateEvent;
+			
+			import com.assessment.AssessmentConfLayout;
+			import com.assessment.AssessmentConfiguration;
+			
+			import flashx.textLayout.formats.Float;
+			
+			import gadget.control.CloseableToolTip;
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.lists.ReportList;
+			import gadget.service.RightService;
+			import gadget.service.UserService;
+			import gadget.sync.SyncProcess;
+			import gadget.sync.incoming.GetOwnerUser;
+			import gadget.sync.task.LoginCRM;
+			import gadget.sync.task.TaskParameterObject;
+			import gadget.util.ActivityDataUtils;
+			import gadget.util.CacheUtils;
+			import gadget.util.DateUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.ImportFileOODUtils;
+			import gadget.util.InputFormUtils;
+			import gadget.util.PDFUtil;
+			import gadget.util.PreferenceUtils;
+			import gadget.util.Relation;
+			import gadget.util.SodUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.ArrayList;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.LinkButton;
+			import mx.controls.Menu;
+			import mx.core.UIComponent;
+			import mx.core.Window;
+			import mx.events.CloseEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.DragManager;
+			import mx.utils.Base64Decoder;
+			import mx.utils.StringUtil;
+			public static const AUTO_NEXT_SYNC:String = "Auto Next Sync";
+			public static const LABEL_DAILY_AGENDA:String = i18n._("GLOBAL_DAILY_AGENDA");
+			public static const LABEL_DASHBORD:String = i18n._("GLOBAL_DASHBOARD");
+			public static const LABEL_CHAT:String = i18n._("GLOBAL_CHAT");
+			public static const DASHBOARD:String = "Dashboard";
+			public static const REVENUE_REPORT:String = "RevenueReport";
+			public static const LABEL_REVENUE_REPORT:String = "Revenue Report";
+			// CH 24-July-2013
+			public static const DASHBOARD_REPORT:String = "DashboardReport";
+			public static const LABEL_DASHBORD_REPORT:String = "Dashboard Segment & Target";
+			
+			public static const VISIT_CUSTOMER:String = "VisitCustomer";
+			public static const LABEL_VISIT_CUSTOMER:String = i18n._("GLOBAL_VISIT_CUSTOMER@Visit Customer");
+			
+			public static const CHAT:String = "Chat";
+			public static const DAILY_AGENDA:String = "DailyAgenda";
+			public static const mapCustomTab:Object = {Dashboard:"Dashboard",RevenueReport:"RevenueReport",Chat:"Chat",DailyAgenda:"DailyAgenda", DashboardReport: "DashboardReport",VisitCustomer:"VisitCustomer"}
+			//CRO 05.01.2011
+			private const MAINWINDOW_MENU_VIEW:String = 'GLOBAL_VIEW' ;
+			private const GLOBAL_CREATE:String = 'GLOBAL_CREATE';
+			private const MAINWINDOW_MENU_ITEM:String = 'MAINWINDOW_MENU_ITEM';
+			//CRO 05.01.2011
+			private const MAINWINDOW_MENU_LAYOUT:String = 'GLOBAL_LAYOUT';
+			private const MAINWINDOW_MENU_TOOLS:String = 'MAINWINDOW_MENU_TOOLS';
+			private const MAINWINDOW_MENU_RECENTLY_VIEWED:String = 'MAINWINDOW_MENU_RECENTLY_VIEWED';
+			private const MAINWINDOW_MENU_HELP:String = 'MAINWINDOW_MENU_HELP';
+			//CRO 05.01.2010
+			private const MAINWINDOW_BUTTON_PREFERENCES:String = 'GLOBAL_PREFERENCES';
+			private const MAINWINDOW_BUTTON_SYNCHRONIZE_DATA:String = 'MAINWINDOW_BUTTON_SYNCHRONIZE_DATA';
+			//CRO 05.01.2011
+			private const MAINWINDOW_BUTTON_QUICK_SEARCH:String = 'GLOBAL_QUICK_SEARCH';
+			private const MAINWINDOW_ALERT_LOGO_ERROR_MSG:String = 'MAINWINDOW_ALERT_LOGO_ERROR_MSG';
+			
+			// Menu Item
+			[Embed(source='/assets/edit.png')] [Bindable] public var editIcon:Class;
+			[Embed(source='/assets/link.png')] [Bindable] public var linkIcon:Class;
+			[Embed(source='/assets/delete.png')] [Bindable] public var deleteIcon:Class;
+			[Embed(source='/assets/add.png')] [Bindable] public var addIcon:Class;
+			[Embed(source='/assets/report.png')] [Bindable] public var reportIcon:Class;
+			[Embed(source='/assets/epadSign.png')] [Bindable] public var epadSignIcon:Class;
+			[Embed(source='/assets/pdficon.gif')] [Bindable] public var groupingIcon:Class;
+			[Embed(source='/assets/clipboard.png')] [Bindable] public var clipboardIcon:Class;
+			[Embed(source='/assets/mail_icon.png')] [Bindable] public var emailIcon:Class;
+			[Embed(source='/assets/printer.png')] [Bindable] public var printerIcon:Class;
+			[Embed(source='/assets/green_circle.png')] [Bindable] public var priorityIcon:Class;
+			[Embed(source='/assets/custom/si_appointments16.gif')] [Bindable] public var typeIcon:Class;
+			[Embed(source='/assets/field.png')] [Bindable] public var fieldManagentIcon:Class;
+			
+			[Embed(source='/assets/info.png')] [Bindable] public var infoIcon:Class;
+			
+			[Embed(source='/assets/netbreeze_small.png')] [Bindable] public var netbreezeSmallIcon:Class;
+			private const GLOBAL_EDIT:String = 'GLOBAL_EDIT';
+			//CRO 05.01.2011
+			private const MAINWINDOW_SUBMENU_LINK:String = 'GLOBAL_LINK';
+			private const GLOBAL_DELETE:String = 'GLOBAL_DELETE';
+			private const MAINWINDOW_SUBMENU_BATCH_INSERT:String = 'GLOBAL_BATCH_INSERT';
+			private const MAINWINDOW_SUBMENU_BATCH_INSERT_TITLE:String = 'MAINWINDOW_SUBMENU_BATCH_INSERT_TITLE';
+			private const MAINWINDOW_SUBMENU_BATCH_UPDATE:String = 'GLOBAL_BATCH_UPDATE';
+			
+			private const MAINWINDOW_TOOLTIP_LIST:String = 'GLOBAL_LIST';
+			
+			private const MAINWINDOW_MENUITEM_VIEW:String = 'GLOBAL_VIEW';
+			private const GLOBAL_NEW:String = 'GLOBAL_NEW';
+			private const MAINWINDOW_TOOLTIP_PLEASE_SETUP:String = 'MAINWINDOW_TOOLTIP_PLEASE_SETUP';
+			private const MAINWINDOW_TOOLTIP_NO_LOCAL_DATA:String = 'MAINWINDOW_TOOLTIP_NO_LOCAL_DATA';
+			private const MAINWINDOW_TOOLTIP_PLEASE_SYNCHRONIZE:String = 'MAINWINDOW_TOOLTIP_PLEASE_SYNCHRONIZE';			
+			
+			// Menu Tool
+			[Embed(source='/assets/icon_update.png')] [Bindable] public var updateIcon:Class;
+			[Embed(source='/assets/preferences.png')] [Bindable] public var preferencesIcon:Class;
+			[Embed(source='/assets/search.png')] [Bindable] public var searchIcon:Class;
+			[Embed(source='/assets/sync.png')] [Bindable] public var syncIcon:Class;
+			[Embed(source='/assets/chart_bar.png')] [Bindable] public var chartIcon:Class;
+			[Embed(source='/assets/customize.png')] [Bindable] public var listLayoutIcon:Class;
+			[Embed(source='/assets/daily_agenda.png')] [Bindable] public var dailyAgendaIcon:Class;
+			[Embed(source='/assets/report_builder.png')] [Bindable] public var reportBuilderIcon:Class;
+			[Embed(source='/assets/tree_map.png')] [Bindable] public var treeMapIcon:Class;
+			[Embed(source='/assets/cake.png')] [Bindable] public var cakeIcon:Class;
+			//CRO 05.01.2011
+			private const MAINWINDOW_SUBMENU_QUICK_SEARCH:String = 'GLOBAL_QUICK_SEARCH';
+			private const MAINWINDOW_SUBMENU_SYNCHRONIZE:String = 'GLOBAL_SYNCHRONIZE';
+			//CRO 05.01.2011
+			private const MAINWINDOW_SUBMENU_PREFERENCES:String = 'GLOBAL_PREFERENCES';
+			private const MAINWINDOW_SUBMENU_CHARTS:String = 'GLOBAL_CHARTS';
+			private const MAINWINDOW_SUBMENU_LIST_LAYOUT:String = 'MAINWINDOW_SUBMENU_LIST_LAYOUT';
+			//CRO 05.01.2011
+			private const MAINWINDOW_SUBMENU_CUSTOM_LAYOUT:String = 'GLOBAL_CUSTOM_LAYOUT';
+			//CRO 05.01.2011
+			private const MAINWINDOW_SUBMENU_VIEW_LAYOUT:String = 'GLOBAL_VIEW_LAYOUT';
+			private const MAINWINDOW_SUBMENU_DAILY_AGENDA:String = 'GLOBAL_DAILY_AGENDA';
+			private const MAINWINDOW_SUBMENU_REPORT_BUILDER:String = 'GLOBAL_REPORT_BUILDER';
+			private const GLOBAL_BIRTHDAY_LIST:String = 'GLOBAL_BIRTHDAY_LIST';
+			private const MAINWINDOW_SUBMENU_TREE_MAP:String = 'GLOBAL_TREE_MAP';
+			private const MAINWINDOW_SUBMENU_SIGNATURE:String = 'GLOBAL_SIGNATURE';
+			private const MAINWINDOW_SUBMENU_INITIALIZENEWDB:String = 'Initialize New DB';
+			public static const MAINWINDOW_SUBMENU_FIELDMANAGMENT:String = 'GLOBAL_CUSTOM_FIELDS_MANAGEMENT';
+			public static const MAINWINDOW_SUBMENU_VALIDATION_RULE:String = 'GLOBAL_VALIDATION_RULE';
+			private const MAINWINDOW_SUBMENU_REPORTS:String = 'MAINWINDOW_SUBMENU_REPORTS';
+			private const MAINWINDOW_SUBMENU_REPORTS_GROUPING_PDF:String = 'MAINWINDOW_SUBMENU_REPORTS_GROUPING_PDF';
+			// Menu Help
+			[Embed(source='/assets/call.png')] [Bindable] public var supportIcon:Class;
+			[Embed(source='/assets/help.png')] [Bindable] public var helpIcon:Class;
+			[Embed(source='/assets/about.png')] [Bindable] public var aboutIcon:Class;
+			[Embed(source='/assets/info.png')] [Bindable] public  var ideaIcon:Class;
+			private const MAINWINDOW_SUBMENU_HELP_CONTENTS:String = 'MAINWINDOW_SUBMENU_HELP_CONTENTS';
+			private const MAINWINDOW_SUBMENU_IDEAS_ON_DEMAND:String = 'IDEAS_ON_DEMAND';
+			//CRO 05.01.2011
+			private const MAINWINDOW_SUBMENU_SUPPORT:String = 'GLOBAL_SUPPORT';
+			private const MAINWINDOW_SUBMENU_ABOUT:String = 'MAINWINDOW_SUBMENU_ABOUT';
+			private const GLOBAL_APPLICATION_UPDATE:String = 'GLOBAL_APPLICATION_UPDATE';
+			
+			public static const MAINWINDOW_SUBMENU_ASSESSMENT_CONFIGURATION:String = 'ASSESSMENT_CONFIGURATION';
+			
+			private var navigateHistory:ArrayCollection= new ArrayCollection();
+			public var syncProcess:SyncProcess = null;
+			
+			private var appUpdater:ApplicationUpdaterUI = new ApplicationUpdaterUI();
+			
+			private var viewMenuData:Array = new Array();
+			private var createMenuData:Array = new Array();
+			
+			private var menuTabData:Array = new Array();
+			
+			public var crmGadget:CRMGadget;
+			
+			public var chatClientControl:ChatClientControl;
+			
+			private var upperBarMenu:Menu;
+			
+			private var tabMenu:Menu;
+			
+			private var timeSync:Timer;
+			
+			private var oBookmark:Object;
+			public var isUpdateTransaction:Boolean;
+			private var activityEntityIsEnabled:Boolean = false;
+			private var _interface_as_icon:Boolean;
+			private var _currentSelectedList:List;
+			private var selectedEntity:String=null;
+			
+			public var isActivityCalendar:Boolean=false;
+			
+			public var refreshDashboard:Function ;
+			
+			
+			
+			//menubar
+			
+			private var itemMenuData:Array =[
+				{ data:GLOBAL_EDIT, label:i18n._(GLOBAL_EDIT) + ' - E', icon:editIcon},
+				{data:MAINWINDOW_SUBMENU_LINK, label:i18n._(MAINWINDOW_SUBMENU_LINK) + ' - L', icon:linkIcon},
+				{data:GLOBAL_DELETE, label:i18n._(GLOBAL_DELETE) + ' - D', icon:deleteIcon}				
+			];
+			private var layoutsMenuData:Array=[			
+				
+				{data:MAINWINDOW_SUBMENU_LIST_LAYOUT,label:i18n._(MAINWINDOW_SUBMENU_LIST_LAYOUT),icon:listLayoutIcon},
+				{data:MAINWINDOW_SUBMENU_CUSTOM_LAYOUT,label:i18n._(MAINWINDOW_SUBMENU_CUSTOM_LAYOUT),icon:listLayoutIcon},
+				{data:MAINWINDOW_SUBMENU_VIEW_LAYOUT,label:i18n._(MAINWINDOW_SUBMENU_VIEW_LAYOUT),icon:listLayoutIcon}
+				
+			];
+			private var toolsMenuData:Array =
+				[
+					{data:MAINWINDOW_SUBMENU_QUICK_SEARCH,label:i18n._(MAINWINDOW_SUBMENU_QUICK_SEARCH) + ' - F3',icon:searchIcon},
+					{data:MAINWINDOW_SUBMENU_SYNCHRONIZE,label:i18n._(MAINWINDOW_SUBMENU_SYNCHRONIZE),icon:syncIcon},
+					{data:MAINWINDOW_SUBMENU_PREFERENCES,label:i18n._(MAINWINDOW_SUBMENU_PREFERENCES),icon:preferencesIcon},
+					{data:MAINWINDOW_SUBMENU_CHARTS,label:i18n._(MAINWINDOW_SUBMENU_CHARTS),icon:chartIcon},
+					
+					
+					{data:MAINWINDOW_SUBMENU_BATCH_INSERT,label:i18n._(MAINWINDOW_SUBMENU_BATCH_INSERT_TITLE) + ' - I',icon:addIcon},
+					{data:MAINWINDOW_SUBMENU_BATCH_UPDATE,label:i18n._(MAINWINDOW_SUBMENU_BATCH_UPDATE) + ' - B',icon:editIcon},
+					{data:MAINWINDOW_SUBMENU_REPORT_BUILDER,label:i18n._(MAINWINDOW_SUBMENU_REPORT_BUILDER),icon:reportBuilderIcon},
+					{data:MAINWINDOW_SUBMENU_TREE_MAP,label:i18n._(MAINWINDOW_SUBMENU_TREE_MAP),icon:treeMapIcon}
+					
+				];
+			private var  helpMenuData:Array =[
+				
+				{data:MAINWINDOW_SUBMENU_SUPPORT,label:i18n._(MAINWINDOW_SUBMENU_SUPPORT),icon:supportIcon},
+				{data:MAINWINDOW_SUBMENU_HELP_CONTENTS,label:i18n._(MAINWINDOW_SUBMENU_HELP_CONTENTS) + ' - F1',icon:helpIcon},
+				{data:MAINWINDOW_SUBMENU_IDEAS_ON_DEMAND,label:i18n._(MAINWINDOW_SUBMENU_IDEAS_ON_DEMAND),icon:ideaIcon},
+				{data:MAINWINDOW_SUBMENU_ABOUT,label:i18n._(MAINWINDOW_SUBMENU_ABOUT) + ' CRMGadget2Go',icon:aboutIcon}
+			];
+			
+			private var helpMenuDataUpdateApp:Array=[//Bug #1477 CRO-->
+				
+				{data:MAINWINDOW_SUBMENU_SUPPORT,label:i18n._(MAINWINDOW_SUBMENU_SUPPORT),icon:supportIcon},
+				{data:GLOBAL_APPLICATION_UPDATE,label:i18n._(GLOBAL_APPLICATION_UPDATE),icon:updateIcon},
+				{data:MAINWINDOW_SUBMENU_HELP_CONTENTS,label:i18n._(MAINWINDOW_SUBMENU_HELP_CONTENTS) + ' - F1',icon:helpIcon},
+				{data:MAINWINDOW_SUBMENU_IDEAS_ON_DEMAND,label:i18n._(MAINWINDOW_SUBMENU_IDEAS_ON_DEMAND),icon:ideaIcon},
+				{data:MAINWINDOW_SUBMENU_ABOUT,label:i18n._(MAINWINDOW_SUBMENU_ABOUT) + ' CRMGadget2Go',icon:aboutIcon}
+			];
+			
+			
+			
+			
+			
+			
+			//#934 show warning message when close main form for TCS JD user CRO
+			public function closeMain():void{
+				var isCleanDB:Boolean ;
+				var lst:ArrayCollection = Utils.checkWarningServiceRequest();
+				var autoSyncDate:Object = Database.lastsyncDao.find(AUTO_NEXT_SYNC);
+				var nowTime:Number = new Date().getTime();
+				if( lst != null && lst.length >0){
+					Alert.show(i18n._("SERVICE_JD_REQUIRE_PDF_ATT"),i18n._("SYNCHRONIZE_ALERT_WARNING"), Alert.OK | Alert.CANCEL, this, onClosingEvent, null, Alert.OK);	
+				}else if(Database.preferencesDao.isEnableAUTO_SYNC() && autoSyncDate != null && parseFloat(autoSyncDate.sync_date)<nowTime){
+					Alert.show(i18n._("START_SYNC_BEFORE_CLOSING_G2G"),i18n._("SYNCHRONIZE_ALERT_WARNING"), Alert.OK | Alert.CANCEL, this, onSyncEvent, null, Alert.OK);
+				}else{
+					
+					cleanDatabaseAndExit();
+				}
+				
+				
+			}
+			
+			private function createCompletedAction():void{
+				importDefaultXMLfile(); 
+				manageNavPanelView(); 
+				updateTransactions(); 
+				init() ;
+				checkExpired(); 
+				initKeyHandler();
+				if(this._currentSelectedList!=null){
+					selectList(_currentSelectedList.entity);//refresh selected list
+				}else{
+					selectList(null);
+				};
+			}
+			
+			
+			
+			private function cleanDatabaseAndExit():void{
+				
+				Utils.showLoadingProgressWindow(function():void{
+					Database.cleanDb();
+					close();
+				},i18n._("WE_ARE_OPTIMIZING_THE_DATABASE_APPLICTION_IS_CLOSED"),"Shutdown",400);
+			}
+			public function onClosingEvent(eventObj:CloseEvent):void{
+				if (eventObj.detail==Alert.OK) {
+					cleanDatabaseAndExit();
+				}
+				
+			}
+			
+			public function onSyncEvent(eventObj:CloseEvent):void{
+				if (eventObj.detail==Alert.OK) {
+					openSyncWindowAuto();
+				}else if(eventObj.detail==Alert.CANCEL){
+					close();
+				}
+				
+			}
+			
+			public function initKeyHandler():void {
+				systemManager.stage.addEventListener(KeyboardEvent.KEY_UP, keysUpHandler);
+				systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN, keysDownHandler);
+			}
+			
+			public function notifyList():void {
+				crmGadget.ready(); 
+			}
+			
+			
+			private function keysDownHandler(event:KeyboardEvent):void{
+				if(event.altKey && event.keyCode != Keyboard.ALTERNATE){
+					var myMenu:Menu;
+					var index:int = -1;
+					if(upperBarMenu!=null){
+						upperBarMenu.hide();
+					}
+					
+					switch(event.keyCode){
+						case Keyboard.V:
+							upperBarMenu = Menu.createMenu(this, viewMenuData, false);
+							index = 0;
+							break;
+						case Keyboard.C:
+							upperBarMenu = Menu.createMenu(this, createMenuData, false);
+							index = 1;
+							break;
+						case Keyboard.I:
+							upperBarMenu = Menu.createMenu(this, getItemMenuData(), false);
+							index = 2;
+							break;
+						case Keyboard.L:
+							upperBarMenu = Menu.createMenu(this, layoutsMenuData, false);
+							index = 3;
+							break;
+						case Keyboard.T:
+							upperBarMenu = Menu.createMenu(this, getToolsMenuData(), false);
+							index = 4;
+							break;
+						case Keyboard.R:
+							upperBarMenu = Menu.createMenu(this, getRecentlyViewedItem(), false);
+							index = 5;
+							break;
+						case Keyboard.H:
+							upperBarMenu = Menu.createMenu(this, Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_APPLICATION_UPDATE) ? helpMenuDataUpdateApp : helpMenuData, false);
+							index = 6;
+							break;
+						
+					}
+					
+					if(index > -1){
+						upperBarMenu.iconField="icon";
+						upperBarMenu.labelField="label";
+						upperBarMenu.id = (menuToolbar.dataProvider as ArrayCollection).getItemAt(index) + "menuToolbar";
+						var children:LinkButton  = menuToolbar.getChildAt(index) as LinkButton;
+						var p:Point = menuToolbar.localToGlobal(new Point(children.x, children.y + children.height));
+						upperBarMenu.addEventListener(MenuEvent.ITEM_CLICK, menuAction);
+						upperBarMenu.show(p.x, p.y);
+					}
+				}
+			}
+			private var fFull:Boolean = false;
+			private function keyHandleViewFullMode():void{
+				
+				windowTitleBar.visible = fFull;
+				windowTitleBar.includeInLayout = fFull;
+				contMenu.top = fFull?28:0; 
+				if(fFull){
+					stage.displayState=stage.nativeWindow.displayState;
+					fFull = false;
+				}else{
+					fFull = true;
+					stage.displayState=StageDisplayState.FULL_SCREEN_INTERACTIVE;
+				}				
+			}
+			private function keysUpHandler(event:KeyboardEvent):void
+			{
+				//			if( event.keyCode == Keyboard.F4 && event.altKey == true ) this.close();
+				switch(event.keyCode) {
+					case Keyboard.F1:
+						openHelp();
+						break;
+					case Keyboard.F3:
+						openQuickSearchWindow();
+						break;
+					case Keyboard.F11:
+						keyHandleViewFullMode();
+						break;
+				}
+			}
+			
+			
+			public function fieldComplete():void {
+				for each(var list:List in navigator.getChildren()) {
+					list.initGridColumns();
+				}
+				checkTips();
+			}		
+			
+			public function getListByEntity(entity:String):List{
+				for each(var list:List in navigator.getChildren()) {
+					if(list.entity==entity){
+						return list;
+					};
+				}
+				return null;
+			}
+			private function createLastSync():void {
+				var tomorrow:Date = new Date();
+				tomorrow.setTime(tomorrow.getTime() + (1000 * 60 * 60 * 24 ));
+				
+				var task_name:String = AUTO_NEXT_SYNC;
+				var syncObject:Object = Database.lastsyncDao.find(task_name); 
+				if(syncObject == null){
+					syncObject = new Object();
+					syncObject.task_name = task_name;
+					syncObject.sync_date = tomorrow.getTime(); //next sync date
+					syncObject.start_row = 0;
+					syncObject.start_id = '';
+					Database.lastsyncDao.insert(syncObject);
+				}else{
+					syncObject.sync_date = tomorrow.getTime(); //next sync date
+					Database.lastsyncDao.update(syncObject);
+				}
+			}
+			
+			public function syncEnd(isUpdateTrans:Boolean=true):void {
+				createLastSync();
+				syncBtn1.visible = false;
+				syncBtn1.includeInLayout = false;
+				syncBtn2.visible = true;
+				syncBtn2.includeInLayout = true;
+				//don't need to refresh all list because when change tab it is auto refresh-----------mony
+				//				for each(var list:List in navigator.getChildren()) {
+				//					list.initGridColumns();
+				//					list.filterData();
+				//					list.initCalendar(); // Bug #213
+				//					// CH # Bug 254
+				//					list.detail.init();
+				//				}
+				if(isUpdateTransaction && isUpdateTrans){
+					updateTransactions();	
+					if(this._currentSelectedList!=null){
+						selectList(_currentSelectedList.entity);//refresh selected list
+					}else{
+						selectList(null);
+					};
+				}else{
+					if(this._currentSelectedList!=null){
+						this._currentSelectedList.loadData();
+					}
+				}
+				checkTips();
+				
+			}
+			
+			private function onError(event:ErrorEvent):void {
+				Alert.show(event.toString(), "", Alert.OK, this);
+			}
+			
+			private function onUpdate(event:UpdateEvent):void {
+				appUpdater.checkNow(); // Go check for an update now
+			}
+			
+			
+			private var fMax:Boolean = false;
+			private var currentEntity:String;
+			
+			private var currentTip:CloseableToolTip;
+			
+			
+			private function viewRestoreMaxWindow():void {
+				if (fMax) {
+					fMax = false;
+					restore();
+				} else { 
+					fMax = true; 
+					maximize();
+				}
+				//checkTips();
+			}
+			//Bug #5521 CRO
+			private function assessmentConfiguration():void{
+				var ass:AssessmentConfiguration = new AssessmentConfiguration();
+				var titleBarColor:String = Database.preferencesDao.getValue(PreferencesDAO.BACKGROUND_COLOR) as String; 
+				ass.iAseesment = new AssessmentController();
+				ass.titleBarColor=titleBarColor;
+				ass.maximizable = true;
+				WindowManager.openModal(ass);
+			}
+			//Bug #1477 CRO
+			private function applicationUpdate():void{
+				// appUpdater.updateURL = "http://desktop.crm-gadget.com/update.xml"; // Server-side XML file describing update
+				// Change Request #184
+				appUpdater.updateURL = Database.preferencesDao.getStrValue("update_url", "http://desktop.crm-gadget.com/update.xml"); // Server-side XML file describing update
+				appUpdater.isCheckForUpdateVisible = false; // We won't ask permission to check for an update
+				appUpdater.addEventListener(UpdateEvent.INITIALIZED, onUpdate); // Once initialized, run onUpdate
+				appUpdater.addEventListener(ErrorEvent.ERROR, onError); // If something goes wrong, run onError
+				appUpdater.initialize(); // Initialize the update framework
+			}
+			
+			private function manageNavPanelView():void {
+				var navPanelStatus:String = Database.preferencesDao.getValue("navPanel.show") as String;
+				if(navPanelStatus == "0") switchFilterList();
+			}
+			
+			private function initial():void{
+				var nativeApp:NativeApplication = NativeApplication.nativeApplication;				
+				//nativeApp.idleThreshold = 10;				
+				nativeApp.addEventListener(Event.DEACTIVATE, userIdleHandler);
+				nativeApp.addEventListener(Event.ACTIVATE, userActiveHandler);	
+			}
+			
+			
+			private function userActiveHandler(e:Event):void
+			{
+				if(stage!=null){
+					var fRate:int = Database.preferencesDao.getIntValue(PreferencesDAO.FRAME_RATE,0);
+					if(fRate>0){
+						stage.frameRate = fRate;
+					}else{
+						stage.frameRate = 10;
+					}		
+				}
+				//trace("User came back.");
+			}
+			
+			private function userIdleHandler(e:Event):void
+			{
+				if(stage!=null)
+					stage.frameRate = 1;
+				//trace("User is idle");
+			}
+			[Bindable] private var appName:String = "";
+			public function refreshApplicationName():void{
+				var appInfo:Object = Utils.getAppInfo();
+				appName = Database.preferencesDao.getValue("application_name","") as String;
+				if(appName != null && appName !=""){
+					title = appName + " " + appInfo.version;
+					titleLabel.text = appName + " " + appInfo.version;
+				}else{
+					title = appInfo.name + " " + appInfo.version;
+					titleLabel.text = appInfo.name + " " + appInfo.version;
+				}
+			}
+			private function init():void {				
+				// find all cascading picklist parent code.
+				var listEntity:ArrayCollection = Database.cascadingPicklistDAO.getAllCascadingEntity();
+				if(listEntity!=null && listEntity.length>0){
+					for each(var obj:Object in listEntity){
+						Database.cascadingPicklistDAO.find_cascading_parent(obj.entity);
+					}
+					var cache:CacheUtils = new CacheUtils("picklist_ood");
+					cache.clear();
+				}
+				
+				Alert.yesLabel = i18n._('SYNCHRONIZE_ALERT_YES');
+				Alert.noLabel = i18n._('SYNCHRONIZE_ALERT_NO');
+				PreferenceUtils.WindowScreenBounds(this);				
+				WindowManager.init(this);				
+				//activityAppointmentIcon = ImageUtils.getImage("Activity",1);
+				
+				// Find the current version and update the title accordingly	
+				var appInfo:Object = Utils.getAppInfo();
+				appName = Database.preferencesDao.getValue("application_name","") as String;
+				if(appName != null && appName !=""){
+					title = appName + " " + appInfo.version;
+					titleLabel.text = appName + " " + appInfo.version;
+				}else{
+					title = appInfo.name + " " + appInfo.version;
+					titleLabel.text = appInfo.name + " " + appInfo.version;
+				}
+				
+				
+				
+				
+				// load window logo.
+				refreshWindowLogo();
+				
+				navigator.addEventListener(Event.CHANGE, tabChangeListener);
+				navigator.addEventListener(Event.ACTIVATE, tabChangeListener);			
+				
+				//selectList(null);--mony this function already call in updateTransaction 
+				loadBookmarks();
+				checkTips();
+				
+				var preferences:Object = Database.preferencesDao.read();
+				if (preferences != null && !StringUtils.isEmpty(preferences.sodhost) && !StringUtils.isEmpty(preferences.sodlogin)
+					&& !StringUtils.isEmpty(preferences.sodpass) && preferences.sync_startup==1) {
+					executeSynchronize(null);
+					setTimerSyncInterval(preferences.syn_interval);
+				} 
+				var reportMenuITem:Object;
+				/*if(1){
+				var initDBMenuITem:XML = new XML ('<menuitem data="' + MAINWINDOW_SUBMENU_INITIALIZENEWDB + '" label="'+i18n._(MAINWINDOW_SUBMENU_INITIALIZENEWDB)+ '" icon="epadSignIcon" />');	
+				toolsMenuData.appendChild(initDBMenuITem);
+				}*/
+				
+				
+				var fieldManagementMenuITem:Object = {data: MAINWINDOW_SUBMENU_FIELDMANAGMENT ,label:i18n._(MAINWINDOW_SUBMENU_FIELDMANAGMENT), icon:fieldManagentIcon };	
+				toolsMenuData.push(fieldManagementMenuITem);
+				
+				var validationRuleMenuITem:Object = {data:MAINWINDOW_SUBMENU_VALIDATION_RULE , label:i18n._(MAINWINDOW_SUBMENU_VALIDATION_RULE),icon:fieldManagentIcon};	
+				toolsMenuData.push(validationRuleMenuITem);
+				
+				var assessmentConfigMenuITem:Object = {data: MAINWINDOW_SUBMENU_ASSESSMENT_CONFIGURATION , label:i18n._(MAINWINDOW_SUBMENU_ASSESSMENT_CONFIGURATION), icon:fieldManagentIcon};
+				
+				assessmentConfigMenuITem.enabled = Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_ASSESSMENT_SCRIPT);
+				toolsMenuData.push(assessmentConfigMenuITem);
+				if(UserService.DIVERSEY==UserService.getCustomerId()){
+					var hide_user_signature:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.HIDE_USER_SIGNATURE);
+					if(!hide_user_signature){
+						var signMenuITem:Object = {data:MAINWINDOW_SUBMENU_SIGNATURE ,label:i18n._(MAINWINDOW_SUBMENU_SIGNATURE),icon:epadSignIcon};	
+						toolsMenuData.push(signMenuITem);
+					}
+					
+					reportMenuITem = { data:"MAINWINDOW_SUBMENU_REPORTS" ,label:i18n._('GLOBAL_REPORTS'), icon:reportIcon,children: [
+						{data:"GLOBAL_BIRTHDAY_LIST" ,label:i18n._(GLOBAL_BIRTHDAY_LIST), icon:cakeIcon},
+						{data:"MAINWINDOW_SUBMENU_REPORTS_GROUPING_PDF", label:i18n._('GlOBALL_GROUPING_PDF'), icon:groupingIcon}]};		    
+					toolsMenuData.push(reportMenuITem);
+				}else{//CRO 11.02.2011
+					reportMenuITem = {data:"MAINWINDOW_SUBMENU_REPORTS", label:i18n._('GLOBAL_REPORTS'), icon:reportIcon,children:[
+						{data:"GLOBAL_BIRTHDAY_LIST", label:i18n._(GLOBAL_BIRTHDAY_LIST),icon:cakeIcon}]
+					};		
+					toolsMenuData.push(reportMenuITem);
+				}
+				
+			}
+			
+			public function refreshAssessmentScript():void{
+				var enable_ass:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_ASSESSMENT_SCRIPT);
+				var lstTool:Object = toolsMenuData[10];
+				lstTool.enabled = enable_ass;
+			}
+			
+			
+			public function refreshWindowLogo():void{
+				var titleLogo:String = Database.preferencesDao.getValue(PreferencesDAO.WINDOW_LOGO) as String;				
+				if (!StringUtils.isEmpty(titleLogo)) {
+					var base64Dec:Base64Decoder = new Base64Decoder();
+					base64Dec.decode(titleLogo);
+					var bytes:ByteArray = base64Dec.toByteArray();
+					var loader:Loader = new Loader();
+					loader.contentLoaderInfo.addEventListener(Event.COMPLETE, function(e:Event):void {
+						windowlogo.load(bytes);
+						windowlogo.addEventListener(Event.COMPLETE, imageLoaded); 
+						windowlogo.percentHeight = 100;
+						windowlogo.percentWidth = 100;
+					});
+					loader.loadBytes(bytes);
+				}else{
+					windowlogo.height=0;
+				}
+				
+				var titleColor:String = Database.preferencesDao.getValue(PreferencesDAO.BACKGROUND_COLOR) as String;	
+				if (!StringUtils.isEmpty(titleColor)) {
+					windowTitleBar.setStyle('backgroundColor',titleColor);
+				}
+				
+				// disable custom Layout Menu
+				// var disable_custom_layout:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_CUSTOM_LAYOUT);
+				
+				// disable_layout_manager = disable Custom Layout, Layout Manager(click button Customize Layout on Detail View) 
+				var disable_layout_manager:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_LAYOUT_MANAGER); 
+				var customLayoutXML:Object = layoutsMenuData[1];
+				customLayoutXML.enabled = !disable_layout_manager;
+				
+				
+				// disable_list_layout = disable List Layout, View Layout and Edit Layout 
+				var disable_list_layout:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_LIST_LAYOUT);
+				var listLayoutXML:Object = layoutsMenuData[0];
+				var viewLayoutXML:Object = layoutsMenuData[2];
+				listLayoutXML.enabled = !disable_list_layout;
+				viewLayoutXML.enabled = !disable_list_layout;
+				
+			}
+			
+			private function imageLoaded(e:Event):void{
+				var img:Image = e.target as Image;
+				var finalWidth:int = img.contentWidth;
+				var finalHeight:int = img.contentWidth;
+				if (img.contentWidth > 160) {
+					finalWidth = 160;
+					finalHeight = img.contentHeight * 160 / img.contentWidth;
+				} else {
+					finalWidth = img.contentWidth;
+					finalHeight = img.contentHeight;
+				}
+				img.width = finalWidth;
+				img.height = finalHeight;
+			}
+			
+			private function executeSynchronize(event:TimerEvent):void {				
+				if (syncProcess == null || syncProcess.finished) {
+					// Bug #1510
+					var login:LoginCRM = new LoginCRM(
+						function testConnectionSuccess(sessionId:String):void { 
+							syncBtn1.visible = true;
+							syncBtn1.includeInLayout = true;
+							syncBtn2.visible = false;
+							syncBtn2.includeInLayout = false;
+							syncProcess = new SyncProcess(false,false);
+							syncProcess.bindFunctions(null, null, null, null, [syncEnd], fieldComplete);
+							syncProcess.start();
+						},
+						function testConnectionError():void { 
+							/* hanlder error here */
+						});
+					login.loginCRM(Database.preferencesDao.read());
+				}
+			}
+			
+			public function setTimerSyncInterval(syn_interval:int):void {
+				if (syn_interval != 0) {
+					timeSync = new Timer(syn_interval * (60 * 1000),0);
+					timeSync.addEventListener(TimerEvent.TIMER, executeSynchronize);
+					timeSync.start();
+				}else{
+					if (timeSync != null) {
+						timeSync.stop();
+					}
+				}
+			}
+			
+			
+			public function updateUserInterfaceView(interfaceStyle:String, numChild:int):void{
+				var showIcon:Boolean = false;
+				if("icons" == interfaceStyle){
+					showIcon = true;
+				} else {
+					//navPanels.height = 40 + (25 * numChild);
+				}
+				navButtons.visible = showIcon;
+				navButtons.includeInLayout = showIcon;
+				navPanels.visible = !showIcon;
+				navPanels.includeInLayout = !showIcon;
+				tabBar.visible = !showIcon;
+				tabBar.includeInLayout = !showIcon;
+				
+			}
+			
+			private function importDefaultXMLfile():void{
+				if(File.userDirectory.exists){
+					for each(var file:File in File.userDirectory.getDirectoryListing()){
+						if(file.name =="gadget.xml"){
+							Preferences.uploadXMLFile(file,null);
+							
+							// reanme xml file,read this file only one time.
+							var newNativePath:String = file.nativePath.replace("gadget.xml","gadget_.xml"); 
+							var newFile:File = File.userDirectory.resolvePath(newNativePath);
+							file.moveTo(newFile,true);
+							break;
+						}
+					}
+				}
+			}	
+			private function createTabCustom(entity:String,navTabsData:ArrayList,tabName:String):void{
+				menuTabData.push(tabMenuItem(entity,tabName));
+				viewMenuData.push(createViewMenuItem(entity, tabName));
+				if(Database.preferencesDao.read().interface_style=="icons"){
+					navButtons.addChild(createNavButton(entity));
+				}else{
+					navTabsData.addItem({"label":tabName,"data":entity, "icon":ImageUtils.getImage(entity)} );	
+				}
+			}
+			public function updateTransactions():void{
+				
+				tabSelected = 0;			
+				var preferences:Object = Database.preferencesDao.read();
+				
+				if(preferences.showDebug == 1){
+					OOPSwindow.init();
+				}else{
+					OOPSwindow.bye();
+				}
+				
+				var transactions:ArrayCollection = Database.transactionDao.listTransaction();
+				createMenuData = new Array();
+				viewMenuData = new Array();
+				menuTabData = new Array();
+				navButtons.removeAllChildren();
+				navPanels.removeAllChildren();
+				redrawViewStackNavigator(transactions);
+				var navTabsData:ArrayList = new ArrayList();
+				var numTabs:int = 0;
+				
+				// CH 24-July-2013
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_DASHBOARD_REPORT)){
+					createTabCustom(DASHBOARD_REPORT, navTabsData, LABEL_DASHBORD_REPORT);
+				}
+				
+				//bug 1679 CRO
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_DASHBOARD)){
+					createTabCustom(DASHBOARD,navTabsData,LABEL_DASHBORD);
+				}
+				if(Database.preferencesDao.isEnableRevenueReport()){
+					createTabCustom(REVENUE_REPORT,navTabsData,LABEL_REVENUE_REPORT);
+					
+				}
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_FEED)){
+					createTabCustom(CHAT,navTabsData,LABEL_CHAT);
+				}
+				//#1728 CRO
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_DAILY_AGENDA)){
+					var name:String = Database.preferencesDao.getStrValue(PreferencesDAO.DAILY_AGENDA_NAME);
+					name = StringUtils.isEmpty(name) ? LABEL_DAILY_AGENDA : name;
+					createTabCustom(DAILY_AGENDA,navTabsData,name);
+				}
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_VISITIT_CUSTOMER)){
+					//ColopLast
+					createTabCustom(VISIT_CUSTOMER,navTabsData,LABEL_VISIT_CUSTOMER);
+				}
+				
+				for each (var transaction:Object in transactions) {
+					if (transaction.display && transaction.enabled) {
+						var entity:String = transaction.entity;
+						var displayName:String = Database.customLayoutDao.getDisplayName(entity);
+						var displayName1:String = "";
+						var displayName2:String = "";
+						viewMenuData.push(createViewMenuItem(entity, Database.customLayoutDao.getPlural(entity)));
+						if(entity == "Activity"){
+							createMenuData.push(createNewMenuItem(entity, 0, displayName==entity? i18n._("GLOBAL_TASK"):displayName));
+							displayName1 = Database.customLayoutDao.getDisplayName(entity, 1);
+							createMenuData.push(createNewMenuItem(entity, 1, displayName1==entity? i18n._("GLOBAL_APPOINTMENT"):displayName1));
+							displayName2 = Database.customLayoutDao.getDisplayName(entity, 2);
+							if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_BUTTON_ACTIVITY_CREATE_CALL)) {
+								createMenuData.push(createNewMenuItem(entity, 2, displayName2==entity? i18n._("GLOBAL_CALL"):displayName2));
+							}
+							
+						}else{
+							createMenuData.push(createNewMenuItem(entity, 0, displayName));
+						}
+						
+						if(preferences.interface_style=="icons"){
+							_interface_as_icon = true;
+							navButtons.addChild(createNavButton(entity));
+						}else{
+							_interface_as_icon = false;
+							if(entity == "Activity"){
+								activityEntityIsEnabled = true; //means Activit is enabled and we add Task and Appoint in the tab
+								navPanels.addChild(createNavPanel(entity, 0, displayName==entity? i18n._("GLOBAL_TASK"):displayName));
+								navPanels.addChild(createNavPanel(entity, 1, displayName1==entity? i18n._("GLOBAL_APPOINTMENT"):displayName1));
+								// Change Request #440
+								if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_BUTTON_ACTIVITY_CREATE_CALL))
+									navPanels.addChild(createNavPanel(entity, 2, displayName2==entity? i18n._("GLOBAL_CALL"):displayName2));
+								//CRO Bug fixing 364 11.01.2011
+								menuTabData.push(tabMenuItem(entity,GUIUtils.getListName(  displayName , "")));
+								var taskCalendar:Object =new Object();
+								taskCalendar.label =i18n._("GLOBAL_CALENDAR");
+								taskCalendar.data = entity + " " + "Calendar";
+								taskCalendar.icon = returnIcon(entity);
+								menuTabData.push(taskCalendar);
+								
+								// set hide task list
+								var hide_task_list:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.HIDE_TASK_LIST) as Boolean;				
+								
+								if(!hide_task_list) navTabsData.addItem({"label":Database.customLayoutDao.getPlural(entity) ,"data":entity, "icon":ImageUtils.getImage(entity)});
+								navTabsData.addItem({"label":i18n._("GLOBAL_CALENDAR")  ,"data":entity + " Calendar", "icon":ImageUtils.getImage(entity)});
+								numTabs += 2;
+							}else{
+								navPanels.addChild(createNavPanel(entity));
+								navTabsData.addItem({"label":Database.customLayoutDao.getPlural(entity),"data":entity, "icon":ImageUtils.getImage(entity)});
+								
+								menuTabData.push(tabMenuItem(entity, Database.customLayoutDao.getPlural(entity)));
+								
+								numTabs ++;
+							}
+						}
+						
+					}
+					// update navigator
+					var child:List = navigator.getChildByName(transaction.entity) as List;
+					if (transaction.display == 1) {
+						if (!child) {
+							child = createList(transaction.entity);
+							navigator.addChild(child);				    	  
+						} else {
+							if (child.displayName != Database.customLayoutDao.getDisplayName(transaction.entity)) {
+								navigator.removeChild(child);
+								child = createList(transaction.entity);
+								navigator.addChild(child);	
+							}
+						}
+					} else {
+						if(child) {
+							navigator.removeChild(child);
+						}		    		
+					}
+				}
+				
+				if(UserService.getCustomerId() == UserService.NESTLE){
+					createMenuData.push({ type:"separator"});
+					var rule:HRule = new HRule();
+					rule.width = 140;
+					//rule.setStyle("width", "100");
+					navPanels.addChild(rule);
+					for each (var inputForm:Object in InputFormUtils.getInputForms()) {
+						navPanels.addChild(createInputFormNavPanel(inputForm.id, inputForm.name));
+						createMenuData.push(createInputFormMenuItem(inputForm.id, inputForm.name));
+						numTabs ++;
+					}
+				}
+				
+				for each (var list:List in navigator.getChildren()) {
+					list.linkList.updateFilters(transactions);
+					// show/hide button sync, accept and unaccept from import xml file in preference.mxml
+					if(transaction.entity == "Service Request") list.initGridColumns();
+				}
+				
+				// check user interface 
+				if (preferences != null){				
+					updateUserInterfaceView(preferences.interface_style, numTabs);
+				}
+				if(!_interface_as_icon){
+					tabBar.dataProvider = navTabsData;
+					tabBar.iconField = "icon";
+					tabBar.validateNow();
+					tabBar.selectedIndex = findIndexForCurrentEntity(currentEntity, navTabsData);
+				}
+				
+				
+				
+				var enableChat:Boolean = preferences["enable_chat"] == 1 ? true: false;
+				//chatBtn.visible = enableChat;
+				//chatBtn.includeInLayout = enableChat;
+				
+			}
+			
+			
+			private function createInputFormNavPanel(id:String, name:String):LinkButton{
+				var button:LinkButton = new LinkButton();
+				button.setStyle("icon", editIcon);
+				button.setStyle("textAlign", "left");
+				button.toolTip = name;
+				button.label = name;
+				button.width = 140;
+				button.data = "IF " + id;
+				button.addEventListener(MouseEvent.CLICK, navButtonDoubleClick);
+				return button;
+			}
+			
+			
+			private function findIndexForCurrentEntity(selectedEntity:String, entities:ArrayList):int {
+				if (selectedEntity!=null) {
+					for(var i:int=0; i<entities.length; i++) {
+						var object:Object = entities.getItemAt(i);
+						if (selectedEntity==object.data) {
+							return i;
+						}
+					}
+				}
+				return 0;
+			}
+			
+			private var tabSelected:int = 0;
+			
+			private function tabEvent(event:ItemClickEvent):void {
+				oBookmark = null; // set default filter list
+				var tabBar:TabBar = TabBar(event.currentTarget);				
+				var data:String = tabBar.dataProvider.source[event.index].data;
+				// if(activityEntityIsEnabled) tabSelected = event.index;
+				tabSelected = event.index;
+				selectList(data);
+			}                
+			
+			private function createNavPanel(entity:String, subtype:int=0, activityStr:String=""):LinkButton{
+				var button:LinkButton = new LinkButton();
+				button.setStyle("icon", ImageUtils.getImage(entity, subtype));
+				button.setStyle("textAlign", "left");
+				if(activityStr!=""){
+					button.toolTip = activityStr;
+					button.label = activityStr;
+				}else{
+					button.toolTip = Database.customLayoutDao.getDisplayName(entity);
+					button.label = Database.customLayoutDao.getDisplayName(entity);
+				}
+				button.width = 140;
+				button.data = entity + "/" + subtype;
+				button.addEventListener(MouseEvent.CLICK, navButtonDoubleClick);
+				var canCreateOrDelete:Boolean = RightService.canCreate(entity);
+				button.enabled = canCreateOrDelete;
+				return button;
+			}
+			
+			private function createNavButton(entity:String):Button {
+				var button:Button = new Button();
+				/*
+				if("icons"!=style){
+				button.setStyle("icon", ImageUtils.getCustomLayoutIconsByEntity(entity)[0].icon);
+				button.toolTip = "New " + Database.transactionDao.getDisplayName(entity);
+				button.width = 160;
+				button.data = entity;
+				button.label = "New " + Database.transactionDao.getDisplayName(entity);
+				button.labelPlacement="right";
+				button.setStyle("paddingLeft", "2");
+				button.addEventListener(MouseEvent.CLICK, navButtonDoubleClick);
+				return button;
+				}*/
+				button.setStyle("skin", ImageUtils.getBigImage(entity));
+				button.toolTip = Database.customLayoutDao.getDisplayName(entity) + " " + i18n._(MAINWINDOW_TOOLTIP_LIST);
+				button.width = 80;
+				button.height = 80;
+				button.alpha = 0.25;
+				button.data = entity;
+				button.doubleClickEnabled = true;
+				button.addEventListener(MouseEvent.DOUBLE_CLICK, navButtonDoubleClick);
+				button.addEventListener(MouseEvent.CLICK, navButtonClick);
+				button.addEventListener(MouseEvent.MOUSE_OVER, navButtonOver);
+				button.addEventListener(MouseEvent.MOUSE_OUT, navButtonOut);
+				return button;
+			}
+			private function navButtonDoubleClick(event:MouseEvent):void{
+				
+				if(StringUtils.startsWith(event.target.data, "IF ")){
+					var combinedInputForm:CombinedInputForm = new CombinedInputForm();
+					WindowManager.openModal(combinedInputForm);
+					return;
+				}
+				
+				var index:int = event.target.data.toString().indexOf("/");
+				var subtype:int = 0;
+				if(index==-1){
+					index = event.target.data.toString().length;
+				}else{
+					subtype = int(event.target.data.toString().substr(index + 1, event.target.data.toString().length));
+				}
+				var entity:String = event.target.data.toString().substr(0, index);
+				
+				var newObj:Object;
+				if(entity == 'Activity'){
+//					switch(subtype){
+//						case 0: newObj = ActivityDataUtils.getActivityData(ActivityDataUtils.TASK_SUBTYPE); break;
+//						case 1: newObj = ActivityDataUtils.getActivityData(ActivityDataUtils.APPOINTMENT_SUBTYPE); break;
+//						case 2: {
+							newObj =ActivityDataUtils.getActivityData(subtype); 
+							var obj:Object = getListByEntity("Account").list.selectedItem;
+							
+							
+							if(Database.preferencesDao.isEnableCallCopySubject()){
+								var objContact:Object = null;
+								var selectedList:List = navigator.selectedChild as List;
+								var selectedItem:Object = null;
+								var selectedEntity:String = selectedList.entity;
+								var accId:String = "";
+								var contId:String = "";
+								var contFullName:String = "";
+								if(obj != null && !StringUtils.isEmpty(obj.AccountId)){
+									obj = Database.accountDao.findByOracleId(obj.AccountId);
+									//bug#
+									//newObj.Subject = obj.AccountName == null ? "" : obj.AccountName;
+									newObj.AccountId = obj.AccountId ;
+									newObj.AccountName = obj.AccountName;
+									contId = obj["PrimaryContactId"];
+									contFullName =  obj["PrimaryContactFullName"];
+									
+									
+								}
+								
+								if(selectedEntity == Database.contactDao.entity && selectedList.list != null && selectedList.list.selectedItem != null){
+									// selected contact object
+									selectedItem = selectedList.list.selectedItem;
+									if(selectedItem != null){
+										contId = selectedItem["ContactId"];
+										objContact = Database.contactDao.findByOracleId(contId);
+										if(obj == null){
+											accId = objContact["AccountId"];
+										}
+										if(!StringUtils.isEmpty(accId)){
+											newObj.AccountId = accId ;
+											newObj.AccountName = objContact["AccountName"];
+										}
+										contFullName = objContact["ContactFullName"];
+									}
+								}
+								
+								
+								
+								//bug#8313
+								if(Database.preferencesDao.isAutoSetPrimaryContact()||selectedEntity == Database.contactDao.entity){
+									if(objContact == null && !StringUtils.isEmpty(contId)){
+										objContact = Database.contactDao.findByOracleId(contId);
+									}
+//									var con:Object = Database.contactDao.findByOracleId(obj["PrimaryContactId"]);
+									newObj["PrimaryContactId"] = contId;
+									newObj["PrimaryContact"] = contFullName;
+									if(objContact!=null){
+										newObj["PrimaryContactFirstName"] = objContact["ContactFirstName"];
+										newObj["PrimaryContactLastName"] = objContact["ContactLastName"];
+									}
+								}
+//							}
+//							break;
+						}
+//					}	
+					
+					
+					
+				}else if(entity==Database.customObject11Dao.entity && Database.preferencesDao.isEnableSampleOrder()){
+					var lst:List = navigator.selectedChild as List;
+					if(lst.entity==Database.contactDao.entity){
+						newObj = new Object();
+						//copy contact
+						var itemSelected:Object = lst.list.selectedItem;
+						if(itemSelected != null){
+							
+							var parentobj:Object = Database.contactDao.findByOracleId(itemSelected["ContactId"]);						
+						
+							var referencers:ArrayCollection = Relation.getReferencers(Database.contactDao.entity);
+							for each (var relation:Object in referencers) {
+								if (relation.entitySrc == Database.customObject11Dao.entity && relation.entityDest == Database.contactDao.entity) {
+									newObj[relation.keySrc] = parentobj[relation.keyDest];
+									for(var i:int=0; i<relation.labelDest.length; i++){
+										newObj[relation.labelSrc[i]] = parentobj[relation.labelDest[i]];
+									}								
+								}
+							}
+						}
+					}
+				}
+				
+				selectList(entity).openScreenCreate(newObj, subtype);
+				// selectList(entity).checkLayoutRecordType(newObj, subtype);
+				
+			}
+			private function navButtonClick(event:MouseEvent):void {
+				oBookmark = null; // set default filter list
+				selectList(event.target.data);
+			}
+			
+			private function navButtonOver(event:MouseEvent):void {
+				if (event.target.data != currentEntity) {
+					fadeMed.play([event.target]);
+				}
+			}
+			
+			private function navButtonOut(event:MouseEvent):void {
+				if (event.target.data != currentEntity) {
+					fadeMed.play([event.target], true);
+				}
+			}
+			
+			private function createViewMenuItem(entity:String, display_plural_name:String):Object {
+				var x:Object =  new Object();
+				x.entity = entity;                                                                                               
+				x.label = i18n._(MAINWINDOW_MENUITEM_VIEW) + " " + display_plural_name;
+				x.data = "View " + entity;
+				x.type = "radio";
+				x.groupName = "one";
+				x.icon = returnIcon(entity);
+				x.toggled = "false";
+				return x;
+			}
+			
+			private function getRecentlyViewedItem():Array {
+				var recentlyViewedData:Array = new Array();
+				for each(var recentObj:Object in Database.recentDao.read()){
+					var obj:Object = Database.getDao(recentObj.entity).findByGadgetId(recentObj.id);
+					var icontype:String;
+					if (obj != null) {
+						var x:Object = { label:Utils.getName(obj), icon:returnIcon(obj.gadget_type, ImageUtils.getActivitySubType(obj)), gadget_id:obj.gadget_id, data:'Recent', entity:recentObj.entity};
+						recentlyViewedData.push(x);
+					}
+				}
+				return recentlyViewedData;
+			}
+			
+			private function createInputFormMenuItem(id:String, display_name:String):Object {
+				var x:Object = new Object();
+				x.label = display_name;
+				x.data = "IF " + id;
+				x.icon = "editIcon";
+				return x;
+			}	
+			
+			private function createNewMenuItem(entity:String, subtype:int, display_name:String):Object {
+				var canCreate:Boolean = RightService.canCreate(entity);
+				var x:Object = new Object();
+				x.label = display_name;
+				x.data = "New " + entity + "/" + subtype;
+				x.icon = returnIcon(entity, subtype);
+				x.enabled = canCreate;
+				return x;
+			}
+			
+			public static function tabMenuItem(entity:String, display_name:String, subtype:int=0):Object {
+				var x:Object = new Object;
+				x.label = display_name;
+				x.data = entity;
+				x.icon = returnIcon(entity, subtype);
+				return x;
+			}
+			
+			private static function returnIcon(entity:String, subtype:int=0):Class{
+				
+				return ImageUtils.getImage(entity,subtype);
+				//				var icontype:String;
+				//				switch (entity) {
+				//					case VISIT_CUSTOMER:
+				//						visitCustomer = ImageUtils.getImage(entity)
+				//						icontype = 'visitCustomer'; break; //Dashboard
+				//					
+				//					case DAILY_AGENDA:
+				//						dailyAgenda = ImageUtils.getImage(entity)
+				//						icontype = 'dailyAgendaIcon'; break; //Dashboard
+				//					case DASHBOARD:
+				//						dashboardIcon = ImageUtils.getImage(entity)
+				//						icontype = 'dashboardIcon'; break; //Dashboard
+				//					case CHAT:
+				//						chatIcon = ImageUtils.getImage(entity)
+				//						icontype = 'chatIcon'; break; //Account
+				//					case 'Account':
+				//						accountIcon = ImageUtils.getImage(entity);
+				//						icontype = 'accountIcon'; break; //Account
+				//					case 'Asset':
+				//						assetIcon = ImageUtils.getImage(entity);
+				//						icontype = 'assetIcon'; break; //Asset
+				//					case 'Contact':
+				//						contactIcon = ImageUtils.getImage(entity);
+				//						icontype = 'contactIcon'; break; //Contact
+				//					case 'Opportunity':
+				//						opportunityIcon = ImageUtils.getImage(entity);
+				//						icontype = 'opportunityIcon'; break; //Opportunity
+				//					case 'Activity':
+				//						if(subtype==0){
+				//							activityIcon = ImageUtils.getImage(entity, subtype);
+				//							icontype = 'activityIcon';
+				//						}else if(subtype==1){
+				//							activityAppointmentIcon = ImageUtils.getImage(entity, subtype);
+				//							icontype = 'activityAppointmentIcon';
+				//						}else{
+				//							activityCallIcon = ImageUtils.getImage(entity, subtype);
+				//							icontype = 'activityCallIcon';
+				//						}
+				//						break; //Activity
+				//					case 'Product':
+				//						productIcon = ImageUtils.getImage(entity);
+				//						icontype = 'productIcon'; break; //Product
+				//					case 'Service Request':
+				//						serviceIcon = ImageUtils.getImage(entity);
+				//						icontype = 'serviceIcon'; break; //ServiceRequest
+				//					case 'Campaign':
+				//						campaignIcon = ImageUtils.getImage(entity);
+				//						icontype = 'campaignIcon'; break; //Campaign
+				//					case 'Custom Object 1':
+				//						customObjectIcon = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon'; break; //CustomObject
+				//					case 'Lead':
+				//						leadIcon = ImageUtils.getImage(entity);
+				//						icontype = 'leadIcon'; break; //Lead
+				//					
+				//					case 'Custom Object 2':
+				//						customObjectIcon2 = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon2'; break; //CustomObject2
+				//					case 'Custom Object 3':
+				//						customObjectIcon3 = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon3'; break; //CustomObject3
+				//					case 'CustomObject7':
+				//						customObjectIcon7 = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon7'; break; //CustomObject7
+				//					case 'CustomObject14':
+				//						customObjectIcon14 = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon14'; break; //CustomObject14
+				//					case 'CustomObject4':
+				//						customObjectIcon4 = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon4'; break; //CustomObject4
+				//					case 'CustomObject5':
+				//						customObjectIcon5 = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon5'; break; //CustomObject5
+				//					case 'CustomObject6':
+				//						customObjectIcon6 = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon6'; break; //CustomObject6
+				//					case 'CustomObject8':
+				//						customObjectIcon8 = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon8'; break; //CustomObject8
+				//					case 'CustomObject9':
+				//						customObjectIcon9 = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon9'; break; //CustomObject9
+				//					case 'CustomObject10':
+				//						customObjectIcon10 = ImageUtils.getImage(entity);
+				//						icontype = 'customObjectIcon10'; break; //CustomObject10
+				//					case 'Territory':
+				//						territoryIcon = ImageUtils.getImage(entity);
+				//						icontype = 'territoryIcon'; break; //Territory
+				//					case 'Note':
+				//						noteIcon = ImageUtils.getImage(entity);
+				//						icontype = 'noteIcon'; break; //Note
+				//					case 'MedEdEvent':
+				//						medEdEventIcon = ImageUtils.getImage(entity);
+				//						icontype = 'medEdEventIcon'; break; //MedEd Event
+				//					
+				//					default: icontype = '';
+				//				}
+				//				return icontype;
+			}
+			
+			private function tabChangeListener(event:Event):void{
+				var stack:ViewStack = event.target as ViewStack;
+				
+				
+				for(var i:int = 0; i < viewMenuData.length; i++){
+					viewMenuData[i].toggled = "false";
+				}
+				//Change Request #7701 CRO
+				//				if(mapCustomTab[currentEntity] != null){  
+				//					filterList.visible = false;
+				//					filterList.includeInLayout = false;
+				//				}else{
+				//					filterList.visible = true;
+				//					filterList.includeInLayout = true;
+				//				}
+				viewMenuData[stack.selectedIndex].toggled = "true";
+			}
+			
+			private function createList(entity:String):List{	    	
+				var list:List = new List();
+				list.percentWidth = 100;
+				list.percentHeight = 100;
+				list.entity = entity;
+				list.name = entity;
+				list.mainwindow=this;
+				list.displayName = Database.customLayoutDao.getDisplayName(entity);
+				list.icon = ImageUtils.getImage(entity);
+				list.setStyle("hideEffect", fadeOut);
+				list.setStyle("showEffect", fadeIn);
+				list.filter = Database.filterDao.getObjectFilter(entity, 0);
+				return list;
+			}
+			
+			private function checkExpired():void {
+				// AM - 22/03/2010 - disabled
+				//if(new Date()>new Date('05/01/2010')){
+				//	Alert.show("Your CRM Gadget trial version has expired","Trial Version",4,this,closeHandler);
+				//}
+			}
+			
+			private function closeHandler(evt:CloseEvent):void {
+				close();
+			}
+			
+			public function checkTips():void {
+				if (currentTip != null) {
+					currentTip.close();
+					currentTip = null;
+				}
+				var preferences:Object = Database.preferencesDao.read();
+				if (preferences.sodhost == '' || preferences.sodlogin == '' || preferences.sodpass == '') {
+					createTip(prefBtn, i18n._(MAINWINDOW_TOOLTIP_PLEASE_SETUP));
+				} else if (syncProcess == null || syncProcess.finished) {
+					if (!Database.lastsyncDao.isSynced()) {
+						createTip(syncBtn1.visible ? syncBtn1 : syncBtn2, i18n._(MAINWINDOW_TOOLTIP_NO_LOCAL_DATA));
+					} else if (Database.picklistDao.read() == null) { 
+						createTip(syncBtn1.visible ? syncBtn1 : syncBtn2, i18n._(MAINWINDOW_TOOLTIP_PLEASE_SYNCHRONIZE));
+					}
+				}
+			}
+			
+			private function createTip(button:Button, text:String):void {
+				currentTip = new CloseableToolTip(systemManager);
+				currentTip.text = text;
+				systemManager.toolTipChildren.addChild(UIComponent(currentTip));
+				
+				currentTip.setActualSize(currentTip.getExplicitOrMeasuredWidth(), currentTip.getExplicitOrMeasuredHeight());
+				
+				currentTip.move(button.parent.x + button.x , button.y + 60);
+			}
+			
+			
+			
+			public function loadBookmarks():void {
+				bookmarkBar.removeAllChildren();
+				addContextMenuBookmark();			
+				var data:Array = Database.bookmarkDao.read();
+				if(data) {
+					for(var i:int = 0; i<data.length; i++){
+						bookmarkBar.addChild(newBookmarkButton(data[i]));
+					}		
+				}
+			}
+			
+			public function newBookmarkButton(data:Object):LinkButton {
+				var bkBtn:LinkButton = new LinkButton();
+				var displayName:String = data.displayName;
+				if(!displayName){
+					for each(var objFilter:Object in Database.filterDao.listFilters()){
+						if (objFilter.id == data.id) {
+							//CRO bug fixing 44 21.01.2011 
+							var objName:String = (objFilter.name as String);
+							objName = objName.indexOf('GLOBAL') == -1 ? objName : i18n._(objName);
+							displayName = objName.replace("{ENTITY}",Database.customLayoutDao.getPlural(objFilter.entity));
+							break;
+						}
+					}
+				}
+				bkBtn.data = data;
+				bkBtn.label = displayName;
+				bkBtn.addEventListener(MouseEvent.CLICK, bookmarkButtonClickHandler);
+				return bkBtn;			
+			}
+			
+			private function bookmarkButtonClickHandler(evt:Event):void {
+				var linkBtn:LinkButton = evt.target as LinkButton;
+				var data:Object = linkBtn.data;
+				oBookmark = data;
+				if(!data.type) {
+					var filter:Object = Database.filterDao.findFilter(data.id);
+					data.entity = filter.entity;
+					data.name = filter.name;
+					data.type = filter.type;
+				}
+				selectList(data.entity).doFilter(data);
+			}
+			
+			private function addContextMenuBookmark():void {
+				var menuItem:ContextMenuItem = new ContextMenuItem("Delete");
+				menuItem.addEventListener(ContextMenuEvent.MENU_ITEM_SELECT, deleteBookmarkHandler);
+				var customContextMenu:ContextMenu = new ContextMenu();
+				customContextMenu.hideBuiltInItems();
+				customContextMenu.customItems.push(menuItem);
+				bookmarkBar.contextMenu = customContextMenu;
+			}
+			
+			private function deleteBookmarkHandler(evt:ContextMenuEvent):void {
+				var linkBtn:LinkButton = evt.mouseTarget as LinkButton;
+				if (linkBtn != null) {
+					bookmarkBar.removeChild(linkBtn);
+					Database.bookmarkDao.delete_bookmark(linkBtn.data);
+				}
+			}
+			private function createCustomList(entity:String):List{
+				var list:List = new List();
+				list.percentWidth = 100;
+				list.percentHeight = 100;
+				list.entity = entity;
+				list.name = entity;
+				list.mainwindow=this;
+				list.displayName = entity;
+				//list.icon = ImageUtils.getImage(entity);
+				list.setStyle("hideEffect", fadeOut);
+				list.setStyle("showEffect", fadeIn);
+				return list;
+			}
+			private function redrawViewStackNavigator(transactions:ArrayCollection):void {
+				//var sortedNavigatorChildren:Array =  navigator.getChildren().sort(sortByEntity);
+				navigator.removeAllChildren();
+				
+				// CH 24-July-2013
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_DASHBOARD_REPORT)){
+					navigator.addChild( createCustomList(DASHBOARD_REPORT) );
+				}
+				
+				//default dashboard tab 1679 CRO
+				
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_DASHBOARD)){
+					navigator.addChild( createCustomList(DASHBOARD) );
+				}
+				if(Database.preferencesDao.isEnableRevenueReport()){
+					navigator.addChild( createCustomList(REVENUE_REPORT));
+					
+				}
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_FEED)){
+					navigator.addChild( createCustomList(CHAT) );
+				}
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_DAILY_AGENDA)){
+					navigator.addChild( createCustomList(DAILY_AGENDA) );
+				}
+				if(Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_VISITIT_CUSTOMER)){
+					navigator.addChild( createCustomList(VISIT_CUSTOMER) );
+				}
+				
+				for each (var transaction:Object in transactions){
+					if(transaction.display){
+						navigator.addChild( createList(transaction.entity) );
+					}
+				}
+				navigator.validateNow();
+			}	
+			
+			private function sortByEntity(listA:List, listB:List):int {
+				if (listA.entity < listB.entity){
+					return -1;
+				}else if (listA.entity > listB.entity){
+					return 1;
+				}else{
+					return 0;
+				}
+			}		
+			
+			public function selectList(entity:String=null):List {
+				//clear selected item
+				for each (var list:List in navigator.getChildren()) {
+					list.list.selectedIndex=-1;
+				}
+				var index:int =0;
+				if(StringUtils.isEmpty(entity)){
+					entity = selectedEntity;
+				}
+				if(!StringUtils.isEmpty(entity)){
+					var tabname:String = entity;
+					if(entity=="Activity Calendar"){
+						tabname = "Activity";
+						
+					}
+					if(navigator.getChildByName(tabname)==null){
+						entity=null;
+					}	
+				}
+				if (entity == null && navigator.numChildren!=0){
+					entity = (navigator.getChildAt(0) as List).entity;
+				}
+				
+				
+				
+				if (entity == null)
+					entity = "Account";
+				
+				if(mapCustomTab[entity] != null ||entity=="Activity Calendar"){
+					filterList.visible = false;
+					filterList.includeInLayout = false;
+				}else{
+					filterList.visible = true;
+					filterList.includeInLayout = true;
+				}
+				
+				if(entity=="Activity Calendar"){
+					currentEntity = "Activity";
+				}else{
+					currentEntity = entity;
+				}
+				selectedEntity = entity;
+				for each (var navButton:Button in navButtons.getChildren()) {
+					if (navButton.data == currentEntity) {
+						navButton.alpha = 1;
+					} else {
+						navButton.alpha = .25;
+					}
+				}
+				
+				var currentList:List;
+				
+				for each (var list:List in navigator.getChildren()) {
+					if (list.entity == currentEntity) {
+						navigator.selectedChild = list;
+						currentList = list;
+						filterList.list = list;
+						filterList.listFilters();
+						break;
+					}
+				}
+				
+				var selectedIndex:int = 0;
+				for ( var j:int = 0; j < viewMenuData.length; j++ ) {
+					if (viewMenuData[j].entity == currentEntity) {
+						viewMenuData[j].toggled = "true";
+						selectedIndex = j;
+						
+					} else {
+						viewMenuData[j].toggled = "false";
+					}
+				}
+				
+				enableLayoutMenuData(currentEntity);
+				
+				if(_interface_as_icon){
+					tabBar.selectedIndex = selectedIndex;
+				}else {
+					isActivityCalendar = false;
+					if(activityEntityIsEnabled){
+						var tabBarData:ArrayList = (tabBar.dataProvider as ArrayList);
+						for(var k:int=0; k<tabBarData.length; k++){
+							var tabData:Object = tabBarData.getItemAt(k); 
+							if( tabData.data == currentEntity){
+								if(entity=="Activity Calendar"){
+									k +=1;
+									isActivityCalendar = true;
+								} 
+								tabBar.selectedIndex = k;
+								index = k;
+								
+								
+								break;
+							}
+						}
+					}else{
+						tabBar.selectedIndex = tabSelected;
+					}
+				}
+				
+				var listSelected:List = navigator.selectedChild as List;
+				this._currentSelectedList = listSelected;
+				if(currentEntity == "Activity"){
+					listSelected.manageViewTabBar(_interface_as_icon);
+					if(!_interface_as_icon){
+						var isCalendar:Boolean = entity == "Activity Calendar";
+						listSelected.viewStack.selectedIndex = (  isCalendar? 1 : 0 );
+						listSelected.detail.visibleSubTab([Database.accountDao.entity,Database.contactDao.entity],isCalendar);
+					}
+				}
+				
+				var objectTransaction:Object = Database.transactionDao.find(currentEntity);
+				var arrayFilter:ArrayCollection = Database.filterDao.listFiltersCriteria(currentEntity);
+				selectedIndex = 0;
+				var filter:Object;
+				for(var i:int=0; i<arrayFilter.length; i++){
+					var obj:Object = arrayFilter.getItemAt(i);
+					if(oBookmark) {
+						if(oBookmark.name == obj.name) {
+							selectedIndex = i;
+							filter = obj;
+							break;
+						}
+					}else {
+						if(obj.type == objectTransaction.default_filter) {
+							selectedIndex = i;
+							filter = obj;
+							break;
+						}
+					}
+					/* if(obj.type == objectTransaction.default_filter){
+					objectDefaultFilter = obj;
+					//						if (listSelected!=null)
+					//							listSelected.doFilter(obj);
+					selectedIndex = i;
+					filter = obj;
+					break;
+					} */
+				}
+				filterList.filterGrid.selectedIndex = selectedIndex;
+				if (filterList.list!=null)
+					filterList.list.filter = filter;
+				// Clear Data on the detail list and link list
+				//listSelected.detail.clearData();				
+				//listSelected.linkList.linkListGrid.dataProvider = null;
+				//				listSelected.filterData();				
+				//				listSelected.initGridColumns();
+				//				listSelected.detail.loadData();	
+				//				listSelected.computeColumnList();
+				listSelected.loadData();
+				var obj:Object = new Object();
+				obj.entity = currentEntity;
+				obj.gadget_id = "";
+				if(navigateHistory.length>0 ){
+					var previousObj:Object = navigateHistory.getItemAt(navigateHistory.length-1);
+					var curIndex:int = parseInt(previousObj.tabIndex);
+					if(index != curIndex){
+						obj.tabIndex = index;
+						listSelected.backHistory = obj;
+						navigateHistory.addItem(obj);
+					}
+				}else{
+					obj.tabIndex = index;
+					listSelected.backHistory = obj;
+					navigateHistory.addItem(obj);
+					
+				}
+				
+				return  listSelected;
+			}
+			
+			
+			public function getSelectedList():List{
+				return this._currentSelectedList;
+			}
+			
+			
+			public function openSyncWindow(isSRSycnow:Boolean=false,records:Array=null):void {
+				var synchronize:Synchronize = new Synchronize();
+				synchronize.isSRSyncnow=isSRSycnow;				
+				isUpdateTransaction=!isSRSycnow;
+				synchronize.records=records;
+				synchronize.mainWindow = this;
+				WindowManager.openModal(synchronize);
+			}
+			
+			public function openSyncWindowAuto():void {
+				var synchronize:Synchronize = new Synchronize();
+				isUpdateTransaction=true;
+				synchronize.mainWindow = this;
+				synchronize.syncData();
+				WindowManager.openModal(synchronize);
+			}
+			
+			private function openQuickSearchWindow():void {
+				var quickSearch:QuickSearch = new QuickSearch();
+				quickSearch.mainWindow = this;
+				WindowManager.openModal(quickSearch);
+			}
+			
+			private function openPreferenceWindow():void{
+				var preferences:Preferences = new Preferences();
+				preferences.mainWindow = this;
+				WindowManager.openModal(preferences);
+			}
+			
+			
+			private function menuClick(event:ItemClickEvent):void {
+				//var myMenu:Menu;
+				if(upperBarMenu!=null){
+					upperBarMenu.hide();
+				}
+				switch (event.index) {
+					case 0:
+						upperBarMenu = Menu.createMenu(this, viewMenuData, false);					
+						break;
+					case 1:
+						upperBarMenu = Menu.createMenu(this, createMenuData, false);
+						break;
+					case 2:
+						upperBarMenu = Menu.createMenu(this, getItemMenuData(), false);
+						
+						break;
+					case 3:
+						upperBarMenu = Menu.createMenu(this, layoutsMenuData, false);
+						break;
+					case 4:
+						upperBarMenu = Menu.createMenu(this, getToolsMenuData(), false);
+						break;
+					case 5:
+						upperBarMenu = Menu.createMenu(this, getRecentlyViewedItem(), false);
+						break;
+					case 6:
+						upperBarMenu = Menu.createMenu(this, Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_APPLICATION_UPDATE) ? helpMenuDataUpdateApp : helpMenuData, false);
+						break;
+				}
+				upperBarMenu.iconField="icon";
+				upperBarMenu.labelField="label";
+				var children:LinkButton = event.target.getChildAt(event.index);
+				var p:Point = event.target.localToGlobal(new Point(children.x, children.y + children.height));
+				upperBarMenu.addEventListener(MenuEvent.ITEM_CLICK, menuAction);
+				upperBarMenu.show(p.x, p.y);
+			}
+			
+			private function getRight():Object {
+				var canCreate:Boolean;
+				var canUpdate:Boolean;
+				var canDelete:Boolean;
+				
+				//				var list:List = (navigator.selectedChild as List);
+				//				if(list.list!=null && list.list.selectedItem!=null){
+				//					canCreateOrDelete = RightService.canCreateAndDelete(list.list.selectedItem.gadget_type);
+				//					canUpdate = RightService.canUpdate(list.list.selectedItem.gadget_type);
+				//				}
+				var list:ArrayCollection = ((navigator.selectedChild as List).list.dataProvider as ArrayCollection);
+				if(list.length > 0 ) {
+					var gadgetType:String=list.getItemAt(0).gadget_type;
+					canCreate = RightService.canCreate(gadgetType);					
+					canUpdate = RightService.canUpdate(gadgetType);
+					canDelete=RightService.canDelete(gadgetType);
+				}
+				return {'canCreate':canCreate, 'canUpdate':canUpdate,'canDelete':canDelete};
+			}
+			
+			private function getItemMenuData():Array{
+				var right:Object = getRight();
+				var editItemXML:Object = itemMenuData[0];
+				editItemXML.enabled = right.canUpdate;
+				var linkItemXML:Object = itemMenuData[1];
+				linkItemXML.enabled = right.canUpdate;
+				var deleteItemXML:Object = itemMenuData[2];
+				deleteItemXML.enabled = right.canDelete;
+				return itemMenuData;
+			}
+			
+			private function enableLayoutMenuData(entity:String):void{
+				var listLayout:Object = layoutsMenuData[0];
+				var disable_list_layout:Boolean = Database.preferencesDao.getBooleanValue(PreferencesDAO.DISABLE_LIST_LAYOUT);
+				var enableListAndView:Boolean = !disable_list_layout && (SodUtils.transactionProperty(entity)!=null) ;
+				
+				listLayout.enabled = enableListAndView;
+				
+				var viewLayout:Object = layoutsMenuData[2];
+				viewLayout.enabled = enableListAndView;
+				
+				
+			}
+			
+			private function getToolsMenuData():Array {
+				var right:Object = getRight();
+				var insertBatchItemXML:Object = toolsMenuData[5];
+				insertBatchItemXML.enabled = right.canCreate;
+				var editBatchItemXML:Object = toolsMenuData[6];
+				editBatchItemXML.enabled = right.canUpdate;
+				return toolsMenuData;
+			}
+			
+			private function menuAction(event:MenuEvent):void{
+				if (StringUtils.startsWith(event.item.data, "IF ")) {
+					var combinedInputForm:CombinedInputForm = new CombinedInputForm();
+					WindowManager.openModal(combinedInputForm);
+					return;
+				}
+				if (StringUtils.startsWith(event.item.data, "View ")) {
+					//				if(activityEntityIsEnabled){
+					//					tabSelected = event.index;
+					//					if((event.index>=2 && viewMenuData.getItemAt(1).@data.substring(5) == "Activity") ||
+					//						(event.index>=1 && viewMenuData.getItemAt(0).@data.substring(5) == "Activity")){
+					//						tabSelected ++;
+					//					}
+					//				}
+					selectList(event.item.data.substring(5));
+					return;
+				}
+				if (StringUtils.startsWith(event.item.data, "New ")) {
+					var entityName:String = event.item.data.substring(4, event.item.data.toString().indexOf("/"));
+					//var subtypeName:String = event.label.substring(entityName.length + 1);
+					//var subtypeIndex:int = LayoutUtils.convertSubtypeNameToSubtypeIndex(entityName, subtypeName);
+					var subtypeIndex:int = int(event.item.data.toString().substring(event.item.data.toString().indexOf("/") + 1, event.item.data.toString().length));
+					selectList(entityName).openScreenCreate(null,subtypeIndex);
+					return;
+				}
+				
+				if(event.item.data == "Recent"){
+					var entity:String = event.item.entity;
+					var gadget_id:String = event.item.gadget_id;
+					var obj:Object = Database.getDao(entity).findByGadgetId(gadget_id);
+					selectList(entity).editScreenDetail(obj,entity);
+					return;
+				}
+				
+				if (event.item.data != null) {
+					
+					switch (event.item.data) {
+						case GLOBAL_EDIT : openEditObject(); break;
+						case MAINWINDOW_SUBMENU_BATCH_INSERT : openBatchInserObject(); break;
+						case MAINWINDOW_SUBMENU_BATCH_UPDATE : openBatchEditObject(); break;
+						case MAINWINDOW_SUBMENU_LINK  : openLinkObject(); break;
+						case GLOBAL_DELETE : openDeleteObject(); break;				
+						case MAINWINDOW_SUBMENU_SYNCHRONIZE : openSyncWindow(); break;
+						case MAINWINDOW_SUBMENU_PREFERENCES : openPreferenceWindow(); break;
+						case MAINWINDOW_SUBMENU_SUPPORT : openLoginWindow(); break;
+						case MAINWINDOW_SUBMENU_HELP_CONTENTS : openHelp(); break;
+						case MAINWINDOW_SUBMENU_IDEAS_ON_DEMAND : openIdeasOnDemand(); break;
+						case MAINWINDOW_SUBMENU_ABOUT : openAbout(); break;
+						case MAINWINDOW_SUBMENU_CHARTS : openChart(); break;
+						case MAINWINDOW_SUBMENU_QUICK_SEARCH : openQuickSearchWindow(); break;
+						case MAINWINDOW_SUBMENU_LIST_LAYOUT : openListLayout(); break;
+						case MAINWINDOW_SUBMENU_CUSTOM_LAYOUT : openCustomLayout(); break;
+						case MAINWINDOW_SUBMENU_VIEW_LAYOUT : openViewLayout(); break
+						//case MAINWINDOW_SUBMENU_DAILY_AGENDA : openDailyAgenda(); break;
+						case MAINWINDOW_SUBMENU_REPORT_BUILDER : openReportBuilder(); break;
+						case GLOBAL_BIRTHDAY_LIST : openReportBirthdayList(); break;
+						case MAINWINDOW_SUBMENU_TREE_MAP : openTreeMapWindow(); break;
+						case MAINWINDOW_SUBMENU_TREE_MAP : openTreeMapWindow(); break;
+						case MAINWINDOW_SUBMENU_SIGNATURE : openSignatureWindow(); break;
+						case MAINWINDOW_SUBMENU_INITIALIZENEWDB : initializeNewDB(); break;
+						case MAINWINDOW_SUBMENU_FIELDMANAGMENT : openFieldMangementWindow(); break;
+						case MAINWINDOW_SUBMENU_VALIDATION_RULE : openValidationRuleWindow(); break;
+						case MAINWINDOW_SUBMENU_REPORTS_GROUPING_PDF : openGroupingWindow(); break;
+						
+						case GLOBAL_APPLICATION_UPDATE : applicationUpdate(); break;
+						
+						case MAINWINDOW_SUBMENU_ASSESSMENT_CONFIGURATION : assessmentConfiguration(); break;
+					}
+				}
+			}
+			private function openGroupingWindow():void{
+				var goupingWindow:GroupingPDF = new GroupingPDF();
+				WindowManager.openModal(goupingWindow);
+			}
+			private function openTreeMapWindow():void{
+				var treeMap:TreeMapWindow = new TreeMapWindow();
+				WindowManager.openModal(treeMap);
+			}
+			
+			private function initializeNewDB():void {			
+				var encrypt_DB_file:File = File.applicationDirectory.resolvePath(Database.getCustomDatabasePathFromFile() + "/" + Database.ENCRYPTED_DB_NAME);
+				var db_file:File = File.applicationDirectory.resolvePath(Database.getCustomDatabasePathFromFile() + "/" + Database.DB_NAME);
+				var current_db_file:File = encrypt_DB_file.exists? encrypt_DB_file:db_file;
+				if(current_db_file.exists){
+					Alert.show('Are you sure you want to initialize new database? \nYou will loose your local data.',"Initialize New Database", Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+						if (event.detail==Alert.YES){
+							crmGadget.initializeNewDB(current_db_file);
+						}    	 
+					});	
+				}		
+			}
+			
+			private function openValidationRuleWindow():void{
+				var validationRule:ValidationRuleWindow = new ValidationRuleWindow();
+				WindowManager.openModal(validationRule);
+			}
+			
+			private function openFieldMangementWindow():void{
+				var fieldManagment:FieldManagmentWindow = new FieldManagmentWindow();
+				WindowManager.openModal(fieldManagment);
+			}
+			
+			private function openSignatureWindow():void{
+				
+				//				var javaUtils:JavaDetection = new JavaDetection(this);
+				var signature:EpadSignatureWindow = new EpadSignatureWindow();
+				WindowManager.openModal(signature);
+			}
+			
+			private function openReportBuilder():void{
+				var reportBuilder:ReportList = new ReportList();
+				WindowManager.openModal(reportBuilder);
+			}
+			
+			private function openReportBirthdayList():void {
+				PDFUtil.birthdayListToPDF(logo_error_message);
+			}
+			
+			private function logo_error_message():void{
+				Alert.show(i18n._(MAINWINDOW_ALERT_LOGO_ERROR_MSG), "", Alert.OK, this);
+			}
+			//bug #1728 CRO
+			/*private function openDailyAgenda():void{
+			var dailyWindow:DailyAgenda = new DailyAgenda();
+			WindowManager.openModal(dailyWindow);
+			}*/
+			
+			private function openViewLayout():void{
+				//bug 1679 CRO do nothing with dashboard and chat tab
+				if(mapCustomTab[currentEntity] != null) return;
+				var viewLayout:ViewLayout = new ViewLayout();
+				viewLayout.list = (navigator.selectedChild as List);
+				WindowManager.openModal(viewLayout);
+			}
+			
+			private function openCustomLayout():void{
+				var customLayoutList:CustomLayoutList = new CustomLayoutList();
+				customLayoutList.mainWindow = this;
+				WindowManager.openModal(customLayoutList);
+			}
+			
+			private function openBatchInserObject():void{
+				var list:List = (navigator.selectedChild as List);
+				var batchInser:BatchInsert = new BatchInsert();
+				batchInser.entity = list.entity;
+				batchInser.mainWindow = this;
+				WindowManager.openModal(batchInser);
+			}
+			
+			private function openEditObject():void {
+				var list:List = (navigator.selectedChild as List);
+				list.editScreenDetail(list.list.selectedItem);
+			}
+			
+			private function openBatchEditObject():void{
+				var list:List = (navigator.selectedChild as List);
+				list.batchUpdate();
+			}
+			
+			private function openDeleteObject():void {
+				var list:List = (navigator.selectedChild as List);
+				list.deleteItem(list.list.selectedItem);
+			}
+			
+			private function openLinkObject():void {
+				var list:List = (navigator.selectedChild as List);
+				list.openLinkTo(list.list.selectedItem);
+			}
+			
+			private function openLoginWindow():void{
+				//			var preferences:Object = Database.preferencesDao.read();
+				//			if(preferences.im_auto_sing_in == 0){
+				//				var loginWindow:LoginWindow = new LoginWindow();
+				//				loginWindow.preferences = preferences;
+				//				WindowManager.openModal(loginWindow);
+				//			}else{
+				//				openSupportWindow();
+				//			}
+				var loginWindow:LoginWindow = new LoginWindow();
+				// AM : Always use WindowManager to open windows !
+				WindowManager.openModal(loginWindow);
+				/* 			var screenBounds:Rectangle = Screen.mainScreen.bounds; 
+				loginWindow.nativeWindow.x = (screenBounds.width - loginWindow.nativeWindow.width) / 2; 
+				loginWindow.nativeWindow.y = (screenBounds.height - loginWindow.nativeWindow.height) / 2; */
+			}
+			
+			// AM : this is used nowhere ? I comment it out 
+			/*  		private function openSupportWindow():void {
+			var supportWindow:SupportWindow = new SupportWindow();
+			supportWindow.open(true);
+			}	 */
+			
+			private function openHelp():void {
+				//Utils.openURL('http://desktop.crm-gadget.com/html/help.html','_blank');
+				var helpWindow:Help = new Help();
+				//				helpWindow.urlHelp = 'http://desktop.crm-gadget.com/html/help.html';
+				helpWindow.urlHelp = 'http://desktop.crm-gadget.eu/?page_id=255';
+				WindowManager.openModal(helpWindow);
+			}
+			private function openIdeasOnDemand():void{
+				var idea:IdeasOnDemand = new IdeasOnDemand();
+				//idea.url = 'http://ideasondemandcrm.appspot.com';
+				WindowManager.openModal(idea);
+			}
+			private function openAbout():void {
+				var aboutWindow:AboutCRMGadget2Go = new AboutCRMGadget2Go();
+				WindowManager.openModal(aboutWindow);
+			}
+			
+			
+			private function openChart():void {
+				var chartLayout:Chart = new Chart();
+				WindowManager.openModal(chartLayout);
+			}
+			
+			private function openListLayout():void {
+				//bug 1679 CRO do nothing with dashboard and chat tab
+				if(mapCustomTab[currentEntity] != null) return;
+				var listLayout:ListLayout = new ListLayout();
+				listLayout.list = (navigator.selectedChild as List);
+				listLayout.filter = filterList.filterGrid.selectedItem;
+				WindowManager.openModal(listLayout);
+			}
+			
+			
+			
+			public function addBookmark(bookmark:Object):void
+			{
+				if(!Database.bookmarkDao.is_bookmarked(bookmark)){
+					var linkBtn:LinkButton = newBookmarkButton(bookmark); 
+					bookmarkBar.addChild(linkBtn);
+					Database.bookmarkDao.insert_bookmark(bookmark);
+				}
+			}
+			
+			private function menuDownClick(event:MouseEvent):void{
+				if(tabMenu!=null){
+					tabMenu.hide();
+				}
+				tabMenu = Menu.createMenu(this, menuTabData, false);
+				tabMenu.width = 155;
+				tabMenu.iconField="icon";
+				tabMenu.labelField="label";
+				var child:Button = event.target as Button;
+				var p:Point = event.target.localToGlobal(new Point(child.x, child.y + child.height));
+				tabMenu.addEventListener(MenuEvent.ITEM_CLICK, menuDownAction);
+				var list:List = navigator.selectedChild as List;
+				var x:Number=list.width-tabMenu.width;
+				if(Database.preferencesDao.getBooleanValue("navPanel.show",0)){
+					x = list.width;
+				}
+				tabMenu.show(x , p.y);
+			}
+			
+			private function menuDownAction(event:MenuEvent):void{
+				var data:String = event.item.data;
+				if(activityEntityIsEnabled) tabSelected = event.index;
+				selectList(data);
+			}
+			
+			private const FILTER_WIDTH:int = 160;
+			
+			private function switchFilterList():void{
+				buttonBar.width = FILTER_WIDTH - buttonBar.width;
+				if (buttonBar.width == 0) {
+					switchFilter.setStyle("icon", ImageUtils.rightIcon);
+					Database.preferencesDao.setValue("navPanel.show", "0");
+				} else {
+					switchFilter.setStyle("icon", ImageUtils.leftIcon);
+					Database.preferencesDao.setValue("navPanel.show", "1");
+				}
+			}
+			
+			private static const FILE_NAME:String = 'gadget.xml';
+			private var _sessionId:String = null;
+			private var _fileName:String = null;
+			
+			private function reload():void{
+				updateTransactions();
+				refreshWindowLogo();
+				if(this._currentSelectedList!=null){
+					selectList(_currentSelectedList.entity);//refresh selected list
+				}else{
+					selectList(null);
+				};
+				if(_fileName){
+					Alert.show(i18n._("GLOBAL_IMPORT_SUCCESSFULLY") + " " + _fileName + "" , i18n._("IMPORT_PREFERENCE_FROM_OOD"), Alert.OK, this);
+					_fileName = null;
+					_sessionId = null;
+				}
+				
+				
+			}
+			private function importFromOOD(xml:XML,prefsXMLList:Function=null,mapValueWithControls:Function=null):void{
+				Utils.showLoadingProgressWindow(function importPref():void{Utils.importConfig(xml,prefsXMLList,mapValueWithControls,reload);}, "Importing Data","Importing Data");
+				//Utils.importConfig(xml,prefsXMLList,mapValueWithControls,reload,null);			
+			}
+			
+			private function successHandler(sessionId:String):void{
+				
+				//var time:GetCurrentUser = new GetCurrentUser();
+				//time.call(preferences, null, null, logErrorAndEnd, taskEventHandler, countHandler);
+				
+				this._sessionId = sessionId;
+				Utils.showLoadingProgressWindow(loadXmlConfigFromServer, i18n._(StringUtils.SAVING_DATA_STR), i18n._(StringUtils.SAVING_PREF_STR));
+				// loadXmlConfigFromServer();				
+			}
+			
+			private function loadXmlConfigFromServer():void{
+				var preferences:Object = Database.preferencesDao.read();
+				var incomingUserLogin:GetOwnerUser = new GetOwnerUser(handlerCompleteGetOwnerUser, _sessionId);
+				var _param:TaskParameterObject = new TaskParameterObject(incomingUserLogin);
+				_param.preferences = preferences;
+				incomingUserLogin.param = _param;
+				incomingUserLogin.requestCall();
+			}
+			
+			
+			private function handlerCompleteGetOwnerUser(ownerUser:Object, error:String, sessionId:String):void {
+				var fileName:String = FILE_NAME;
+				// var currentUser:Object = Database.currentUserDAO.getCurrentUser();
+				// var user:Object = Database.allUsersDao.ownerUser();
+				if(ownerUser){
+					var role:String = ownerUser["Role"];
+					fileName = "gadget_" + getRoleNameUrl(role) + ".xml";
+					loadXmlConfig(sessionId, fileName, finishLoadRoleXml);
+				}else{
+					loadXmlConfig(sessionId, FILE_NAME, null);
+				}
+			}
+			
+			
+			private function getRoleNameUrl(roleName:String):String{
+				var specialCharacters:Array = [" ", "<", ">", "#", "%", "{", 
+					"}", "|", "\\", "^", "~", "[", "]", "`", ";", "/", "?", ":", "@", "=", "&", "$"];
+				for each(var spc:String in specialCharacters) {
+					roleName = StringUtils.replaceAll_(roleName, spc, "");
+				}
+				if(roleName.length>19){
+					roleName = roleName.substr(0, 19);
+				}
+				
+				trace("Url RoleName : " + roleName);
+				return roleName;
+			}
+			
+			private function finishLoadRoleXml(sessionId:String, success:Boolean):void{
+				if(!success){
+					// if can not find role xml on server, then go to check gadget.xml on server again
+					loadXmlConfig(sessionId, FILE_NAME, null);
+				}
+			}
+			
+			private function loadXmlConfig(sessionId:String, fileName:String, finishLoadRoleXml:Function):void{
+				var strForwardSlash:String = tmpPreferences.sodhost.charAt(tmpPreferences.sodhost.length-1) == "/" ? "" : "/";
+				
+				this._fileName = fileName;
+				var request:URLRequest = new URLRequest();
+				request.url = tmpPreferences.sodhost + strForwardSlash +  "OnDemand/user/content/" + fileName; 
+				request.method = URLRequestMethod.GET;
+				request.contentType = "text/xml; charset=utf-8";
+				request.idleTimeout =100000;
+				request.useCache = false;
+				request.requestHeaders.push(new URLRequestHeader("Cookie", sessionId));
+				
+				var loader:URLLoader = new URLLoader();
+				loader.dataFormat = URLLoaderDataFormat.BINARY;
+				loader.addEventListener(Event.COMPLETE, function(e:Event):void {
+					
+					var data:String = (e.target as URLLoader).data;
+					var xml:XML = new XML(data);
+					var name:String = xml.name();
+					
+					if("configuration" == name){
+						// import preferrence 
+						importFromOOD(xml);
+						testConnectionWait.visible = false;
+						impFromOOD.enabled = true;
+						
+						if(finishLoadRoleXml != null){
+							finishLoadRoleXml(sessionId, true);
+						}else{
+							// Alert.show("Message", "Read file : " + fileName + " from server sucessfully." , Alert.OK, this); 
+						}
+					}else{
+						testConnectionError('Max size expected',null);
+					}
+				});
+				
+				loader.addEventListener(IOErrorEvent.IO_ERROR, function(e:IOErrorEvent):void {
+					
+					if(finishLoadRoleXml != null){
+						finishLoadRoleXml(sessionId, false);
+					}else{
+						testConnectionError(e.text, null);
+					}
+				});
+				
+				loader.load(request);
+			}
+			
+			
+			
+			private function testConnectionSuccess(sessionId:String):void{
+				// sending to get xml configuration file from server
+				ImportFileOODUtils.execute(tmpPreferences,successHandler, testConnectionError);
+			}
+			
+			private function testConnectionError(error:String, event:Event):void{
+				testConnectionWait.visible = false;
+				impFromOOD.enabled = true;
+				Alert.show(error, i18n._('Error'), Alert.OK, this); 
+			}
+			
+			private function testConnection():void{
+				testConnectionWait.visible = true;
+				
+				var login:LoginCRM = new LoginCRM(testConnectionSuccess, testConnectionError);
+				login.loginCRM(tmpPreferences);
+			}
+			private var tmpPreferences:Object;
+			private function importPref():void{
+				impFromOOD.enabled = false;
+				tmpPreferences = new Object()
+				var username:String = '';
+				var passwornd:String ='';
+				
+				if(Database.preferencesDao.getBooleanValue("use_sso")){
+					username = Database.preferencesDao.getValue("tech_username") +"";
+					passwornd = Database.preferencesDao.getValue("tech_password") +"";
+				}else{
+					username = Database.preferencesDao.getValue("sodlogin")+"";
+					passwornd = Database.preferencesDao.getValue("sodpass")+"";
+				}
+				tmpPreferences.sodhost =Database.preferencesDao.getValue("sodhost");
+				tmpPreferences.sodlogin = username;
+				tmpPreferences.sodpass = passwornd;
+				testConnection();
+				//	Utils.showLoadingProgressWindow(function importPref():void{testConnection();}, "Importing Data","Importing Data");
+				
+			}
+			/*private function openDashboardChartWindow():void {
+			var dashboardChart:DashboardChart = new DashboardChart();
+			WindowManager.openModal(dashboardChart);
+			}*/
+			
+			private function addHistoryAction():void{
+				if(navigateHistory.length>0){
+					var i:int =0;
+					if(navigateHistory.length > 1){
+						navigateHistory.removeItemAt(navigateHistory.length-1);
+					}
+					
+					if(navigateHistory.length>=1){
+						i = 1;
+					}
+					var obj:Object = navigateHistory.getItemAt(navigateHistory.length-i);
+					var data:String = tabBar.dataProvider.source[parseInt(obj.tabIndex)].data;
+					selectList(data);
+					if(obj.gadget_id != ""){
+						Utils.openDetail(Database.getDao(obj.entity).findByGadgetId(obj.gadget_id),this);
+					}
+				}
+			}
+		]]>
+	</mx:Script>
+	
+	
+	<mx:Style source="styles.css"/>
+	
+	<mx:Fade id="fadeOut" duration="100" alphaFrom="1.0" alphaTo="0.0"/>
+	<mx:Fade id="fadeIn" duration="100" alphaFrom="0.0" alphaTo="1.0"/>
+	<mx:Fade id="fadeMed" duration="100" alphaFrom="0.25" alphaTo="0.5"/>
+	
+	<mx:Canvas styleName="main" left="0" top="0" right="0" bottom="0" id="hiddenCanvas" width="100%" height="100%">
+		<mx:Canvas id="windowTitleBar" backgroundColor = "#EEEEEE" styleName="titleBar" doubleClickEnabled="true" doubleClick="viewRestoreMaxWindow()" mouseDown="nativeWindow.startMove()" height="24" top="2" left="2" right="2">			
+			<mx:Label id="titleLabel" text="CRM Gadget" top="0" left="24" />
+			<mx:Button styleName="iconBack" height="16" width="16" top="3" left="4" click="addHistoryAction()"/>
+			<mx:Button styleName="iconMinimize" height="16" width="16" top="2" right="36" click="minimize()"/>
+			<mx:Button styleName="iconMaximize" height="16" width="16" top="2" right="20" click="viewRestoreMaxWindow()"/>
+			<mx:Button styleName="iconClose" height="16" width="16" top="2" right="4" click="closeMain();"/>
+		</mx:Canvas>
+		<mx:VBox id="contMenu" height="64" top="28" left="4" right="0" verticalGap="2" width="100%">
+			<mx:HBox width="100%">
+				<mx:LinkBar id="menuToolbar" itemClick="menuClick(event)">
+					<mx:dataProvider>
+						<mx:String>{i18n._(MAINWINDOW_MENU_VIEW)}</mx:String>
+						<mx:String>{i18n._(GLOBAL_CREATE)}</mx:String>
+						<mx:String>{i18n._(MAINWINDOW_MENU_ITEM)}</mx:String>
+						<mx:String>{i18n._(MAINWINDOW_MENU_LAYOUT)}</mx:String>
+						<mx:String>{i18n._(MAINWINDOW_MENU_TOOLS)}</mx:String>
+						<mx:String>{i18n._(MAINWINDOW_MENU_RECENTLY_VIEWED)}</mx:String>
+						<mx:String>{i18n._(MAINWINDOW_MENU_HELP)}</mx:String>
+					</mx:dataProvider>
+				</mx:LinkBar>
+				<mx:HBox width="100%" horizontalAlign="right" paddingTop="4" paddingRight="10" horizontalGap="2">
+					<!--<mx:LinkButton id="chartBtn" icon="@Embed(source='/assets/chart_bar.png')" toolTip="{i18n._('Dashboard')}" click="openDashboardChartWindow();"/>-->
+					<control:CustomLinkButton id="testConnectionWait" icon="{ImageUtils.synOkIcon}" label="" visible="false" includeInLayout="true"/>
+					<mx:LinkButton id="impFromOOD" icon="@Embed(source='/assets/upload_config.png')" toolTip="{i18n._('IMPORT_PREFERENCE_FROM_OOD')}" click="importPref()" />
+					<mx:LinkButton id="prefBtn" icon="@Embed('/assets/preferences.png')" label="{i18n._(MAINWINDOW_BUTTON_PREFERENCES)}"
+								   click="openPreferenceWindow();"/>
+					<mx:LinkButton id="syncBtn2" icon="{ImageUtils.synIcon}" label="{i18n._(MAINWINDOW_BUTTON_SYNCHRONIZE_DATA)}"
+								   click="openSyncWindow();"/>
+					<control:CustomLinkButton id="syncBtn1" icon="{ImageUtils.synOkIcon}" label="{i18n._(MAINWINDOW_BUTTON_SYNCHRONIZE_DATA)}"
+											  click="openSyncWindow();" visible="false" includeInLayout="false"/>
+					
+					<mx:LinkButton icon="@Embed('/assets/search.png')" label="{i18n._(MAINWINDOW_BUTTON_QUICK_SEARCH)}"
+								   click="openQuickSearchWindow();"/>
+					<!-- AM 13/04/2010 : still a little bit bugged so i comment it -->
+					<!--<mx:LinkButton width="25" height="18" id="syncBtn" left="-3" icon="@Embed('/assets/sync.png')" click="openSyncWindow();" />-->					
+					<!--<mx:Image verticalAlign="middle" source="@Embed('/assets/sync.png')" />
+					<control:AutoComplete id="txtQuickSearch" dataProvider="{getQuickSearchData()}" lookAhead="true" 
+					close="{txtQuickSearchHandler(event)}" focusOut="txtQuickSearch.typedText=''"/> -->
+				</mx:HBox>
+			</mx:HBox>
+			<mx:HRule width="100%"/>
+			<mx:HBox width="100%" height="22">
+				<mx:Image source="@Embed('/assets/star.png')" horizontalAlign="right" width="24"/>
+				<mx:HBox id="bookmarkBar" width="100%" height="100%" horizontalGap="0" backgroundColor="#FFFFFF">
+					<mx:dragEnter>
+						if (event.dragSource.hasFormat('items')) {
+						var dropTarget:HBox = event.currentTarget as HBox;
+						DragManager.acceptDragDrop(dropTarget);
+						}
+					</mx:dragEnter>
+					<mx:dragOver>
+					</mx:dragOver>
+					<mx:dragDrop>
+						var data:Object = event.dragSource.dataForFormat('items');
+						addBookmark(data[0]);
+					</mx:dragDrop>
+				</mx:HBox>
+			</mx:HBox>
+			<mx:HRule width="100%"/>
+		</mx:VBox>
+		
+		<mx:Canvas top="92" left="8" right="8" bottom="8" width="100%" height="100%">    		
+			<mx:HBox width="100%" height="100%" verticalAlign="middle" horizontalGap="0">
+				<mx:VBox width="160" height="100%" id="buttonBar" verticalAlign="middle" horizontalAlign="center">
+					<mx:Image id= "windowlogo" horizontalAlign="center" verticalAlign="middle"/>
+					<mx:Tile tileWidth="80" tileHeight="80" id="navButtons" width="160" horizontalGap="0" verticalGap="0"/>					
+					<mx:Panel title="{i18n._(GLOBAL_CREATE)}" id="navPanels" height="100%" width="160" horizontalGap="0" verticalGap="0" layout="vertical" />
+					<list:FilterList id="filterList" width="100%" height="100%"/>
+				</mx:VBox>
+				<mx:LinkButton id="switchFilter" width="12" height="24" icon="{ImageUtils.leftIcon}" click="switchFilterList()" />
+				<mx:VBox width="100%" height="100%" paddingLeft="-8" verticalGap="0">
+					<mx:HBox width="100%" horizontalGap="0" paddingRight="16" paddingLeft="6">
+						<containers:ButtonScrollingCanvas id="buttonCanvas" verticalScrollPolicy="off"
+														  leftButtonStyleName="leftButton"
+														  buttonWidth="20"
+														  rightButtonStyleName="rightButton"
+														  width="100%"
+														  height="24" 
+														  includeInLayout="{tabBar.includeInLayout}" visible="{tabBar.visible}"
+														  horizontalScrollPolicy="auto">
+							
+							<mx:TabBar id="tabBar" includeInLayout="false" visible="false" paddingRight="16" paddingLeft="10" itemClick="tabEvent(event);" height="24" paddingBottom="-1" styleName="tabBar" />
+						</containers:ButtonScrollingCanvas>
+						<mx:Button width="20" height="24" icon="@Embed('/assets/down.png')" includeInLayout="{tabBar.includeInLayout}" visible="{tabBar.visible}" click="menuDownClick(event);" />
+					</mx:HBox>
+					
+					<mx:ViewStack id="navigator" width="100%" height="100%" creationPolicy="all"  change="tabChangeListener(event)"/>
+				</mx:VBox>
+			</mx:HBox>
+		</mx:Canvas>
+		<mx:VBox horizontalAlign="right" verticalAlign="bottom" width="100%" height="100%" paddingBottom="1" paddingRight="1">
+			<mx:Image  source="@Embed('/assets/resize.png')" >
+				
+			</mx:Image>
+		</mx:VBox>
+		
+	</mx:Canvas>
+	
+</mx:Window>

@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						   xmlns:s="library://ns.adobe.com/flex/spark" 
+						   xmlns:mx="library://ns.adobe.com/flex/mx"
+						   xmlns:control="gadget.control.*"
+						   xmlns:rtc="AfcsNameSpace"
+						   title="{i18n._('GLOBAL_SUPPORT')}"
+						   width="600" height="550"
+						   showStatusBar="false"
+						   showFlexChrome="false" transparent="true" systemChrome="none"
+						   creationComplete="init()" 
+						   >	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<rtc:AdobeHSAuthenticator id="auth"/>
+		
+		<!--
+		| Automatically promote guests so they can use the application
+		|
+		| Note: In order for this to work, the host needs to enter the room once to enable all the pods
+		| (enter the room and go through the various screens)
+		-->
+		<rtc:RoomSettings id="settings" autoPromote="true"/>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.rtc.authentication.AdobeHSAuthenticator;
+			import com.adobe.rtc.clientManagers.MicrophoneManager;
+			import com.adobe.rtc.collaboration.AudioPublisher;
+			import com.adobe.rtc.events.AuthenticationEvent;
+			import com.adobe.rtc.events.SessionEvent;
+			import com.adobe.rtc.pods.FileShare;
+			import com.adobe.rtc.pods.Roster;
+			import com.adobe.rtc.pods.SimpleChat;
+			import com.adobe.rtc.pods.WebCamera;
+			import com.adobe.rtc.session.ConnectSession;
+			
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			
+			import mx.containers.HBox;
+			import mx.containers.VBox;
+			import mx.controls.Button;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.SliderEvent;
+			import mx.managers.PopUpManager;
+			import mx.validators.StringValidator;
+			import mx.validators.Validator;
+			
+			import spark.components.HGroup;
+			import spark.components.HSlider;
+			import spark.components.Label;
+			
+			private const LOGINWINDOW_MSG_AUTENTICATION_SUCCEEDED:String = "LOGINWINDOW_MSG_AUTENTICATION_SUCCEEDED";
+			private const LOGINWINDOW_MSG_AUTENTICATION_FAILED:String = "LOGINWINDOW_MSG_AUTENTICATION_FAILED";			
+			private const LOGINWINDOW_MSG_GOD_EVENT:String = "LOGINWINDOW_MSG_GOD_EVENT";
+			//CRO 05.01.2011
+			private const LOGINWINDOW_TITLEBAR_SUPPORT:String = "GLOBAL_SUPPORT";
+			private const LOGINWINDOW_BUTTON_AUDIO:String = "GLOBAL_AUDIO";
+			private const LOGINWINDOW_LABEL_VOLUME:String = "GLOBAL_VOLUME";
+			private const LOGINWINDOW_TITLE_CONNECT_TO_ROOM:String = "LOGINWINDOW_TITLE_CONNECT_TO_ROOM";
+			private const LOGINWINDOW_BUTTON_LOGIN:String = "GLOBAL_LOGIN";
+			
+			private var validators:Array = [];
+			
+			private function init():void{
+				imform.roomURL.text = "https://connectnow.acrobat.com/crmgadget2go/crmgadget2go";
+				setValidator();
+				sess.addEventListener(SessionEvent.ERROR, onEventNotification);
+				sess.addEventListener(SessionEvent.SYNCHRONIZATION_CHANGE, onEventNotification);
+				auth.addEventListener(AuthenticationEvent.AUTHENTICATION_FAILURE, onEventNotification);
+				auth.addEventListener(AuthenticationEvent.AUTHENTICATION_SUCCESS, onEventNotification);
+				popup(loginWindow);
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function login():void {
+				if( validate() ) {
+					notificationMessage.text = "";
+					auth.userName = imform.username.text;
+					auth.password = imform.passwordFormItem.visible ? imform.password.text : null; // password==null : the user is a guest
+					sess.roomURL = imform.roomURL.text;	
+					sess.login();
+				}
+			}
+			
+			private function setValidator():void {
+				addStringValidatorTo(imform.roomURL, validators);
+				addStringValidatorTo(imform.username, validators);
+			}
+			
+			private function addStringValidatorTo(source:DisplayObject, validatorList:Array):void {
+				var sv:StringValidator = new StringValidator();
+				sv.property = "text";
+				sv.source = source;
+				validatorList.push(sv);
+			}
+			
+			private function validate():Boolean {
+				var validatorErrorArray:Array = Validator.validateAll(validators);
+				return (validatorErrorArray.length == 0);
+			}
+
+			private function onEventNotification(p_event:Event):void {
+				if (p_event.type == SessionEvent.SYNCHRONIZATION_CHANGE) {
+					if (sess.isSynchronized) {
+						// isSyncronized==true : we are connected to the room
+						PopUpManager.removePopUp(loginWindow);
+					} else {
+						// isSyncronized==false : we are disconnected from the room
+						sess.roomURL = null;
+						notificationMessage.text = "";
+						popup(loginWindow);
+					}
+				}else if (p_event.type == AuthenticationEvent.AUTHENTICATION_SUCCESS) {
+					// Authentication succeeded
+					notificationMessage.text = i18n._(LOGINWINDOW_MSG_AUTENTICATION_SUCCEEDED);
+				}else if (p_event.type == AuthenticationEvent.AUTHENTICATION_FAILURE) {
+					// Authentication failed : bad password or invalid username
+					notificationMessage.text = i18n._(LOGINWINDOW_MSG_AUTENTICATION_FAILED);
+				}else if (p_event.type == SessionEvent.ERROR) {
+					// Generic session error, but this can happen if you mispell the account/room names
+					// (sError.error.name == "INVALID_INSTANCE" and sError.error.message == "Invalid Instance")
+					var sError:SessionEvent = p_event as SessionEvent;
+					notificationMessage.text = sError.error.message;
+				}else
+					notificationMessage.text = i18n._(LOGINWINDOW_MSG_GOD_EVENT)+ " " + p_event;
+			}
+			
+			private function popup(window:IFlexDisplayObject):void {
+				PopUpManager.addPopUp(window, this, true);
+				PopUpManager.centerPopUp(window);
+				window.visible = true;
+			}
+			private function onCreationComplete():void		
+			{
+				
+				var mic:Microphone = Microphone.getMicrophone();
+				Security.showSettings("2");
+				mic.setLoopBack(false);
+				if (mic != null) 
+				{
+					 mic.setUseEchoSuppression(true);
+		//			 mic.addEventListener(ActivityEvent.ACTIVITY, activityHandler);
+		//			 mic.addEventListener(StatusEvent.STATUS, statusHandler);
+					
+				}
+			 }
+				
+			
+		]]>
+	</fx:Script>
+	<fx:Style source="styles.css"/>
+	<mx:Canvas id="canvasMain" styleName="main" left="0" top="0" width="600" height="550" right="0" bottom="0">
+		<control:TitleBar title="{i18n._(LOGINWINDOW_TITLEBAR_SUPPORT)}" icon="@Embed(source='/assets/call.png')"/>
+		<mx:TitleWindow id="loginWindow" title="{i18n._(LOGINWINDOW_TITLE_CONNECT_TO_ROOM)}" visible="false">
+			<mx:VBox>
+				<control:IMForm id="imform"/>
+				<mx:HBox width="100%" paddingRight="16"><!--CRO 05.01.2011-->
+					<control:DetailButtonBar buttonLabel="GLOBAL_LOGIN" action="login" />
+				</mx:HBox>
+				<mx:Text id="notificationMessage"/>
+			</mx:VBox>
+		</mx:TitleWindow>
+		<rtc:ConnectSessionContainer width="100%" height="100%" top="30" 
+			id="sess" authenticator="{auth}" initialRoomSettings="{settings}" autoLogin="false" creationComplete="onCreationComplete()">
+			<mx:HBox width="100%" height="100%">
+				<mx:VBox width="25%" height="100%">
+					<rtc:Roster width="100%" height="50%"/>
+					<rtc:WebCamera width="100%" height="40%"/>
+					<mx:VBox>
+						<rtc:AudioPublisher id="audioPub" height="0" gain="50" useEchoSuppression="true"/>
+						<rtc:AudioSubscriber/>
+						<s:HGroup verticalAlign="middle">
+							<mx:Button label="{i18n._(LOGINWINDOW_BUTTON_AUDIO)}" toggle="true" id="audioButt" click="volumeSlider.enabled = audioButt.selected; (audioButt.selected) ? audioPub.publish() : audioPub.stop();"/>
+							<s:Label text="{i18n._(LOGINWINDOW_LABEL_VOLUME)}"/>
+							<s:HSlider id="volumeSlider" enabled="false" minimum="0" maximum="100" value="50" change="audioPub.gain = volumeSlider.value"/>
+						</s:HGroup>
+					</mx:VBox>
+				</mx:VBox>
+				<mx:VBox width="100%" height="100%">
+					<rtc:FileShare width="100%" height="50%"/>
+					<rtc:SimpleChat width="100%" height="50%"/>
+				</mx:VBox>
+			</mx:HBox>
+		</rtc:ConnectSessionContainer>			
+	</mx:Canvas>
+</mx:Window>

@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:control="gadget.control.*" 
+		   xmlns:MyValidate="gadget.util.*"
+		   width="450" height="420" verticalAlign="middle"
+		   resizable="false"
+		   initialize="init();"
+		   showFlexChrome="false" transparent="true" systemChrome="none">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.lists.ReportList;
+			import gadget.util.FieldUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+			import mx.controls.Alert;
+			import mx.controls.ComboBox;
+			import mx.events.DragEvent;
+			import mx.validators.StringValidator;
+			import mx.validators.Validator;
+			
+			[Bindable] public var reportItem:Object;
+			[Bindable] public var isCreate:Boolean;
+			
+			[Bindable] private var availabledData:ArrayCollection = new ArrayCollection();
+			[Bindable] private var selectedData:ArrayCollection = new ArrayCollection();
+			
+			[Embed(source='/assets/search.png')] [Bindable] public var searchIcon:Class;
+			
+			
+			private static var TITLE_CREATE_STR:String = i18n._('REPORTDETAIL_TITLE_CREATE_STR');
+			private static var TITLE_EDIT_STR:String = i18n._('REPORTDETAIL_TITLE_EDIT_STR');
+			//CRO 05.01.2011
+			private static var DIALOG_TITLE_STR:String = i18n._('GLOBAL_REPORT_BUILDER');
+			private static var NAME_MSG_ERR:String = i18n._('REPORTDETAIL_NAME_MSG_ERR');
+			private static var ENTITY_MSG_ERR:String = i18n._('REPORTDETAIL_ENTITY_MSG_ERR');
+			
+			
+			public var reportList:ReportList;
+			
+			private var validate:Array = new Array();
+			
+			private function init():void{
+				actionButtonAdd.visible = isCreate;
+				actionButtonAdd.includeInLayout = isCreate;
+				actionButtonUpdate.visible = !isCreate;
+				actionButtonUpdate.includeInLayout = !isCreate;
+				var selectedItem:Object;
+				
+				this.title = isCreate ? TITLE_CREATE_STR : TITLE_EDIT_STR + reportItem.name;
+				reportDetail.title = this.title;
+				
+				var transactions:ArrayCollection = new ArrayCollection();
+				transactions.addItem({label:"", data:""});
+				for each (var transaction:Object in Database.transactionDao.listTransaction()){
+					var objCombo:Object = {label:Database.customLayoutDao.getDisplayName(transaction.entity), data:transaction.entity, icon:ImageUtils.getImage(transaction.entity)};
+					transactions.addItem(objCombo);
+					if(transaction.entity == reportItem.entity) selectedItem = objCombo;
+				}
+				cboEntity.dataProvider = transactions;
+				
+				// Validate Field Name
+				var stringValidator:StringValidator = new StringValidator();
+				stringValidator.property = "text";
+				stringValidator.source = reportName;
+				stringValidator.required = true;
+				stringValidator.requiredFieldError = NAME_MSG_ERR;
+				validate.push(stringValidator);
+				
+				if(!isCreate){
+					availabledData = Utils.getColumns(reportItem.entity);
+					availabledData.removeItemAt(0);
+					var criteria:Object = new Object();
+					criteria.id = reportItem.id;
+					var fieldsSelected:ArrayCollection = Database.reportFieldsDAO.getFieldsReport(criteria);
+					
+					for(var j:int=0; j<fieldsSelected.length; j++){
+						for(var i:int=0; i<availabledData.length; i++){
+							if(fieldsSelected.getItemAt(j).element_name==availabledData.getItemAt(i).column){
+								selectedData.addItemAt(availabledData.source.splice(i,1)[0], j);
+								break;
+							}
+						}
+					}					
+					filter.dataProvider = Utils.getAllFilters(reportItem.entity);
+					filter.selectedIndex = reportItem.filter_id ? Utils.getComboIndex(filter, reportItem.filter_id, 'id') : 0;
+					availabledGrid.dataProvider = availabledData;
+					selectedGrid.dataProvider = selectedData;
+					cboEntity.selectedItem = selectedItem;
+				}else{
+					stringValidator = new StringValidator();
+					stringValidator.property = "text";
+					stringValidator.source = cboEntity;
+					stringValidator.required = true;
+					stringValidator.requiredFieldError = ENTITY_MSG_ERR;
+					
+					validate.push(stringValidator);
+				}
+			}
+			
+			private function changeEntityAction(event:Event):void{
+				var cbo:ComboBox = event.currentTarget as ComboBox;
+				selectedData.removeAll();
+				availabledData.removeAll();
+				filter.dataProvider = new ArrayCollection();
+				var entity:String = cbo.selectedItem.data;
+				if(entity != ""){
+					filter.dataProvider = Utils.getAllFilters(entity);
+					var data:ArrayCollection = Utils.getColumns(entity);
+					data.removeItemAt(0);
+					var fields:ArrayCollection =FieldUtils.getDefaultFieldsObject(entity);
+					for each(var reportObject:Object in data){
+						if(fields.contains(reportObject.column)){
+							selectedData.addItem(reportObject);
+						}else{
+							availabledData.addItem(reportObject);
+						}
+					}
+				}
+			}
+			
+			private function commit():Boolean{
+				var error:String = "";
+				for each(var objError:Object in Validator.validateAll(validate)){
+					if(objError.type=="invalid"){
+						error += objError.message;
+						break;
+					}
+				}
+				if(StringUtils.isEmpty(error)){
+					selectedData = selectedGrid.dataProvider as ArrayCollection;
+					var reportId:int = 0;
+					if(isCreate){
+						var reportObject:Object = new Object();
+						reportObject.name = reportName.text;
+						reportObject.entity = cboEntity.selectedItem.data;
+						reportObject.filter_id = filter.selectedItem.id;
+						Database.reportDAO.insert(reportObject);
+						reportId = Database.reportDAO.select_last_id();
+					}else{
+						reportItem.name = reportName.text;
+						reportItem.filter_id = filter.selectedItem.id;
+						reportItem.entity = cboEntity.selectedItem.data;
+						Database.reportDAO.updateReport(reportItem);
+						var criteria:Object = new Object();
+						criteria.id = reportItem.id;
+						Database.reportFieldsDAO.delete_(criteria);
+						reportId = reportItem.id;
+					}
+					Database.begin();
+					for(var i:int=0; i<selectedData.length; i++){
+						var object:Object = new Object();
+						object.id = reportId;
+						object.element_name = selectedData.getItemAt(i).column;
+						object.num = i + 1;
+						Database.reportFieldsDAO.insert(object);
+					}
+					Database.commit();
+					reportList.initData();
+					return true;
+				}
+				Alert.show(error, DIALOG_TITLE_STR, Alert.OK, this);
+				return false;
+			}
+			//#294: Report - Order & Search 31.10.2010
+			/*private function moveUpCol():void{
+				selectedData = selectedGrid.dataProvider as ArrayCollection;
+			    var index:int = selectedGrid.selectedIndex;
+				if(index == 0 || index == -1) return;
+				var obj:Object = selectedData.getItemAt(index);
+				selectedData.addItemAt( obj,index-1);
+				selectedData.removeItemAt(index+1);
+				
+				selectedData.refresh();
+			}
+			private function moveDownCol():void{
+				selectedData = selectedGrid.dataProvider as ArrayCollection;
+				var index:int = selectedGrid.selectedIndex;
+				if(index == selectedData.length-1 || index == -1) return;
+				var obj:Object = selectedData.getItemAt(index);
+				selectedData.addItemAt( obj,index+2);
+				selectedData.removeItemAt(index);
+				
+				selectedData.refresh();
+			}*/
+			//end #294: Report - Order & Search
+			private function dragStartEvent(event:DragEvent):void{
+				var grid:DataGrid = event.currentTarget as DataGrid;
+				if(grid.id=="availabledGrid"){
+					grid.dropEnabled = false;
+					selectedGrid.dropEnabled = true;
+				}else if(grid.id=="selectedGrid"){
+					availabledGrid.dropEnabled = true;
+					selectedGrid.dropEnabled = true;
+				}
+			}
+			
+			private function dropEvent(event:DragEvent):void{
+				var grid:DataGrid = event.target as DataGrid;
+				availabledData = grid.dataProvider as ArrayCollection;
+				var sort:Sort = new Sort();
+				sort.fields = [new SortField("label", true)];
+				availabledData.sort = sort;
+				availabledData.refresh();
+				grid.selectedIndex = -1;
+				grid.dataProvider = availabledData;
+			}
+				
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="450" height="420" right="0" bottom="0">
+		<control:TitleBar id="reportDetail" icon="@Embed(source='/assets/report_builder.png')" />
+		<mx:VBox top="40" left="16" right="16" bottom="16" width="100%" height="100%">
+			<mx:Form><!--CRO 05.01.2011-->
+				<mx:FormItem label="{i18n._('GLOBAL_NAME')}">
+					<mx:TextInput id="reportName" width="220" text="{reportItem.name}" />
+				</mx:FormItem><!--CRO 05.01.2011-->
+				<mx:FormItem label="{i18n._('GLOBAL_ENTITY')}">
+					<control:IconComboBox width="220" id="cboEntity" change="changeEntityAction(event)"  />
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._('GLOBAL_FILTER')}">
+					<mx:ComboBox id="filter" width="220" labelField="displayName" />
+				</mx:FormItem>
+			</mx:Form>
+			<mx:HBox width="100%" height="100%">
+				<mx:DataGrid id="availabledGrid" dataProvider="{availabledData}"
+						 dragEnabled="true"
+						 dragMoveEnabled="true"
+						 dragStart="dragStartEvent(event)"
+						 dragDrop="dropEvent(event)"
+						 width="50%" height="100%">
+					<mx:columns>
+						<mx:DataGridColumn headerText="{i18n._('REPORTDETAIL_DATAGRIDCOLUMN_HEADERTEXT_FIELDS')}" dataField="label" />
+					</mx:columns>
+				</mx:DataGrid>
+				<mx:DataGrid id="selectedGrid" dataProvider="{selectedData}" 
+						 dragEnabled="true"
+						 dragMoveEnabled="true"
+						 dragStart="dragStartEvent(event)"
+						 dropEnabled="true"
+						 width="50%" height="100%">
+					<mx:columns>
+						<mx:DataGridColumn headerText="{i18n._('REPORTDETAIL_DATAGRIDCOLUMN_HEADERTEXT_SELECTED_FIELDS')}" dataField="label" />
+					</mx:columns>
+				</mx:DataGrid>
+				<!--<mx:VBox  >
+					<mx:Button icon="{searchIcon}" id="moveUP"  click="moveUpCol()" />
+					<mx:Button  id="moveDown"  click="moveDownCol()"/>
+				</mx:VBox>-->
+				
+			</mx:HBox>
+			<control:DetailButtonBar id="actionButtonAdd" buttonIcon="@Embed('/assets/add.png')" action="commit" buttonLabel="GLOBAL_ADD"/>
+			<control:DetailButtonBar id="actionButtonUpdate" buttonIcon="@Embed('/assets/edit.png')" action="commit" buttonLabel="GLOBAL_UPDATE"/>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

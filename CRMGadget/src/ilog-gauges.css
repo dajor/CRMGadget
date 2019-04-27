@@ -1,0 +1,42 @@
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+@namespace local "*";
+
+local|GaugeFormBase
+{
+  padding-left: 5;
+  padding-right: 5;
+  padding-bottom: 0;
+  padding-top:0;
+  vertical-gap : 2;
+}
+
+mx|FormItem
+{
+  indicator-gap: 5;
+}
+
+.circularSpark
+{
+  skin-class: ClassReference("com.ibm.ilog.elixir.gauges.skins.spark.CircularGaugeSkin");
+}
+
+.semiCircularSpark
+{
+  skin-class: ClassReference("com.ibm.ilog.elixir.gauges.skins.spark.SemiCircularGaugeSkin");
+}
+
+.horizontalSpark
+{
+  skin-class: ClassReference("com.ibm.ilog.elixir.gauges.skins.spark.HorizontalGaugeSkin");
+}
+
+.verticalSpark
+{
+  skin-class: ClassReference("com.ibm.ilog.elixir.gauges.skins.spark.VerticalGaugeSkin");
+}
+
+.glossyKnob
+{
+  skin-class: ClassReference("com.ibm.ilog.elixir.gauges.skins.glossy.KnobGaugeSkin");
+}

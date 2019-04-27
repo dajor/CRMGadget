@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Form
+	creationComplete="init()"
+	xmlns:mx="http://www.adobe.com/2006/mxml" paddingBottom="0" xmlns:control="gadget.control.*">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Text;
+			import mx.events.ItemClickEvent;
+			import mx.utils.StringUtil;
+			import mx.validators.Validator;
+			
+			[Bindable] public var filter:Object;
+			[Bindable] public var criteria1:Object;
+			[Bindable] public var criteria2:Object;
+			[Bindable] public var criteria3:Object;
+			[Bindable] public var criteria4:Object;
+			[Bindable] public var criteria5:Object;
+			[Bindable] public var isCreated:Boolean;
+			[Bindable] public var filterName:String;
+//			private function changeLanguageCode():void{
+//				var languageCode:String = CalculatedField.getComboDataField(cbolanguageCodes);
+//				if(languageCode!=CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+//					btnNewField.enabled = false;
+//					btndeleteField.enabled = false;
+//				}else{
+//					btnNewField.enabled = true;
+//					btndeleteField.enabled = true;
+//				}
+//				// fieldsGrid.dataProvider = Database.customFieldDao.selectAll(CalculatedField.getComboDataField(cboEntitys),languageCode);
+//				refreshListDataGrid();
+//			}
+			public function validate(create:Boolean):Array {
+				// check mandatory field
+				var validatorErrorArray:Array = Validator.validateAll([nameValidator]);
+				if (create && !StringUtils.isEmpty(nameInput.text) && Database.filterDao.exists(nameInput.text)){						
+					var error:Object = new Object();
+					//CRO 05.01.2011
+					error.message = i18n._('GLOBAL_FILTER')+ " \"" + nameInput.text + "\" " + i18n._('FILTER_FORM_ALREADY_EXISTS_PLEASE_CHOOSE_ANOTHER_NAME');
+					validatorErrorArray.push(error);
+				}
+				
+				//if the filterName is not typed, so no need to check the criterias.
+				if(validatorErrorArray.length > 0) return validatorErrorArray;
+				
+				// check criterias
+				if(
+					!Utils.isCriteriaCompleted(filterCol1, filterOp1, filterParam1, cboFilterParam1) &&
+					!Utils.isCriteriaCompleted(filterCol2, filterOp2, filterParam2, cboFilterParam2) &&
+					!Utils.isCriteriaCompleted(filterCol3, filterOp3, filterParam3, cboFilterParam3) &&
+					!Utils.isCriteriaCompleted(filterCol4, filterOp4, filterParam4, cboFilterParam4)
+				){
+					addCriteriaError(validatorErrorArray);
+				}
+				
+				return validatorErrorArray;
+				
+			}
+			
+			private function addCriteriaError(validatorErrorArray:Array):void {
+				var error:Object = new Object();
+				error.message = i18n._('FILTER_FORM_AT_LEAST_ONE_OF_THE_CRITERIA_MUST_BE_COMPLETED');
+				validatorErrorArray.push(error);
+			}
+			
+			private function init():void {
+
+				manageViewParamControl(filterOp1);
+				manageViewParamControl(filterOp2);
+				manageViewParamControl(filterOp3);
+				manageViewParamControl(filterOp4);
+				loadData();
+				nameInput.setFocus(); //set focus to any controls to avoid problem with dropdownlist of combobox
+				setSelectedLanguage();
+			}
+			//CRO #1345
+			private function changeLanguage():void{
+				var translate:Object = Database.customFilterTranslatorDao.selectFT(filter.entity,filterName,cboLanguage.selectedItem.data);
+				if(translate != null)  nameInput.text = translate.displayName;
+				if(translate.languageCode == 'ENU'){
+					itemCriteria1.enabled =true;
+					itemCriteria1_1.enabled =true;
+					itemCriteria2.enabled =true;
+					itemCriteria2_1.enabled =true;
+					itemCriteria3.enabled =true;
+					itemCriteria3_1.enabled =false;
+					itemCriteria4.enabled =true;
+					itemCriteria5.enabled =true;
+					filterParam1.enabled =true;
+					filterParam2.enabled =true;
+					filterParam3.enabled =true;
+					filterParam4.enabled =true;
+					cboFilterFormula1.enabled =true;
+					cboFilterFormula2.enabled =true;
+					cboFilterFormula3.enabled =true;
+					cboFilterFormula4.enabled =true;
+					
+					cboFilterParam1.enabled= true;
+					cboFilterParam2.enabled= true;
+					cboFilterParam3.enabled= true;
+					cboFilterParam4.enabled= true;
+					
+				}else{
+					itemCriteria1.enabled =false;
+					itemCriteria1_1.enabled =false;
+					itemCriteria2.enabled =false;
+					itemCriteria2_1.enabled =false;
+					itemCriteria3.enabled =false;
+					itemCriteria3_1.enabled =false;
+					itemCriteria4.enabled =false;
+					itemCriteria5.enabled =false;
+					filterParam1.enabled =false;
+					filterParam2.enabled =false;
+					filterParam3.enabled =false;
+					filterParam4.enabled =false;
+					
+					cboFilterFormula1.enabled =false;
+					cboFilterFormula2.enabled =false;
+					cboFilterFormula3.enabled =false;
+					cboFilterFormula4.enabled =false;
+					
+					cboFilterParam1.enabled= false;
+					cboFilterParam2.enabled= false;
+					cboFilterParam3.enabled= false;
+					cboFilterParam4.enabled= false;
+				}
+			}
+			private function setSelectedLanguage():void{
+				var lst:ArrayCollection = cboLanguage.dataProvider as ArrayCollection;
+				for(var i:int=0;i<lst.length;i++){
+					if(lst.getItemAt(i).data == "ENU"){
+						cboLanguage.selectedIndex = i;
+						break
+					}	
+				}
+			}
+			private function loadData():void {
+				
+				setFilterParamColIndex(filterCol1, filterParam1, cboFilterParam1, criteria1);
+				setFilterParamColIndex(filterCol2, filterParam2, cboFilterParam2, criteria2);
+				setFilterParamColIndex(filterCol3, filterParam3, cboFilterParam3, criteria3);
+				setFilterParamColIndex(filterCol4, filterParam4, cboFilterParam4, criteria4);
+				
+				if(criteria5.param=='desc'){
+					sortbydesc.selected=true;
+				}else{
+					sortbyasc.selected=true;
+				}
+			}
+			
+			private function setOperator(filterCol:ComboBox):void {
+				var selectedItem:Object = filterCol.selectedItem;
+				var isDateField:Boolean = false;
+				if(selectedItem != null) {
+					var newDP:ArrayCollection = new ArrayCollection();
+					var dateOper:Array = ["=", "!=", ">", "<", ""];
+					if(selectedItem.type == "DateTime" || selectedItem.type == "Date") {
+						for each(var oper:Object in Utils.operatorData) {
+							if(dateOper.indexOf(oper.data) != -1) {
+								newDP.addItem({label: oper.label, data: oper.data});
+							}else {
+								newDP.addItem({label: oper.label, data: oper.data, enabled: false});
+							}
+						}
+						isDateField = true;
+					}else {
+						newDP = Utils.operatorData;
+					}
+					var isCboFilterColUnselected:Boolean = StringUtils.isEmpty(selectedItem.label);
+					var objFormula:Object = new Object();
+					if(StringUtils.endsWith(filterCol.id, "1")) {
+						objFormula = {cboFilterFormula: cboFilterFormula1, visible: isDateField}
+						setFilterOpColIndex(filterOp1, filterParam1, cboFilterParam1, criteria1, newDP, isCboFilterColUnselected, objFormula);
+					}else if(StringUtils.endsWith(filterCol.id, "2")) {
+						objFormula = {cboFilterFormula: cboFilterFormula2, visible: isDateField}
+						setFilterOpColIndex(filterOp2, filterParam2, cboFilterParam2, criteria2, newDP, isCboFilterColUnselected, objFormula);
+					}else if(StringUtils.endsWith(filterCol.id, "3")) {
+						objFormula = {cboFilterFormula: cboFilterFormula3, visible: isDateField}
+						setFilterOpColIndex(filterOp3, filterParam3, cboFilterParam3, criteria3, newDP, isCboFilterColUnselected, objFormula);
+					}else if(StringUtils.endsWith(filterCol.id, "4")) {
+						objFormula = {cboFilterFormula: cboFilterFormula4, visible: isDateField}
+						setFilterOpColIndex(filterOp4, filterParam4, cboFilterParam4, criteria4, newDP, isCboFilterColUnselected, objFormula);
+					}
+				}
+			}
+			
+			private function resetFilterParam(filterParam:TextInput, cboFilterParam:ComboBox):void {
+				filterParam.text = "";
+				cboFilterParam.selectedIndex = 0;
+			}
+			
+			private function setFilterOpColIndex(filterOp:ComboBox, filterParam:TextInput, cboFilterParam:ComboBox, criteria:Object, newDP:ArrayCollection, isResetParam:Boolean, objFormula:Object):void {
+				filterOp.dataProvider = newDP;
+				filterOp.selectedIndex = isResetParam ? 0 : Utils.getComboOpIndex(criteria.operator);
+				// For date we display both filterParm and cboFilterFormula
+				objFormula.cboFilterFormula.visible = objFormula.visible;
+				filterParam.includeInLayout = objFormula.visible;
+				filterParam.width = objFormula.visible ? 140 : 260;
+				if(isResetParam) resetFilterParam(filterParam, cboFilterParam);
+			}
+			
+			private function setFilterParamColIndex(filterCol:ComboBox, filterParam:TextInput, cboFilterParam:ComboBox, criteria:Object):void {
+				var isSalesStage:Boolean = (filter.entity == "Opportunity" && criteria.column_name == "SalesStage");
+				setOperator(filterCol);
+				filterParam.text = criteria.param;
+				cboFilterParam.dataProvider = isSalesStage ? Utils.getSalesStage() : PicklistService.getPicklist(filter.entity, criteria.column_name);
+				cboFilterParam.selectedIndex = isSalesStage ? Utils.getCboSalesStageParamIndex(criteria.param) : Utils.getComboParamIndex(criteria.column_name, filter.entity, criteria.param);
+				cboFilterParam.labelField="label";				
+			}
+			
+			private function changeAction(event:Event):void{
+				var currentComboBox:ComboBox = event.currentTarget as ComboBox;
+				var object:Object = currentComboBox.selectedItem;
+				// Change Request #1011
+				setOperator(currentComboBox);
+				var dataSource:ArrayCollection = (object.entity == "Opportunity" && object.column == "SalesStage") ? Utils.getSalesStage() : PicklistService.getPicklist(object.entity, object.column);
+				isPickList(object.type == "Picklist" && dataSource.length > 1 ? true : false, currentComboBox.id, dataSource);
+			}
+			
+			private function operatorChangeHandler(event:Event):void {
+				var operatorComboBox:ComboBox = event.currentTarget as ComboBox;
+				manageViewParamControl(operatorComboBox);
+			}
+			
+			private function manageViewParamControl(operatorComboBox:ComboBox):void {
+				if( !Utils.isEmptyOrIsNotEmptyUnselected(operatorComboBox) ){
+					if(operatorComboBox.id == "filterOp1"){
+						filterParam1.visible = false;
+						cboFilterParam1.visible = false;
+					}else if(operatorComboBox.id == "filterOp2"){
+						filterParam2.visible = false;
+						cboFilterParam2.visible = false;
+					}else if(operatorComboBox.id == "filterOp3"){
+						filterParam3.visible = false;
+						cboFilterParam3.visible = false;
+					}else {
+						filterParam4.visible = false;
+						cboFilterParam4.visible = false;
+					}
+				}else{
+					var colComboBox:ComboBox;
+					var isCboFilterOpUnselected:Boolean = StringUtils.isEmpty(operatorComboBox.selectedItem.label);
+					if(operatorComboBox.id == "filterOp1"){
+						colComboBox = filterCol1;
+						if(isCboFilterOpUnselected) resetFilterParam(filterParam1, cboFilterParam1);
+					}else if(operatorComboBox.id == "filterOp2"){
+						colComboBox = filterCol2;
+						if(isCboFilterOpUnselected) resetFilterParam(filterParam2, cboFilterParam2);
+					}else if(operatorComboBox.id == "filterOp3"){
+						colComboBox = filterCol3;
+						if(isCboFilterOpUnselected) resetFilterParam(filterParam3, cboFilterParam3);
+					}else {
+						colComboBox = filterCol4;
+						if(isCboFilterOpUnselected) resetFilterParam(filterParam4, cboFilterParam4);
+					}	
+					var object:Object = colComboBox.selectedItem;
+					if(object.entity==null || object.column==null || isCboFilterOpUnselected){
+						isPickList(false, colComboBox.id, null);
+						return;
+					}
+					// Change Request #1011
+					var dataSource:ArrayCollection = (object.entity == "Opportunity" && object.column == "SalesStage") ? Utils.getSalesStage() : PicklistService.getPicklist(object.entity, object.column);
+					isPickList(object.type == "Picklist" && dataSource.length > 1 ? true : false, colComboBox.id, dataSource);
+				}				
+			}
+			
+			private function isPickList(show:Boolean, id:String, dataArray:ArrayCollection):void{
+				var cboShow:ComboBox;
+				var criteria:Object;
+				var bIsEmptyOrIsNotEmptyUnselected:Boolean;
+				if(StringUtils.endsWith(id, "1")){
+					bIsEmptyOrIsNotEmptyUnselected = Utils.isEmptyOrIsNotEmptyUnselected(filterOp1);
+					// filterParam1.text = ""; #1015
+					filterParam1.visible = !show && bIsEmptyOrIsNotEmptyUnselected;
+					cboShow = cboFilterParam1;
+					criteria = criteria1;
+				}else if(StringUtils.endsWith(id, "2")){
+					bIsEmptyOrIsNotEmptyUnselected = Utils.isEmptyOrIsNotEmptyUnselected(filterOp2);
+					// filterParam2.text = ""; #1015
+					filterParam2.visible = !show && bIsEmptyOrIsNotEmptyUnselected;
+					cboShow = cboFilterParam2;
+					criteria = criteria2;
+				}else if(StringUtils.endsWith(id, "3")){
+					bIsEmptyOrIsNotEmptyUnselected = Utils.isEmptyOrIsNotEmptyUnselected(filterOp3);
+					// filterParam3.text = ""; #1015
+					filterParam3.visible = !show && bIsEmptyOrIsNotEmptyUnselected;
+					cboShow = cboFilterParam3;
+					criteria = criteria3;
+				}else if(StringUtils.endsWith(id, "4")){
+					bIsEmptyOrIsNotEmptyUnselected = Utils.isEmptyOrIsNotEmptyUnselected(filterOp4);
+					// filterParam4.text = ""; #1015
+					filterParam4.visible = !show && bIsEmptyOrIsNotEmptyUnselected;
+					cboShow = cboFilterParam4;
+					criteria = criteria4;
+				}
+				cboShow.dataProvider = dataArray;
+				var isSalesStage:Boolean = (filter.entity == "Opportunity" && criteria.column_name == "SalesStage");
+				cboShow.selectedIndex = isSalesStage ? Utils.getCboSalesStageParamIndex(criteria.param) : Utils.getComboParamIndex(criteria.column_name, filter.entity, criteria.param);
+				cboShow.visible = show && bIsEmptyOrIsNotEmptyUnselected;
+			}
+			
+			private function formulaChangeHandler(e:Event):void {
+				var cboFilterFormula:ComboBox = e.currentTarget as ComboBox;
+				var data:String = cboFilterFormula.selectedItem.data;
+				if(!StringUtils.isEmpty(data)) {
+					var val:String = "";
+					if(StringUtils.endsWith(cboFilterFormula.id, "1")) {
+						val = StringUtil.trim(filterParam1.text);
+						filterParam1.text = (val ? val + " " : "") + data;
+					}else if(StringUtils.endsWith(cboFilterFormula.id, "2")) {
+						val = StringUtil.trim(filterParam2.text);
+						filterParam2.text = (val ? val + " " : "") + data;
+					}else if(StringUtils.endsWith(cboFilterFormula.id, "3")) {
+						val = StringUtil.trim(filterParam3.text);
+						filterParam3.text = (val ? val + " " : "") + data;				
+					}else if(StringUtils.endsWith(cboFilterFormula.id, "4")) {
+						val = StringUtil.trim(filterParam4.text);
+						filterParam4.text = (val ? val + " " : "") + data;			
+					}
+				}
+			}
+			
+		]]>
+	</mx:Script><!--CRO 05.01.2011-->
+	<mx:FormItem required="true" label="{i18n._('GLOBAL_NAME')}">
+		<mx:HBox width="100%">
+			<mx:TextInput id="nameInput" text="{filter.name}" />
+			<mx:Label text="{i18n._('GLOBAL_LANGUAGE')}"  width="140" textAlign="right"/>
+			<mx:ComboBox  width="160" id="cboLanguage" dataProvider="{FieldManagmentWindow.languageCodes}" change="changeLanguage()" enabled="{!isCreated}"/>	
+		</mx:HBox>
+		
+	</mx:FormItem>
+	<mx:HRule width="100%" />
+	<mx:FormItem label="">
+		<mx:Label text="{i18n._('FILTER_FORM_LABEL_PLEASE_ENTER_FILTER_CRITERIAS')}" fontWeight="bold" />
+		<mx:Label text="{i18n._('FILTER_FORM_LABEL_TIP_AND_OPERATOR_HAS_HIGHER_PRECEDENCE_THAN_OR_OPERATOR')}" fontWeight="bold" />
+	</mx:FormItem>
+	<mx:FormItem label="{i18n._('FILTER_FOMR_FORM_ITEM_CRITERIA1')}" >
+		<mx:HBox id="itemCriteria1">
+			<mx:ComboBox width="160" id="filterCol1" dataProvider="{Utils.getColumns(filter.entity)}" labelField="label" 
+						 creationComplete="filterCol1.selectedIndex=Utils.getComboColIndex(criteria1.column_name, filter.entity)" change="changeAction(event);" />
+			<control:DisabledComboBox width="110" id="filterOp1" dataProvider="{Utils.operatorData}"
+						 selectedIndex="{Utils.getComboOpIndex(criteria1.operator)}" change="operatorChangeHandler(event)"/>
+			<mx:TextInput includeInLayout="false" width="260" id="filterParam1"/>
+			<mx:ComboBox includeInLayout="false" width="120" id="cboFilterFormula1" dataProvider="{Utils.dateFormulaFn}" change="formulaChangeHandler(event)"/>
+			<mx:ComboBox includeInLayout="false" width="160" id="cboFilterParam1"/>
+		</mx:HBox>
+		<mx:HBox id="itemCriteria1_1">
+			<mx:RadioButtonGroup id="filterConj1" selectedValue="{criteria1.conjunction==null? 'AND' : criteria1.conjunction}" />
+			<mx:RadioButton groupName="filterConj1" value="AND" label="{i18n._('FILTER_FORM_RADIO_BUTTON_AND')}" />
+			<mx:RadioButton groupName="filterConj1" value="OR" label="{i18n._('FILTER_FORM_RADIO_BUTTON_OR')}"  />
+		</mx:HBox>
+	</mx:FormItem>
+	<mx:FormItem label="{i18n._('FILTER_FOMR_FORM_ITEM_CRITERIA2')}" >
+		<mx:HBox id="itemCriteria2">
+			<mx:ComboBox width="160" id="filterCol2" dataProvider="{Utils.getColumns(filter.entity)}" labelField="label" 
+						 creationComplete="filterCol2.selectedIndex=Utils.getComboColIndex(criteria2.column_name, filter.entity)" change="changeAction(event);" />
+			<control:DisabledComboBox width="110" id="filterOp2" dataProvider="{Utils.operatorData}" 
+						 selectedIndex="{Utils.getComboOpIndex(criteria2.operator)}" change="operatorChangeHandler(event)"/>
+			<mx:TextInput includeInLayout="false" width="260" id="filterParam2"/>
+			<mx:ComboBox includeInLayout="false" width="120" id="cboFilterFormula2" dataProvider="{Utils.dateFormulaFn}" change="formulaChangeHandler(event)"/>
+			<mx:ComboBox includeInLayout="false" width="160" id="cboFilterParam2"/>
+		</mx:HBox>
+		<mx:HBox id="itemCriteria2_1">
+			<mx:RadioButtonGroup id="filterConj2" selectedValue="{criteria2.conjunction==null? 'AND' : criteria2.conjunction}" />
+			<mx:RadioButton groupName="filterConj2" value="AND" label="{i18n._('FILTER_FORM_RADIO_BUTTON_AND')}" />
+			<mx:RadioButton groupName="filterConj2" value="OR" label="{i18n._('FILTER_FORM_RADIO_BUTTON_OR')}"  />
+		</mx:HBox>
+	</mx:FormItem>
+	<mx:FormItem label="{i18n._('FILTER_FOMR_FORM_ITEM_CRITERIA3')}" >
+		<mx:HBox id="itemCriteria3">
+			<mx:ComboBox width="160" id="filterCol3" dataProvider="{Utils.getColumns(filter.entity)}" labelField="label" 
+						 creationComplete="filterCol3.selectedIndex=Utils.getComboColIndex(criteria3.column_name, filter.entity)" change="changeAction(event);" />
+			<control:DisabledComboBox width="110" id="filterOp3" dataProvider="{Utils.operatorData}" 
+						 selectedIndex="{Utils.getComboOpIndex(criteria3.operator)}" change="operatorChangeHandler(event)"/>
+			<mx:TextInput includeInLayout="false" width="260" id="filterParam3"/>
+			<mx:ComboBox includeInLayout="false" width="120" id="cboFilterFormula3" dataProvider="{Utils.dateFormulaFn}" change="formulaChangeHandler(event)"/>
+			<mx:ComboBox includeInLayout="false" width="160" id="cboFilterParam3"/>
+		</mx:HBox>
+		<mx:HBox id="itemCriteria3_1">
+			<mx:RadioButtonGroup id="filterConj3" selectedValue="{criteria3.conjunction==null? 'AND' : criteria3.conjunction}" />
+			<mx:RadioButton groupName="filterConj3" value="AND" label="{i18n._('FILTER_FORM_RADIO_BUTTON_AND')}" />
+			<mx:RadioButton groupName="filterConj3" value="OR" label="{i18n._('FILTER_FORM_RADIO_BUTTON_OR')}"  />
+		</mx:HBox>
+	</mx:FormItem>
+	<mx:FormItem label="{i18n._('FILTER_FOMR_FORM_ITEM_CRITERIA4')}" >
+		<mx:HBox id="itemCriteria4">
+			<mx:ComboBox width="160" id="filterCol4" dataProvider="{Utils.getColumns(filter.entity)}" labelField="label" 
+						 creationComplete="filterCol4.selectedIndex=Utils.getComboColIndex(criteria4.column_name, filter.entity)" change="changeAction(event);" />
+			<control:DisabledComboBox width="110" id="filterOp4" dataProvider="{Utils.operatorData}" 
+						 selectedIndex="{Utils.getComboOpIndex(criteria4.operator)}" change="operatorChangeHandler(event)"/>
+			<mx:TextInput includeInLayout="false" width="260" id="filterParam4"/>
+			<mx:ComboBox includeInLayout="false" width="120" id="cboFilterFormula4" dataProvider="{Utils.dateFormulaFn}" change="formulaChangeHandler(event)"/>
+			<mx:ComboBox includeInLayout="false" width="160" id="cboFilterParam4"/>
+		</mx:HBox>
+	</mx:FormItem>
+	<mx:FormItem label="  " height="5">
+		
+	</mx:FormItem>
+	<mx:HRule width="100%" />
+	<mx:FormItem label="{i18n._('Order By')}">
+		<mx:HBox id="itemCriteria5">
+		<mx:ComboBox width="160" id="filterCol5" dataProvider="{Utils.getColumns(filter.entity)}" labelField="label" 
+					 creationComplete="filterCol5.selectedIndex=Utils.getComboColIndex(criteria5.column_name, filter.entity)"/>
+		<mx:RadioButton id="sortbyasc" groupName="sortType" value="asc" label="{i18n._('Ascending')}"  />
+		<mx:RadioButton id="sortbydesc" groupName="sortType" value="desc" label="{i18n._('Descending')}"  />
+			</mx:HBox>
+	</mx:FormItem>
+	<mx:StringValidator id="nameValidator" source="{nameInput}" property="text"/>
+</mx:Form>

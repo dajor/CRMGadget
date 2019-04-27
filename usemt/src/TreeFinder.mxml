@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="480" height="450"
+	title="Finder" 
+	showFlexChrome="false" transparent="true" systemChrome="none" creationComplete="init()">
+	
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.TreeUtil;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.ScrollPolicy;
+
+			[Bindable] public var item:Object;
+			[Bindable] public var fieldInfo:Object;
+			[Bindable] private var treeData:XML;
+			[Bindable] private var xmllistDescendants:XMLList;
+			[Bindable] private var xmllistDescendantsIndex:uint;
+			[Bindable] private var isShowBtnNextPrevious:Boolean = false;
+			[Bindable] private var mapTreeAndOODField:ArrayCollection;
+			
+			public var reload:Function;
+			public var textInput:TextInput;
+			private var firstFilter:Boolean = true;
+			private var rootNode:String = null;
+			
+			private var dic:Dictionary =null;
+			// Territory Sector, 		Cluster, 			Region,				Sub Region
+			// CustomText30, 			CustomText31, 		CustomText32,		CustomText33
+			
+			
+			
+			
+			private function init():void {
+				var myData:Object = Database.customFieldDao.first({entity: fieldInfo.entity, column_name: fieldInfo.element_name});
+				if(myData != null) {
+					var xml:XML = new XML(myData.value);
+					rootNode = xml.localName();
+					treeData = generateXML();
+					//treeData = TreeUtil.getTree(new XML(myData.value));
+					mapTreeAndOODField = Utils.bindValueToGridPicklist(myData.bindValue, ["crmData","oodData","oodLabel"]);
+				}
+				if(textInput.text.length > 0) {
+					searchInput.text = textInput.text;
+					searchInput.setSelection(searchInput.text.length, searchInput.text.length);
+					doSearch();
+				}
+				searchInput.setFocus();
+				searchInput.selectionBeginIndex = 0;
+				searchInput.selectionEndIndex = searchInput.text.length;
+			}
+			
+			private function generateXML():XML{
+				var list:ArrayCollection = new ArrayCollection();
+				if(rootNode=="territory") {
+					list = Database.territoryTreeDAO.selectAll();
+				}else if(rootNode=="depthstructure") {
+					list = Database.depthStructureTreeDAO.selectAll();
+				}
+				dic =  new Dictionary();
+				var xml:XML=<Territory display_name="Territory"/>;
+				for each (var obj:Object in list) {
+					var childX:XML = <node id= {obj.id} display_name={getDisplayName(obj)}/>;
+					var objP:Object =dic[obj.pid]; 
+					if( objP==null) {
+						xml.appendChild(childX);
+					}else{
+						var pX:XML = objP.xml;
+						pX.appendChild(childX);
+					}
+					dic[obj.id] = {obj: obj, xml: childX};	
+				}
+				return xml;
+			}
+			
+			private function getDisplayName(obj:Object):String {
+				return obj.display_name ? obj.display_name : obj.id;
+			}
+			
+			private function doSearch():void {
+				if (searchInput.text.length > 2) {
+					//uses e4x to find a node, then calls expand parents to make it visible,
+					//then selects it
+					if(firstFilter) {
+						var data:XML = new XML(textInput.data);
+						var id:String = data.@["id"];
+						if(id) {
+							xmllistDescendants  = treeData.descendants().(@id == id);
+							setSelectedNode();
+						}
+						firstFilter = false;
+					}else {
+						xmllistDescendantsIndex = 0;
+						myTree.openItems = []; // collape all tree node
+						xmllistDescendants  = treeData.descendants().(@display_name.toLowerCase().indexOf(searchInput.text.toLowerCase()) != -1);
+						setSelectedNode();
+						isShowBtnNextPrevious = xmllistDescendants.length() > 1 ? true : false;
+					}
+				}else {
+					isShowBtnNextPrevious = false;
+				}
+			}
+			
+			private function previousFilter():void {
+				if(xmllistDescendantsIndex > 0) {
+					xmllistDescendantsIndex--;
+					setSelectedNode();
+					btnNext.visible = true;
+					if(xmllistDescendantsIndex == 0) btnPrevious.visible = false
+				}
+			}
+			
+			private function nextFilter():void {
+				if(xmllistDescendantsIndex < xmllistDescendants.length() - 1) {
+					xmllistDescendantsIndex++;
+					setSelectedNode();
+					btnPrevious.visible = true;
+					if(xmllistDescendantsIndex == xmllistDescendants.length() - 1) btnNext.visible = false;
+				}
+			}
+			
+			private function setSelectedNode():void {
+				expandParents(xmllistDescendants[xmllistDescendantsIndex]);
+				myTree.selectedItem = xmllistDescendants[xmllistDescendantsIndex];
+				myTree.scrollToIndex(myTree.selectedIndex);
+			}
+			
+			// event handler for the Tree control change event.
+			public function treeChanged(event:Event):void {
+				var selectedNode:XML = (event.currentTarget).selectedItem;
+				if(selectedNode != null) {
+					var id:String = selectedNode.@["id"];
+					var display_name:String = selectedNode.@["display_name"];
+					if(id) {
+						var node:XML = <node id={id} display_name={display_name} />;
+						mapDataTreeAndOODField(dic[id]);
+						textInput.text = display_name;
+						textInput.data = node;
+					}
+					this.close();
+					if(reload != null) reload();
+				}
+			}
+			
+			private function mapDataTreeAndOODField(mapTreeField:Object):void {
+				var tempSave:Object = new Object();
+				var obj:Object = mapTreeField.obj;
+				for each(var map:Object in mapTreeAndOODField) {					
+					tempSave[map.oodData] = obj[map.crmData] ? obj[map.crmData] : "";
+					var code:String = obj[map.crmData];
+					var display_name:String =obj[map.crmData+"_value"] //getDisplayValue(mapTreeField.xml,map.crmData,obj[map.crmData+"_"]);
+					item[map.oodData] = display_name ? display_name : "";
+				}
+				item.objTree= tempSave;
+			}
+			
+			private function getDisplayValue(xml:XML, fieldName:String, val:String ):String{
+					while(true){
+						if(fieldName == "gbk" || fieldName == "lang_text") return val;
+						var pxml:XML = xml.parent();						
+						var grandXml:XML = pxml.parent();
+						if(grandXml==null || val==null){
+							return null;
+						}
+						if( grandXml.parent()==null){
+							return xml.@display_name[0].toString();
+						}
+						var pobj:Object = dic[pxml.@id[0].toString()].obj;
+						var newVal:String = pobj[fieldName];
+						if(newVal==null){
+							return xml.@display_name[0].toString();
+						}
+						xml = pxml;
+						
+					}
+					return val;					
+			}
+			
+			private function getParentByChild(childNode:XML):void {
+				var field:Array = [];
+				while(childNode != null) {
+					for each(var c:XML in childNode.children()) {
+						var id:String = c.@["id"];
+						var type:String = c.@["type"];
+						var oodData:String = c.localName();
+						for each(var m:Object in mapTreeAndOODField) {
+							if(oodData == null) break;
+							if(m.crmData == oodData && field.indexOf(m.crmData) == -1) {
+								item[m.oodData] = type;
+								field.push(m.crmData);
+							}
+						}
+					}
+					childNode = childNode.parent();
+				};
+			}
+			
+			private function labelFunc(item:XML):String {
+//				var id:String = item.@["id"];
+//				var type:String = item.@["label"];
+//				return id + " - " + type;
+				return item.@["display_name"][0].toString();
+			}
+			
+			//starts at the given node, walks up the tree opening nodes as it goes
+			private function expandParents(xmlNode:XML):void {
+				while (xmlNode != null) {  
+					myTree.expandItem(xmlNode, true, false);
+					xmlNode = xmlNode.parent();
+					myTree.validateNow();
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" width="100%" height="100%">
+		<control:TitleBar id="finderBar" icon="@Embed(source='/assets/search.png')" title="{i18n._('GLOBAL_FINDER')}" />
+		<mx:VBox width="100%" height="100%" top="32" left="16" right="16" bottom="16">
+			<mx:HBox width="100%" left="15">
+				<mx:Label text="{i18n._('GLOBAL_SEARCH')}" />
+				<mx:TextInput id="searchInput" change="doSearch()"/>
+				<mx:LinkButton id="btnPrevious" toolTip="Previous" width="16" height="16" icon="{ImageUtils.previousDayIcon}" click="previousFilter()" visible="{isShowBtnNextPrevious}" />
+				<mx:LinkButton id="btnNext" toolTip="Next" width="16" height="16" icon="{ImageUtils.nextDayIcon}" click="nextFilter()" visible="{isShowBtnNextPrevious}" />
+			</mx:HBox>
+			<mx:Canvas width="100%" height="100%">
+				<mx:Tree id="myTree" width="100%" height="100%" labelFunction="labelFunc"
+					showRoot="false" dataProvider="{treeData}" change="treeChanged(event)" />
+			</mx:Canvas>
+			<mx:Canvas width="100%">
+				<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="this.close()" right="0"/>	
+			</mx:Canvas>		
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

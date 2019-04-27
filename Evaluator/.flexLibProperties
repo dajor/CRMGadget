@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<flexLibProperties includeAllClasses="true" version="3">
+  <includeClasses>
+    <classEntry path="com.crmgadget.eval.Evaluator"/>
+    <classEntry path="com.crmgadget.eval.Functionalizer"/>
+    <classEntry path="com.crmgadget.eval.Node"/>
+    <classEntry path="com.crmgadget.eval.Parser"/>
+    <classEntry path="com.crmgadget.eval.OptionalParams"/>
+  </includeClasses>
+  <includeResources/>
+  <namespaceManifests/>
+</flexLibProperties>

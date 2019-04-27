@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	
+	<fx:Script>
+		<![CDATA[
+			import gadget.util.StringUtils;
+			
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			
+			private var _column:AdvancedDataGridColumn;
+			
+		
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					var grid:AdvancedDataGrid= value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						_column = grid.columns[list.columnIndex];
+						
+					}
+				}
+				
+			}	
+			
+			protected function isNew(val:Object):Boolean{
+				for(var f:String in val){
+					if(f!='isNew' && f!='mx_internal_uid' && val[f]!=0 &&!StringUtils.isEmpty(val[f])){
+						val.isNew=false;
+						return false;
+					}
+				}
+				return true;
+			}
+			override public function set data(value:Object):void{		
+				super.data = value;
+				if(value && _column){					
+					if(isNew(value)){
+						//set style to label
+						lblData.setStyle("color","gray");
+						lblData.setStyle("fontStyle","italic");
+					}else{
+						lblData.setStyle("color","black");
+						lblData.setStyle("fontStyle","normal");
+					}
+					//remove gray style
+					lblData.text = _column.labelFunction(value,_column);
+					lblData.toolTip = lblData.text;
+				}
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Label id="lblData" top="0" left="0" right="0" bottom="0"  />
+</s:MXAdvancedDataGridItemRenderer>

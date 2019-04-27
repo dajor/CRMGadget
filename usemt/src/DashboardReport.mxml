@@ -1,0 +1,384 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:control="gadget.control.*"
+		   width="100%" height="100%" 
+		   xmlns:form="gadget.form.*" 
+		   initialize="initial()" xmlns:ibm="http://www.ibm.com/xmlns/prod/ilog/elixir/2010" xmlns:s="library://ns.adobe.com/flex/spark">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.DateUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.PDFUtil;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.DateField;
+			import mx.events.CalendarLayoutChangeEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.formatters.DateFormatter;
+			import mx.formatters.NumberFormatter;
+			import mx.graphics.ImageSnapshot;
+			
+			/*[Bindable]
+			private var pieProvider:ArrayCollection = new ArrayCollection([
+				{Type: "Actual", Percent: "41"}, 
+				{Type: "Target", Percent: "80"}
+			]);
+			
+			[Bindable]
+			private var lineChartProvider:ArrayCollection = new ArrayCollection([
+				{People: "0", Target:"80", Actual:"41"},
+				{People: "11", Target:"80", Actual:"41"},
+				{People: "12", Target:"85", Actual:"50"},
+				{People: "13", Target:"85", Actual:"50"},
+				{People: "14", Target:"45", Actual:"10"},
+				{People: "15", Target:"65", Actual:"35"},
+				{People: "16", Target:"80", Actual:"41"},
+			]);
+			
+			[Bindable]
+			private var columnChartProvider:ArrayCollection = new ArrayCollection([
+				{Type:"Total", Value:"41"},
+				{Type:"A", Value:"20"},
+				{Type:"B", Value:"18"},
+				{Type:"C", Value:"30"},
+			]);
+			*/
+			
+			private var _mainWindow:MainWindow;
+			
+			public function set mainWindow(mainWindow:MainWindow):void{
+				this._mainWindow = mainWindow;
+			}
+			
+			private function initial():void{
+				var periodDefault:Object = Database.dashboardReportDao.getDefaultRecord();
+				var date:Date = new Date();
+				if(periodDefault){
+					date.setMonth(parseInt(periodDefault["Month"]));
+					date.setFullYear(parseInt(periodDefault["Year"]));
+				}
+				dateField.selectedDate = date;
+				generatePieChart(date);
+				var selectedObject:Object = new Object();
+				if(periodDefault){
+					for each(var item:Object in cboTerritory.dataProvider as ArrayCollection){
+						if(item["CustomObject5Id"] == periodDefault["TerritoryId"]){
+							cboTerritory.selectedItem = item;
+							selectedObject = item;
+							break;
+						}
+					}
+				}
+				genterateLineChart(selectedObject);
+			}
+			
+			private function exportToPdfWithEpad(event:MouseEvent):void{
+				/* var pieImage:ImageSnapshot = ImageSnapshot.captureImage(vBoxPie, 100);
+				var columnImage:ImageSnapshot = ImageSnapshot.captureImage(vBoxColumn, 100);
+				var lineImage:ImageSnapshot = ImageSnapshot.captureImage(vBoxLine, 100);
+				PDFUtil.generateDashboardReport(pieImage.data, lineImage.data, columnImage.data); */
+			}
+			
+			//private function tabChangeListener():voi
+
+			protected function dateField_changeHandler(event:CalendarLayoutChangeEvent):void{
+				var df:DateField = event.currentTarget as DateField;
+				generatePieChart(df.selectedDate);
+				cboTerritory.dispatchEvent(new ListEvent(ListEvent.CHANGE));
+			}
+			
+			private function generatePieChart(date:Date):void{
+				var format:DateFormatter = new DateFormatter();
+				format.formatString = "MMMMM YYYY";
+				var displayMonth:String = format.format(date);
+				lblDisplay.text = displayMonth;
+				lblDisplay.data = date;
+				var arr:Array = displayMonth.split(" ");
+				var targets:Array = Database.dashboardReportDao.generateTargets(arr[0], arr[1]);
+				var provider:ArrayCollection = new ArrayCollection(targets);
+				provider.addItemAt({Target:"", CustomObject5Id:"", CustomObject5Name:""}, 0);
+				cboTerritory.dataProvider = provider;
+				if(provider.length > 1){
+					cboTerritory.selectedItem = provider.getItemAt(1);
+				}
+			}
+			
+			private function generateLineChart(territoryId:String, date:Date):void{
+				var array:Array = Database.dashboardReportDao.getTredData(territoryId, date);
+				if(array.length > 0){
+					var lineProvider:ArrayCollection = new ArrayCollection(array);
+//					var firstObject:Object = lineProvider.getItemAt(0);
+//					lineProvider.addItemAt({Month:"", Target:firstObject["Target"], Actual:firstObject["Actual"]}, 0);
+					lineChartCallPlan.dataProvider = lineProvider;
+				}
+			}
+
+			protected function cboTerritory_changeHandler(event:ListEvent):void{
+				var cbo:ComboBox = event.currentTarget as ComboBox;
+				var selectedObject:Object = cbo.selectedItem;
+				genterateLineChart(selectedObject);
+			}
+			
+			private function genterateLineChart(selectedObject:Object):void{
+				var d:Date = lblDisplay.data as Date;
+				
+				var territeryId:String = selectedObject["CustomObject5Id"];
+				var saleRep:Object = Database.dashboardReportDao.getSalesRep(territeryId, d);
+				txtSaleRep.text = saleRep ? saleRep["OwnerFullName"] : "";
+				var actual:String = saleRep ? saleRep["Actual"] : "0";
+				var target:String = selectedObject["Target"] ? selectedObject["Target"] : "0";
+				txtActual.text = actual;
+				txtTarget.text = target;
+				/* var provider:ArrayCollection = new ArrayCollection([
+					{Type: "Actual", Percent: actual}, 
+					{Type: "Target", Percent: target}
+				]); */
+				var numTarget:int = parseInt(target);
+				var numActual:int = parseInt(actual);
+				if(numTarget > 0 && numTarget <= numActual){
+					// Green
+					boxStatus.setStyle("backgroundColor", "#01CC01");
+				}else{
+					if(numActual == 0 && numTarget == 0){
+						boxStatus.setStyle("backgroundColor", "#FFFF01");
+					}else{
+						var percent:Number = numActual / numTarget * 100;
+						if(percent <= 10){
+							// Red
+							boxStatus.setStyle("backgroundColor", "#FFFF01");
+						}else{
+							// Yellow
+							boxStatus.setStyle("backgroundColor", "#FF0000");
+						}
+					}
+				}
+				
+				/*
+				pieCallPlan.dataProvider = provider;
+				//pieCallPlan.validateNow();
+				pieCallPlan.validateDisplayList();
+				pieLegend.validateDisplayList();
+				
+				
+				vBoxPie.removeAllChildren();
+				vBoxPie.addChild(GUIUtils.drawPieChat(target, actual));
+				*/
+				
+				
+				gaugeActual.value = numActual;
+				gaugeTarget.value = numTarget;
+				
+				var segments:Object = Database.dashboardReportDao.getSegmentSplit(territeryId, d);
+				var columnChartProvider:ArrayCollection = new ArrayCollection([
+					{Type:"Total", Value: segments && segments["Total"] ? segments["Total"] : "0"},
+					{Type:"A", Value: segments && segments["A"]? segments["A"] : "0"},
+					{Type:"B", Value: segments && segments["B"]? segments["B"] : "0"},
+					{Type:"C", Value: segments && segments["C"]? segments["C"] : "0"},
+					{Type:"D", Value: segments && segments["D"]? segments["D"] : "0"}
+				]);
+				columnChatSegment.dataProvider = columnChartProvider;
+				seriesSegment.dataProvider = columnChartProvider;
+				
+				
+				saveDefault(d.month + "", d.fullYear + "", territeryId);
+				
+				
+				//Tab Account
+				var arrayProvider:ArrayCollection = new ArrayCollection(Database.dashboardReportDao.getAllAccounts(territeryId, d));
+				gridAccount.dataProvider = arrayProvider;
+				
+				// Generate Tred
+				generateLineChart(territeryId, d);
+				
+			}
+			
+			private function saveDefault(month:String, year:String, territoryId:String):void{
+				if(!StringUtils.isEmpty(month) && !StringUtils.isEmpty(year) && !StringUtils.isEmpty(territoryId)){
+					Database.dashboardReportDao.delete_all();
+					Database.dashboardReportDao.insert({Month:month, Year:year, TerritoryId:territoryId});
+				}
+			}
+			
+			public function createActivity(type:String):void{
+				var selectedObject:Object = gridAccount.selectedItem;
+				var item:Object = new Object();
+				item.Activity ="Appointment";
+				item.AccountName = selectedObject.AccountName ;
+				var subType:int = type == 'Call' ? 2 : 1;
+				item.gadget_type ="Activity";
+				item.CallType = type == 'Call' ? "Account Call" : "General";
+				item.Type = type;
+				GUIUtils.openDetailScreen(true, _mainWindow, "Activity", null, item, false, subType);
+			}
+
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<mx:VBox width="100%" height="100%" verticalGap="8" top="5" left="8" right="8" bottom="8">			
+			<mx:HBox width="100%">
+				<mx:Label text="Segmentation &amp; Targeting" fontSize="16" />
+				<mx:HBox width="100%" horizontalAlign="right">
+					<mx:LinkButton id="pdfExportBtn" icon="{ImageUtils.pdfIcon}" toolTip="{i18n._('GLOBAL_PDF_EXPORT')}" click="Utils.showLoadingProgressWindow(function():void{
+							   exportToPdfWithEpad(event);
+							   }, i18n._(StringUtils.LOADING_STR), i18n._(StringUtils.ATTACHMENTS_STR));" />
+				</mx:HBox>
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:HBox width="100%">
+					<mx:Label text="Territory :" textAlign="right" />
+					<mx:ComboBox editable="false" id="cboTerritory" labelField="CustomObject5Name" change="cboTerritory_changeHandler(event)" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="Sale Rep :" textAlign="right" />
+					<mx:Label id="txtSaleRep" />
+				</mx:HBox>
+				<!--<mx:HBox width="100%">
+					<mx:Label text="Currency :" textAlign="right" />
+					<mx:Label id="txtCurrency" text="USD" />
+				</mx:HBox>-->
+				<mx:HBox width="100%">
+					<mx:Label text="Period :" textAlign="right" />
+					<!--<mx:DateField id="dateField" formatString="MMMMM YYYY" change="dateField_changeHandler(event)" />-->
+					<control:MonthYearField id="dateField" change="dateField_changeHandler(event)" />
+					<mx:Label id="lblDisplay" />
+				</mx:HBox>
+			</mx:HBox>
+			
+			
+			<mx:TabNavigator top="0" left="10"  width="100%" height="100%" right="10" bottom="10" creationPolicy="all" id="tabstrip">
+				<!-- Call Plan Compliance -->
+				<mx:VBox width="100%" paddingLeft="8" paddingRight="8" label="CALL PLAN COMPLIANCE" >
+					<mx:HBox width="100%">
+						<mx:VBox width="100%">
+							<mx:Label text="Ytd Frequency [Visits on Target]" fontSize="14" fontWeight="bold" />
+							<mx:HBox width="100%">
+								<mx:HBox width="100%" verticalAlign="middle">
+									<mx:HBox id="boxStatus" width="50" height="50" backgroundColor="#FF0000" />
+									<mx:Label text="Status" />
+								</mx:HBox>
+								<mx:HBox width="100%">
+									<mx:Form width="100%">
+										<mx:FormItem label="Actual">
+											<mx:TextInput editable="false" width="60" id="txtActual" />
+										</mx:FormItem>
+										<mx:FormItem label="Target">
+											<mx:TextInput editable="false" width="60" id="txtTarget" />
+										</mx:FormItem>
+									</mx:Form>
+								</mx:HBox>
+							</mx:HBox>
+						</mx:VBox>
+						<mx:VBox width="100%" horizontalAlign="center" id="vBoxPie" >
+							<mx:HBox width="100%">
+							
+								
+								<ibm:CircularLinearGauge id="gaugeTarget" width="150" height="150" editable="false" title="Target"
+														 trackMinimum="60" trackMaximum="100" 
+														 majorTickInterval="5"
+														 minorTickInterval="1"
+														 slideDuration="0" showDataTip="true" editMode="continuous" 
+														 liveDragging="false" />
+								
+								<ibm:CircularLinearGauge id="gaugeActual" width="150" height="150" editable="false" title="Actual"
+														   trackMinimum="60" trackMaximum="100" 
+														   slideDuration="0" showDataTip="true" editMode="continuous"
+														   liveDragging="false" />
+							</mx:HBox>
+							<!--
+							<mx:PieChart width="150" height="150" showDataTips="true" id="pieCallPlan" >
+								<mx:series>
+									<mx:PieSeries field="Percent" labelPosition="inside" nameField="Type" />
+								</mx:series>
+							</mx:PieChart>
+							<mx:Legend direction="horizontal" id="pieLegend" dataProvider="{pieCallPlan}" />-->
+						</mx:VBox>
+					</mx:HBox>
+					
+					<mx:HBox width="100%">
+						
+						<mx:VBox width="100%" borderStyle="solid" id="vBoxLine">
+							<mx:HBox width="100%">
+								<mx:Label text="Trend" fontSize="14" />
+								<mx:Legend direction="horizontal" dataProvider="{lineChartCallPlan}" width="100%" />
+							</mx:HBox>
+							<mx:ColumnChart height="160" id="lineChartCallPlan" showDataTips="true">
+								<mx:horizontalAxis>
+									<mx:CategoryAxis id="hAxis" categoryField="Month" />
+								</mx:horizontalAxis>
+								<mx:series>
+									<mx:LineSeries form="curve" displayName="Actual" yField="Actual" />
+									<mx:LineSeries form="curve" displayName="Target" yField="Target" />
+								</mx:series>
+							</mx:ColumnChart>
+						</mx:VBox>
+						
+						<mx:VBox width="100%" borderStyle="solid" id="vBoxColumn">
+							<mx:Label text="Segment Split" fontSize="14" />
+							<mx:ColumnChart height="165" showDataTips="true" id="columnChatSegment">
+								<mx:horizontalAxis>
+									<mx:CategoryAxis categoryField="Type"/>
+								</mx:horizontalAxis>
+								<mx:series>
+									<mx:ColumnSeries labelPosition="inside" id="seriesSegment"
+										xField="Type" yField="Value" />
+								</mx:series>
+							</mx:ColumnChart>
+						</mx:VBox>
+					</mx:HBox>
+					
+				</mx:VBox>
+				
+				<!-- Sale Activities -->
+				<!--<mx:VBox width="100%" label="SALE ACTIVITIES" >
+					<mx:Label text="Sale Activities" fontSize="14" fontWeight="bold" />
+					
+				</mx:VBox>-->
+				
+				<!-- Sale Activities #2-->
+				<!--<mx:VBox width="100%" label="SALE ACTIVITIES #2" >
+					<mx:Label text="Sale Activities #2" fontSize="14" fontWeight="bold" />
+					
+				</mx:VBox>-->
+				
+				<!-- Sale Activities #2-->
+				<mx:VBox width="100%" label="Account" >
+					<mx:Label text="Account Failed" fontSize="14" fontWeight="bold" />
+					<mx:DataGrid width="100%" id="gridAccount" textAlign="center">
+						<mx:columns>
+							<mx:DataGridColumn dataField="AccountId" headerText="Account Id" />
+							<mx:DataGridColumn dataField="AccountName" headerText="Account&#13;Name" />
+							<mx:DataGridColumn dataField="Channel" headerText="Channel" />
+							<mx:DataGridColumn dataField="Segment" headerText="Segment" width="100" />
+							<mx:DataGridColumn dataField="TargetVisitYtd" headerText="Target&#13;Visit YtD" />
+							<mx:DataGridColumn dataField="ActualVisitYtd" headerText="Actual&#13;Visit YtD" />
+							<mx:DataGridColumn dataField="GaptoTargetVisitsYtD" headerText="Gap to Target&#13;Visits YtD" />
+							<mx:DataGridColumn dataField="TargetVisitsNextMonth" headerText="Target Visits&#13;Next Month" />
+							<mx:DataGridColumn dataField="VisitsNextMonthtobeCompliant" headerText="Visits Next&#13;Month to be&#13;Compliant" />
+							<mx:DataGridColumn headerText="Action" width="150">
+								<mx:itemRenderer>
+									<mx:Component>
+										<mx:HBox width="100%" horizontalAlign="center">
+											<mx:Button label="C" click="{outerDocument.createActivity('Call')}"/>
+											<mx:Button label="E" click="{outerDocument.createActivity('Email')}"/>
+											<mx:Button label="M" click="{outerDocument.createActivity('Meeting')}"/>
+										</mx:HBox>										
+									</mx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn resizable="false" width="20" />
+						</mx:columns>
+					</mx:DataGrid>
+				</mx:VBox>
+				
+			</mx:TabNavigator>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Canvas>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*" 
+	xmlns:MyValidate="gadget.util.*"
+	width="400" height="300"
+	resizable="false"
+	title="{i18n._('GLOBAL_USER_SIGNATURE')}" 
+	creationComplete="init();"
+	keyDown="keyDown(event)"
+	
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:s="library://ns.adobe.com/flex/spark">
+	<mx:Script>
+    
+		<![CDATA[
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			[Binable] public var isTouch:Boolean=false;
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="400" height="300" right="0" bottom="0">
+		<control:TitleBar icon="{ImageUtils.epadSignIcon}" title="{i18n._('GLOBAL_USER_SIGNATURE')}"/>
+		<mx:VBox top="40" left="8" right="8" bottom="8">
+			<mx:Canvas width="100%" label="User Sign">
+				<control:EpadSign id="epadPanel" isTouch="{isTouch}" height="200" width="380"/>
+			</mx:Canvas>
+		</mx:VBox>		
+	</mx:Canvas>
+</mx:Window>

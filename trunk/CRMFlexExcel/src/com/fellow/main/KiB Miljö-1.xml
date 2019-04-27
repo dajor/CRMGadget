@@ -1,0 +1,879 @@
+﻿<model title="KiB Miljö" type="Miljö" isCreateSum="false" sumType="">
+  <page title="1 Egenkontroll" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="M-1 Egenkontroll- 1 LAGAR &amp; ANDRA KRAV">
+      <row isheader="true" title="">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+        <col value="Kommentar"/>
+        <col value="Korrigerande åtgärd"/>
+        <col value="Ansvarig"/>
+        <col value="Datum"/>
+      </row>
+      <row title="1 A LAGAR &amp; ANDRA KRAV" colspan="9"/>
+      <row odd="true" title="1 A LAGAR &amp; ANDRA KRAV">
+        <col value="1"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="ea"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-1 Egenkontroll- 1 Lagar&amp; Andra Krav- 1">
+      <row odd="true" title="Lagar och krav">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="1"/>
+        <col value="ka"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-1 Egenkontroll- 1 Lagar&amp; Andra Krav- 2">
+      <row odd="true" title="Tillsyn">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-1 Egenkontroll- 2 KRITERIER">
+      <row title="1 B KRITERIER" colspan="9"/>
+      <row odd="true" title="1 B KRITERIER">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-1 Egenkontroll- 2 Kriterier- 1">
+      <row odd="true" title="Strukturerat arbetssätt">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+      </row>
+      <row>
+        <col value="1"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="1"/>
+      </row>
+    </pageTotal>
+  </page>
+  <page title="2 Verksamhet" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="M-2 Verksamhet- 1 ANSVAR &amp; ORGANISATION">
+      <row isheader="true" title="">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+        <col value="Kommentar"/>
+        <col value="Korrigerande åtgärd"/>
+        <col value="Ansvarig"/>
+        <col value="Datum"/>
+      </row>
+      <row title="2 A ANSVAR &amp; ORGANISATION" colspan="9"/>
+      <row odd="true" title="2 A ANSVAR &amp; ORGANISATION">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 1 Ansvar &amp; Organisation- 1">
+      <row odd="true" title="Miljöansvarig">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 2 MILJÖPOLICY &amp; -MÅL">
+      <row title="2 B MILJÖPOLICY &amp; -MÅL" colspan="9"/>
+      <row odd="true" title="2 B MILJÖPOLICY &amp; -MÅL">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 2 Miljöpolicy &amp;-Mal- 1">
+      <row odd="true" title="Miljöpolicy">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 2 Miljöpolicy &amp;-Mal- 2">
+      <row odd="true" title="Miljömål">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 2 Miljöpolicy &amp;-Mal- 3">
+      <row odd="true" title="Handlingsplan">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 3 DOKUMENTATION">
+      <row title="2 C DOKUMENTATION" colspan="9"/>
+      <row odd="true" title="2 C DOKUMENTATION">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 3 Dokumentation- 1">
+      <row odd="true" title="Egenkontroll">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 4 INTERNREVISION">
+      <row title="2 D INTERNREVISION" colspan="9"/>
+      <row odd="true" title="2 D INTERNREVISION">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 4 Internrevision-1">
+      <row odd="true" title="Internrevisione">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 5 AVVIKELSEHANTERING">
+      <row title="2 E AVVIKELSEHANTERING" colspan="9"/>
+      <row odd="true" title="2 E AVVIKELSEHANTERING">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 5 Avvikelsehantering- 1">
+      <row odd="true" title="Avvikelsehantering">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 6 INTERNA MÖTEN">
+      <row title="2 F INTERNA MÖTEN" colspan="9"/>
+      <row odd="true" title="2 F INTERNA MÖTEN">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M-2 Verksamhet- 6 Interna möten- 1">
+      <row odd="true" title="Interna möten">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+      </row>
+      <row>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+      </row>
+    </pageTotal>
+  </page>
+  <page title="3 Lokaler &amp; Utrusting" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="M- 3 Lokaler &amp; Utrustning- 1 VATTEN &amp; AVLOPP">
+      <row isheader="true" title="">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+        <col value="Kommentar"/>
+        <col value="Korrigerande åtgärd"/>
+        <col value="Ansvarig"/>
+        <col value="Datum"/>
+      </row>
+      <row title="3 A VATTEN &amp; AVLOPP" colspan="9"/>
+      <row odd="true" title="3 A VATTEN &amp; AVLOPP">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 1 Vatten &amp; Avlopp- 1">
+      <row title="Vatten" colspan="9"/>
+      <row odd="true" title="Vatten">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 1 Vatten &amp; Avlopp- 2">
+      <row odd="true" title="Fettavskiljare">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 2 ENERGI">
+      <row title="3 B ENERGI" colspan="9"/>
+      <row odd="true" title="3 B ENERGI">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 2 Energi- 1">
+      <row odd="true" title="Förnybar energi">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 2 Energi- 2">
+      <row odd="true" title="Energieffektivitet">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 3 VÄRME &amp;  KYLA">
+      <row title="3 C VÄRME &amp;  KYLA" colspan="9"/>
+      <row odd="true" title="3 C VÄRME &amp;  KYLA">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 3 Värme &amp; Kyla- 1">
+      <row odd="true" title="Köldmedia">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 4 AVFALL">
+      <row title="3 D AVFALL" colspan="9"/>
+      <row odd="true" title="3 D AVFALL">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 4 Avfall- 1">
+      <row odd="true" title="Avfallsmängd">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 4 Avfall- 2">
+      <row odd="true" title="Farligt avfall">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 5 FÖRBRUKNINGSMATERIAL">
+      <row title="3 E FÖRBRUKNINGSMATERIAL" colspan="9"/>
+      <row odd="true" title="3 E FÖRBRUKNINGSMATERIAL">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 5 Förbrukningsmat.- 1">
+      <row odd="true" title="Förbrukningsmaterial">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 6 INKÖP EXTERNA">
+      <row title="3 F INKÖP EXTERNA TJÄNSTER &amp; PRODUKTER" colspan="9"/>
+      <row odd="true" title="3 F INKÖP EXTERNA TJÄNSTER &amp; PRODUKTER">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 3 Lokaler &amp; Utrustning- 6 Inköp externa- 1">
+      <row odd="true" title="Egna inköp av tjänster och produkter">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+      </row>
+      <row>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+      </row>
+    </pageTotal>
+  </page>
+  <page title="4 Info &amp; Marknadsföring" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="M- 4 Info &amp; Marknadsföring- 1 SKYLTNING &amp; MARKNADS">
+      <row isheader="true" title="">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+        <col value="Kommentar"/>
+        <col value="Korrigerande åtgärd"/>
+        <col value="Ansvarig"/>
+        <col value="Datum"/>
+      </row>
+      <row odd="true" title="4 A SKYLTNING &amp; MARKNADSFÖRING">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 4 Info &amp; Marknadsföring- 1 Skyltning- 1">
+      <row odd="true" title="Märkning i butikshyllan">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 4 Info &amp; Marknadsföring- 1 Skyltning- 2">
+      <row odd="true" title="Marknadsföringsmaterialet">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 4 Info &amp; Marknadsföring- 2 INFORMATIONSPLIKT">
+      <row title="4 B INFORMATIONSPLIKT" colspan="9"/>
+      <row odd="true" title="4 B INFORMATIONSPLIKT">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 4 Info &amp; Marknadsföring- 2 Informationsplikt- 1">
+      <row odd="true" title="Säkerhetsdatablad">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 4 Info &amp; Marknadsföring- 2 Informationsplikt- 2">
+      <row odd="true" title="Kandidatlistan">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+      </row>
+      <row>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+      </row>
+    </pageTotal>
+  </page>
+  <page title="5 Personal" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="M- 5 Personal- 1 UTBILDNING">
+      <row isheader="true" title="">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+        <col value="Kommentar"/>
+        <col value="Korrigerande åtgärd"/>
+        <col value="Ansvarig"/>
+        <col value="Datum"/>
+      </row>
+      <row title="5 A UTBILDNING" colspan="9"/>
+      <row odd="true" title="5 A UTBILDNING">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 5 Personal- 1 Utbildning- 1">
+      <row odd="true" title="Utbildning">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+      </row>
+      <row>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+      </row>
+    </pageTotal>
+  </page>
+  <page title="6 Sortiment" isCreateSum="false" assessmentType="Activity Assessment">
+    <Section title="M- 6 Sortiment- 1 GENERELLA KRAV">
+      <row isheader="true" title="">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+        <col value="Kommentar"/>
+        <col value="Korrigerande åtgärd"/>
+        <col value="Ansvarig"/>
+        <col value="Datum"/>
+      </row>
+      <row title="6 A GENERELLA KRAV" colspan="9"/>
+      <row odd="true" title="6 A GENERELLA KRAV">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 6 Sortiment- 1 Generella krav- 1">
+      <row odd="true" title="Sortimentet">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 6 Sortiment- 2 FISK &amp; SKALDJUR">
+      <row title="6 B FISK &amp; SKALDJUR" colspan="9"/>
+      <row odd="true" title="6 B FISK &amp; SKALDJUR">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 6 Sortiment- 2 Fisk &amp; Skaldjur- 1">
+      <row odd="true" title="Rödlistad fisk och skaldjur">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 6 Sortiment- 3 GROV- &amp; FINKEM">
+      <row title="6 C GROV- &amp; FINKEM" colspan="9"/>
+      <row odd="true" title="6 C GROV- &amp; FINKEM">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 6 Sortiment- 3 Grov- &amp; Finkem- 1">
+      <row odd="true" title="Märkningskontroll">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 6 Sortiment- 4 LÖSVIKTSHANTERING">
+      <row title="6 D LÖSVIKTSHANTERING" colspan="9"/>
+      <row odd="true" title="6 D LÖSVIKTSHANTERING">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <Section title="M- 6 Sortiment- 4 Lösviktshantering- 1">
+      <row odd="true" title="Lösviktshantering">
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+        <col value=""/>
+      </row>
+    </Section>
+    <pageTotal>
+      <row title="Summa">
+        <col value="EA"/>
+        <col value="UA"/>
+        <col value="MA"/>
+        <col value="SA"/>
+        <col value="KA"/>
+      </row>
+      <row>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+        <col value="0"/>
+      </row>
+    </pageTotal>
+  </page>
+  <modelTotal>
+    <row title="">
+      <col value="EA"/>
+      <col value="UA"/>
+      <col value="MA"/>
+      <col value="SA"/>
+      <col value="KA"/>
+      <col value="EA:Ej Aktuell, UA:Utan Anmärkning, MA:Mindre Avvikelse, SA:Större Avvikelse, KA:Kritisk Avvikelse."/>
+    </row>
+    <row title="Totala Avvikelser">
+      <col value="1"/>
+      <col value="0"/>
+      <col value="0"/>
+      <col value="0"/>
+      <col value="1"/>
+    </row>
+    <row title="IHFM status">
+      <col value="50%"/>
+    </row>
+  </modelTotal>
+  <header title="ICA Internrevision miljö, baserad på: ICA-HANDLARE FÖR MILJÖN">
+    <row title="Representant ICA" value=""/>
+    <row title="Butiksnamn" value="ACME Computer Parts"/>
+    <row title="Leverans Adress 1" value="Hemling 1022"/>
+    <row title="Leverans Adress 2" value=""/>
+    <row title="Leverans Postnummer" value="89051"/>
+    <row title="Leverans Ort" value="LÅNGVIKSMON"/>
+    <row title="Profil" value="ICA To Go"/>
+    <row title="Köpman" value=""/>
+    <row title="Kvalitetsansvarig i butik/Miljöansvarig I butik" value=""/>
+    <row title="Datum" value="2013-08-01"/>
+  </header>
+</model>

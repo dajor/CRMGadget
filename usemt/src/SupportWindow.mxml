@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  xmlns:control="gadget.control.*"
+		  xmlns:rtc="AfcsNameSpace"
+		  width="600" height="550"
+		  title="{i18n._('GLOBAL_SUPPORT')}" 
+		  transparent="true"
+		  showStatusBar="false"
+		  systemChrome="none"  
+		  creationComplete="init()"
+		  >
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.rtc.authentication.AdobeHSAuthenticator;
+			import com.adobe.rtc.collaboration.AudioPublisher;
+			import com.adobe.rtc.pods.FileShare;
+			import com.adobe.rtc.pods.Roster;
+			import com.adobe.rtc.pods.SimpleChat;
+			import com.adobe.rtc.pods.WebCamera;
+			import com.adobe.rtc.session.ConnectSession;
+			
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			
+			import mx.containers.HBox;
+			import mx.containers.VBox;
+			import mx.controls.Button;
+			import mx.events.SliderEvent;
+			
+			import spark.components.HGroup;
+			import spark.components.HSlider;
+			import spark.components.Label;
+			//CRO 05.01.2011
+			private const SUPPORTWINDOW_TITLEBAR_SUPPORT:String = "GLOBAL_SUPPORT";
+			private const SUPPORTWINDOW_LABEL_AUDIO:String = "GLOBAL_AUDIO";
+			private const SUPPORTWINDOW_LABEL_VOLUME:String = "GLOBAL_VOLUME";
+			
+			private function init():void {
+				var preferences:Object = Database.preferencesDao.read();
+				var auth:AdobeHSAuthenticator = new AdobeHSAuthenticator();
+				auth.userName=preferences.im_user; //"daniel.jordan@fellow-consulting.de";
+				auth.password=preferences.im_password; //"fellow$29";
+				auth.protocol=preferences.im_protocol; //"rtmfp"
+				
+				var session:ConnectSession = new ConnectSession();
+				//session.roomURL=preferences.im_room_url; //"https://connectnow.acrobat.com/crmgadget2go/crmgadget2go";
+				session.roomURL = "https://connectnow.acrobat.com/crmgadget2go/crmgadget2go";
+				session.authenticator=auth;
+				session.login();
+				
+				var hboxIM:HBox =  new HBox();
+				hboxIM.percentWidth = hboxIM.percentHeight = 100;
+				
+				var vboxRosterWebcamAudio:VBox = new VBox();
+				vboxRosterWebcamAudio.percentHeight = 100;
+				vboxRosterWebcamAudio.percentWidth = 25;
+				var roster:Roster = new Roster();
+				roster.percentWidth = 100;
+				roster.percentHeight = 50;
+				var webcam:WebCamera = new WebCamera();
+				webcam.percentWidth = 100;
+				webcam.percentHeight = 40;
+				var vboxAudio:VBox = new VBox();
+				var audio:AudioPublisher = new AudioPublisher();
+				audio.height = 0;
+				audio.gain = 50;
+				audio.useEchoSuppression = true;
+				var btnAudio:Button = new Button();
+				btnAudio.label = i18n._(SUPPORTWINDOW_LABEL_AUDIO);
+				btnAudio.toggle = true;
+				btnAudio.addEventListener(MouseEvent.CLICK, function(event:MouseEvent):void { btnAudio.selected ? audio.publish() : audio.stop(); });
+					
+				var hGroupVolume:HGroup = new HGroup();
+				hGroupVolume.verticalAlign = "middle";
+				var lblVolume:Label = new Label();
+				lblVolume.text = i18n._(SUPPORTWINDOW_LABEL_VOLUME) + ":";
+				var hSliderVolume:HSlider = new HSlider();
+				hSliderVolume.minimum = 0;
+				hSliderVolume.maximum = 100;
+				hSliderVolume.value = 50;
+				hSliderVolume.addEventListener(SliderEvent.CHANGE, function(event:Event):void { audio.gain = hSliderVolume.value; });
+				hGroupVolume.addElement(btnAudio);
+				hGroupVolume.addElement(lblVolume);
+				hGroupVolume.addElement(hSliderVolume);
+				
+				vboxAudio.addChild(audio);
+				vboxAudio.addChild(hGroupVolume);
+				vboxRosterWebcamAudio.addChild(roster);
+				vboxRosterWebcamAudio.addChild(webcam);
+				vboxRosterWebcamAudio.addChild(vboxAudio);
+				
+				var vboxFileChat:VBox = new VBox();
+				var fileShare:FileShare = new FileShare();
+				fileShare.percentWidth = 100;
+				fileShare.percentHeight = 50;
+				var simpleChat:SimpleChat = new SimpleChat();
+				simpleChat.percentWidth = 100;
+				simpleChat.percentHeight = 50;
+				vboxFileChat.percentWidth = vboxFileChat.percentHeight = 100;
+				vboxFileChat.addChild(fileShare);
+				vboxFileChat.addChild(simpleChat);
+				
+				hboxIM.addChild(vboxRosterWebcamAudio);
+				hboxIM.addChild(vboxFileChat);
+				
+				canvasIM.addChild(hboxIM);
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="600" height="550" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/call.png')" title="{i18n._(SUPPORTWINDOW_TITLEBAR_SUPPORT)}"/>
+		<mx:Canvas id="canvasIM" width="100%" height="100%" top="30"/>
+	</mx:Canvas>
+</s:Window>

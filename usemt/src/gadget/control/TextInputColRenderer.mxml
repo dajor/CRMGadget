@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true" height="100%">
+	<fx:Script>
+		<![CDATA[
+			import gadget.window.WindowManager;
+			
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			
+			import spark.components.Label;
+			import spark.components.TextInput;
+			private var grid:AdvancedDataGrid;
+			public var column:AdvancedDataGridColumn;
+			
+			private var txtComment:TextInput;
+			private var txtVal:Label;
+			
+			override public function set data(value:Object):void{		
+				super.data = value;
+				
+				if(data!=null){		
+					
+					
+					if(data.isHeader && data.isHeader=='1'){
+						if(txtVal==null){
+							txtVal = new Label();
+							txtVal.percentHeight=100;
+							txtVal.percentWidth=100;
+							hBoxCell.addChild(txtVal);
+						}
+						
+						txtVal.text = data[column.dataField];
+						txtVal.visible  = false;
+						txtVal.setStyle("fontWeight","bold");
+						hBoxCell.setStyle("backgroundColor", 0x92B8FF);
+						txtVal.setStyle("backgroundColor", 0x92B8FF);
+						
+					}else if(data.isFooter){
+						hBoxCell.setStyle("backgroundColor", 0x92B8FF);
+					}else{
+						if(txtComment==null){
+							txtComment=new TextInput();
+							txtComment.percentHeight=100;
+							txtComment.addEventListener(Event.CHANGE,changeFunction);
+							txtComment.addEventListener(MouseEvent.DOUBLE_CLICK, doubleClickActionPerforment);
+							hBoxCell.addChild(txtComment);
+						}
+						if(data.odd){
+							hBoxCell.setStyle("backgroundColor", 0xECECEC);
+							txtComment.setStyle("backgroundColor", 0xECECEC);
+						}else{
+							hBoxCell.setStyle("backgroundColor", 0xF5F5F5);
+							txtComment.setStyle("backgroundColor", 0xF5F5F5);
+						}
+						
+						txtComment.enabled = data.RemoveCommentBox=="false";						
+						txtComment.text = data[column.dataField];
+						// CH 6394
+						txtComment.toolTip = data[column.dataField];
+						txtComment.percentWidth =100;
+						txtComment.percentHeight=100;
+					}
+					
+//					if(data.isHeader){
+//						txtVal.text = data[column.dataField];
+//						txtVal.visible  = true;
+//						txtVal.setStyle("fontWeight","bold");
+//						hBoxCell.setStyle("backgroundColor", 0x92B8FF);
+//						txtVal.setStyle("backgroundColor", 0x92B8FF);
+//					}else{
+//						if(data.odd){
+//							hBoxCell.setStyle("backgroundColor", 0xECECEC);
+//							txtCommnet.setStyle("backgroundColor", 0xECECEC);
+//						}else{
+//							hBoxCell.setStyle("backgroundColor", 0xF5F5F5);
+//							txtCommnet.setStyle("backgroundColor", 0xF5F5F5);
+//						}
+//						
+//						txtCommnet.enabled = data.RemoveCommentBox=="false";
+//						
+//						txtCommnet.text = data[column.dataField];
+//						txtCommnet.visible=true;
+//						txtCommnet.percentWidth =100;
+//						//txtCommnet.includeInLayout= false;
+//						txtVal.visible  = false;
+//						txtVal.includeInLayout  = false;
+//					}
+//					if(data.isFooter){
+//						txtCommnet.includeInLayout = false;
+//						txtCommnet.visible  = false;
+//						txtVal.includeInLayout = false;
+//						txtVal.visible  = false;
+//						hBoxCell.setStyle("backgroundColor", 0x92B8FF);
+//						
+//					}
+				}
+			}
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						
+					}
+				}
+				
+			}
+			private function changeFunction(e:Event):void{
+				if(column!=null){	
+					data[column.dataField] = txtComment.text;
+				
+				}
+			}
+			
+			private function doubleClickActionPerforment(e:MouseEvent):void{
+				var txt:TextInput = e.currentTarget as TextInput;
+				var editTextInputWindow:EditTextInputRendererWindow = new EditTextInputRendererWindow();
+				editTextInputWindow.titleWindow = column.headerText;
+				editTextInputWindow.sourceText = txt.text;
+				editTextInputWindow.changeListener = function(destinationText:String):void{
+					txt.text = destinationText;
+					data[column.dataField] = destinationText;
+				};
+				WindowManager.openModal(editTextInputWindow);
+			}
+			
+			
+			
+			
+			
+		]]>
+		
+	</fx:Script>
+	<mx:HBox horizontalAlign="center" verticalAlign="middle" width="100%" height="100%" id="hBoxCell" paddingLeft="3" paddingRight="3" paddingBottom="3">
+		<!--<s:TextInput id="txtCommnet"   visible="false" width="100%" change="changeFunction()"/>
+		<s:Label id="txtVal"    visible="false" paddingRight="50"/> -->
+	</mx:HBox>	
+</s:MXAdvancedDataGridItemRenderer>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.util.ImageUtils;
+			 private function clickFunction():void{
+				data.favorite=!data.favorite;
+				Database.getDao(data.gadget_type).updateFavorite(data);
+				imgFav.source = data.favorite?ImageUtils.favorite:ImageUtils.unFavorite;
+			 }			
+		]]>
+		
+	</fx:Script>
+	<mx:HBox horizontalAlign="center" width="100%">
+		<mx:Image id="imgFav" source="{data.favorite?ImageUtils.favorite:ImageUtils.unFavorite}" click="{clickFunction()}" />
+	</mx:HBox>	
+</s:MXAdvancedDataGridItemRenderer>

@@ -1,0 +1,427 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window
+		xmlns:mx="http://www.adobe.com/2006/mxml"
+		xmlns:control="gadget.control.*"
+		showFlexChrome="false" systemChrome="none" 
+		resizable="false"	
+		close="dispose()"
+		layout="absolute" width="720" height="450" creationComplete="init()"  showStatusBar="false">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.BaseDAO;
+			import gadget.dao.CustomRecordTypeServiceDAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.FormItem;
+			import mx.containers.HBox;
+			import mx.containers.Panel;
+			import mx.controls.Image;
+			import mx.controls.Label;
+			import mx.controls.TextInput;
+			
+			
+			[binable]public var syncEnd:Function;
+			[binable]public var datas:ArrayCollection;
+			
+			public var startSyn:Function;
+			private var i:int=0;
+			private var isStop:Boolean=true;
+			private function dispose():void{
+
+				if(syncEnd!=null && isStop){
+					syncEnd(false);					
+				}
+				this.close();
+				
+				
+			}
+			private function save():void{
+
+				Database.begin();
+				for each (var obj:Object in datas){
+					var localeObj:Object = obj.localeRec;
+					var serverObj:Object = obj.serverRec;
+					var localeMergFields:Object = localeObj.serverMergFields;
+					var serverMergFields:Object = serverObj.localeMergFields;
+					if(localeMergFields==null && serverMergFields==null){
+						localeObj.local_update=null;	
+					}else{
+						var fieldsMergs:Object = localeObj.listFieldMerg;
+						if(fieldsMergs != null ){
+							for (var f:String in fieldsMergs){
+								
+								if(serverMergFields!=null && serverMergFields[f]!=null) continue;
+								
+								localeObj[f] = serverObj[f];
+								
+								
+							} 
+						}
+					}
+					
+					
+					var dao:BaseDAO = Database.getDao(localeObj.gadget_type);
+					dao.updateByOracleId(localeObj);
+					
+				}
+				
+				
+				Database.commit();
+				isStop=false;
+				startSyn();
+				this.close();
+				
+			}
+			
+		
+		   private function checkDiferrent(val1:Object,val2:Object):Boolean{
+			   if(val1==val2){
+				   return false;
+			   }
+			   if((val1==null && val2=='') ||(val1=='' && val2==null)){
+				   return false;
+			   } 
+			   return true;
+			   
+			   
+		   }
+			
+			private function init():void{
+				i=0;
+				createScreen();
+			}
+			
+			
+			private function createLableHeader(text:String,paddingleft:int=0):Label{
+				var label:Label = new Label();
+				label.text=text;
+				label.percentWidth=100;
+				label.setStyle("fontSize","15");
+				label.setStyle("fontWeight","bold");
+				label.setStyle("paddingLeft",paddingleft);
+				return label;
+			}
+			
+			private function enableDisableButton():void{
+				if(datas.length==1){
+					btnNext.enabled=false;
+					btnPreviouse.enabled=false;		
+					btnOk.enabled = true;
+					return;
+				}
+				
+				if(i==0){
+					btnNext.enabled=true;
+					btnPreviouse.enabled=false;
+					return;				
+				}
+				if(i==datas.length-1){
+					btnNext.enabled=false;
+					btnPreviouse.enabled=true;
+					return;
+				}
+				
+				btnNext.enabled=true;
+				btnPreviouse.enabled=true;
+				
+			}
+			
+			private function createLabelFormItem(label:String, info:String, isShowLabel:Boolean=true):FormItem {
+				var frmItm:FormItem = new FormItem();
+				var lblInfo:Label = new Label();
+				if(isShowLabel) frmItm.label = label; //show label only if it's local side
+				lblInfo.text = info;
+				lblInfo.setStyle("fontWeight","bold");
+				if(!isShowLabel) lblInfo.setStyle("paddingLeft",18); //paddingleft to 18 for server side
+				frmItm.addChild(lblInfo);
+				return frmItm;
+			}
+
+			private function createConflictFormItem(label:String, displayObject:DisplayObject, isShowLabel:Boolean=true):FormItem {
+				var frmItm:FormItem = new FormItem();
+				if(isShowLabel) frmItm.label = label;
+				frmItm.addChild(displayObject);
+				return frmItm;
+			}
+
+			private function createScreen():void{
+				
+				var fieldInfo:Object;
+				var item:Object = datas.getItemAt(i);
+				var serverRec:Object = item.serverRec;
+				var localeRec:Object = item.localeRec;
+				var entity:String = item.gadget_type;
+				
+				var titleDetail:String = Utils.getTitle(entity,0,localeRec,false);
+				setTitle(titleDetail);
+				setIcon(entity);
+				
+				enableDisableButton();
+				
+				//clear all controls
+				frmLocal.removeAllChildren();
+				frmServer.removeAllChildren();
+				hboxUndo.removeAllChildren();
+				
+				//show header
+				var headerLocal:FormItem = new FormItem();
+				headerLocal.percentWidth = 100;
+				headerLocal.addChild( createLableHeader("Local Record", -130) );
+				frmLocal.addChild(headerLocal);
+				
+				var headerServer:FormItem = new FormItem();
+				headerServer.percentWidth = 100;
+				headerServer.addChild( createLableHeader("External Record", -30) );
+				frmServer.addChild(headerServer);
+				
+				numberof.text = (i+1) + " of " + datas.length;
+					
+				var fields:ArrayCollection = Database.layoutDao.selectLayout(entity, 0);
+				var listDifferencts:ArrayCollection = new ArrayCollection();
+				var owner:Object = Database.allUsersDao.ownerUser();
+				
+				var serModifiedBy:String = serverRec.ModifiedBy;
+				serModifiedBy = serModifiedBy.substr(0,serModifiedBy.indexOf(','));
+				
+				var locModifiedBy:String = owner['FirstName']+" " + owner['LastName'];
+				
+				frmLocal.addChild( createLabelFormItem("Last Modified By", locModifiedBy) );
+				frmServer.addChild( createLabelFormItem("Last Modified By", serModifiedBy, false) );
+				frmLocal.addChild( createLabelFormItem("Last Modified Date", item.localeModified) );
+				frmServer.addChild( createLabelFormItem("Last Modified Date", item.serverModified, false) );
+				
+				//show conflict fields
+				for each (var field:Object in fields){
+
+					if (field.custom != null) continue;
+
+					var element_name:String=field.column_name;					
+					
+					if(!checkDiferrent(localeRec[element_name],serverRec[element_name])) continue;
+					
+					fieldInfo = Database.fieldDao.findFieldByPrimaryKey(entity, element_name);
+					
+					if(fieldInfo!=null){
+						
+						if(localeRec.listFieldMerg==null) localeRec.listFieldMerg=new Object();
+						localeRec.listFieldMerg[element_name] = element_name;
+						
+						var txtInputLocal:TextInput = createTextInput(entity,localeRec,localeRec.serverMergFields,fieldInfo);											
+						var txtInputServer:TextInput = createTextInput(entity,serverRec,serverRec.localeMergFields,fieldInfo);;
+						
+						listDifferencts.addItem({local:txtInputLocal,server:txtInputServer});
+						
+						var nextImage:Image = new Image();
+						nextImage.width = 16;
+						nextImage.height = 16;
+						nextImage.source = ImageUtils.nextDayIcon;
+						nextImage.data = {localComponent:txtInputLocal, fieldName:element_name, serverComponent:txtInputServer, serverObj:serverRec, localeObj:localeRec};
+						nextImage.addEventListener(MouseEvent.CLICK, function(event:MouseEvent):void{
+							var image:Image = Image(event.currentTarget);
+							var obj:Object = image.data;
+							var fieldName:String = obj.fieldName;
+							var serverObj:Object = obj.serverObj;
+							if(serverObj.localeMergFields==null){
+								serverObj.localeMergFields=new Object();
+							}
+							setMerg(obj.serverComponent,serverObj.localeMergFields,obj.localComponent.text,fieldName);
+						});
+
+						var prevImage:Image = new Image();
+						prevImage.width = 16;
+						prevImage.height = 16;
+						prevImage.source = ImageUtils.previousDayIcon;
+						prevImage.data = {localComponent:txtInputLocal, fieldName:element_name, serverComponent:txtInputServer,serverObj:serverRec, localeObj:localeRec};
+						prevImage.addEventListener(MouseEvent.CLICK, function(event:MouseEvent):void{
+							var image:Image = Image(event.currentTarget);
+							var obj:Object = image.data;
+							var fieldName:String = obj.fieldName;
+							var localeObj:Object = obj.localeObj;
+							if(localeObj.serverMergFields == null){
+								localeObj.serverMergFields = new Object();
+							}							
+							setMerg(obj.localComponent,localeObj.serverMergFields,obj.serverComponent.text,fieldName);							
+						});
+						
+						var localDisplayObject:HBox = new HBox();
+						var serverDisplayObject:HBox = new HBox();
+						
+						localDisplayObject.addChild(txtInputLocal);
+						localDisplayObject.addChild(prevImage);
+						serverDisplayObject.addChild(nextImage);
+						serverDisplayObject.addChild(txtInputServer);
+						
+						var lblConflict:String = fieldInfo.display_name;
+						frmLocal.addChild( createConflictFormItem(lblConflict, localDisplayObject) );
+						frmServer.addChild( createConflictFormItem(lblConflict, serverDisplayObject, false) );
+
+					}
+				}
+				
+				//add undo button
+				var btnUndo:Button = new Button();				
+				btnUndo.label = "Undo";
+				btnUndo.data = {localeObj:localeRec,serverObj:serverRec,listDef:listDifferencts};
+				btnUndo.addEventListener(MouseEvent.CLICK,function(e:MouseEvent):void{
+					var btn:Button = Button(e.currentTarget);
+					var obj:Object = btn.data;
+					obj.localeObj.serverMergFields = null;
+					obj.serverObj.localeMergFields = null;
+					//refref textbox
+					for each(var o:Object in obj.listDef){
+						var localComp:TextInput = o.local;
+						var serverComp:TextInput = o.server;
+						var entity:String = localComp.data.type;
+						var field:Object =  localComp.data.objField;
+						
+						localComp.text = getDisplayValue(entity,field,obj.localeObj);
+						serverComp.text = getDisplayValue(entity,field,obj.serverObj);
+						
+					}
+				});
+								
+				hboxUndo.addChild(btnUndo);
+				
+			}
+			
+			private function createTextInput(entity:String,obj:Object,mergFields:Object, field:Object):TextInput{
+				var element_name:String=field.element_name;	
+				var valMerg:String = null;
+				var isMerged:Boolean =false;
+				if(mergFields!=null){
+					var fieldMergs:Object = mergFields[element_name];
+					if(fieldMergs!=null){
+						valMerg = fieldMergs.val;
+						isMerged = fieldMergs.merg;
+					}
+					
+				}
+				if(valMerg == null && !isMerged){
+					valMerg = getDisplayValue(entity,field,obj);
+				}
+				
+				var textbox:TextInput = new TextInput();
+				textbox.enabled=false;
+				textbox.text = valMerg;
+				textbox.data = {type:entity, objField:field};
+				textbox.width = 150;
+				return textbox;
+			}
+			
+			private function getDisplayValue(entity:String,field:Object,obj:Object):String{
+				
+				var valMerg:String = obj[field.element_name];
+				if(field.data_type == 'Picklist'){
+					var pickval:String =	PicklistService.getValue(entity,field.element_name,valMerg,obj);
+					if( pickval !=null){
+						valMerg = pickval; 
+					}
+				}else if(field.data_type=='Multi-Select Picklist'){
+					var multiPicklist:Object = PicklistService.getMultiSelectPicklist(entity, obj, field.element_name);
+					var val:String = '';
+					var i:int = 0;
+					for each(var selectObj:Object in multiPicklist.selectedItems){
+						if(i>0){
+							val=val+", ";
+						}
+						val=val+ selectObj.label;
+					}
+					if(val!=''){
+						valMerg = val;
+					}
+				}
+				return valMerg;
+			}
+			
+			private function setMerg(inputText:TextInput, mergFields:Object,valMerg:String,field:String):void{
+				mergFields[field] ={val:valMerg,merg:true} ;							
+				inputText.text = valMerg;
+			}
+			
+			private function next():void{
+				i=i+1;
+				if(i>datas.length-1){
+					i=datas.length-1;
+				}
+				if(i==datas.length-1){
+					btnOk.enabled = true;
+				}
+					
+				createScreen();
+			}
+			
+			private function previouse():void{
+				i=i-1;
+				if(i<0){
+					i=0;
+				}
+				createScreen();
+			}
+			
+			private function setTitle(title:String):void {
+				this.title = title;
+				titlebar.title=title;
+			}
+			
+			private function setIcon(entity:String):void {
+				var customLayout:Object = Database.customLayoutDao.readSubtype(entity, 0);
+				var iconName:String = customLayout.custom_layout_icon;
+				titlebar.icon = ImageUtils.getIconByName(iconName);
+				
+				if(CustomRecordTypeServiceDAO.isCustomObject(entity) || Database.preferencesDao.isModernIcon()){
+					var oodIcon:Class =  Database.customRecordTypeServiceDao.readIcon(entity);
+					if(oodIcon){
+						titlebar.icon = oodIcon;
+					}
+				}
+				
+				if(!StringUtils.isEmpty(customLayout.background_color)){
+					titlebar.setStyle("backgroundColor", customLayout.background_color);
+				}else{
+					var titleBarColor:String = Database.preferencesDao.getValue(PreferencesDAO.BACKGROUND_COLOR) as String; 
+					if(!StringUtils.isEmpty(titleBarColor)) titlebar.setStyle('backgroundColor',titleBarColor);					
+				}
+			} 
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	
+	<mx:Canvas width="100%" height="100%" horizontalScrollPolicy="off" styleName="main" left="0" top="0" bottom="0">
+		<control:TitleBar id="titlebar" y="2" x="25"/>
+		<mx:VBox width="100%" height="100%" paddingTop="35" paddingBottom="10" paddingLeft="10" paddingRight="10">
+			<mx:Panel title="Merge Conflict Set Up" width="100%" height="100%">
+				<mx:VBox width="100%" height="100%">
+					<mx:HBox width="100%" height="100%">
+						<mx:Form id="frmLocal" width="50%" height="100%"/>
+						<mx:VRule height="100%"/>
+						<mx:Form id="frmServer" width="50%" height="100%"/>
+					</mx:HBox>
+					<mx:HBox id="hboxUndo" width="100%" horizontalAlign="center"/>
+				</mx:VBox>
+			</mx:Panel>
+			<mx:HBox width="100%" >
+				<mx:HBox width="100%" horizontalAlign="left" paddingTop="4" paddingRight="0">
+					<mx:Button id = "btnPreviouse" label="Previous" click="previouse()" />
+					<mx:Button id = "btnNext" label="Next" click="next()" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center" paddingTop="4" paddingRight="0">
+					<mx:Label id ="numberof"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="right" paddingTop="4" paddingRight="8">
+					<mx:Button label="Cancel" click="dispose()" />
+					<mx:Button id = "btnOk" label="Continue" click="save()" enabled="false" />
+				</mx:HBox>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

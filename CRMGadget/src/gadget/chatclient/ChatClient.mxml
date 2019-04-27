@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="absolute"
+		   initialize="init()"
+		   width="400" height="300"
+		   title="{i18n._('Chat')}"
+		   resizable="false"
+		   showFlexChrome="false" transparent="true" systemChrome="none" xmlns:control="gadget.control.*"
+		   >
+		
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			
+			import org.igniterealtime.xiff.core.UnescapedJID;
+			import org.igniterealtime.xiff.data.Presence;
+			import org.igniterealtime.xiff.events.ConnectionSuccessEvent;
+			import org.igniterealtime.xiff.events.DisconnectionEvent;
+			import org.igniterealtime.xiff.events.IncomingDataEvent;
+			import org.igniterealtime.xiff.events.LoginEvent;
+			import org.igniterealtime.xiff.events.MessageEvent;
+			import org.igniterealtime.xiff.events.PresenceEvent;
+			import org.igniterealtime.xiff.events.RegistrationSuccessEvent;
+			import org.igniterealtime.xiff.events.XIFFErrorEvent;
+			
+			private const SERVER_NAME:String = "jabber.fellow-consulting.de";
+			private const SERVER_PORT:Number = 4222;
+			private var userDTO:Object;
+			
+//			private var userDTO:Object = {username:"sypauv",password:"DBc3dBgach4"};
+//			private var userDTO:Object = {username:"testtest",password:"testtest"};
+//			private var userDTO:Object = {username:"testtest2",password:"testtest2"};			
+			
+			private var _chat:CRMXAMPPConnection;
+			
+			[Bindable]
+			private var presenceDataProvider:Array =	[
+				{ label:"Online", data:Presence.SHOW_CHAT },
+				{ label:"Free To Chat", data:Presence.SHOW_CHAT },
+				{ label:"Away", data:Presence.SHOW_AWAY },
+				{ label:"Do Not Disturb", data:Presence.SHOW_DND },
+				{ label:"Extended Away", data:Presence.SHOW_XA }
+			];
+			
+			private function init():void {
+				var tmpUser:Object = Database.currentUserDAO.getCurrentUser();
+				var roomName:String = tmpUser.user_sign_in_id;
+				roomName = roomName.substring(0,roomName.indexOf("/"));
+				var userloginid:String = tmpUser.id;
+				userDTO = {username:userloginid, password:userloginid, roomname:roomName};
+				setupChat();	
+			}
+			
+			private function setupChat():void {
+//				_chat = new CRMXAMPPConnection(SERVER_NAME, SERVER_PORT);
+				_chat = CRMXAMPPConnection.getInstance();
+				_chat.addEventListener( ConnectionSuccessEvent.CONNECT_SUCCESS, onConnectSuccess );
+				_chat.addEventListener( DisconnectionEvent.DISCONNECT, onDisconnect );
+				_chat.addEventListener( LoginEvent.LOGIN, onLogin );
+				_chat.addEventListener( RegistrationSuccessEvent.REGISTRATION_SUCCESS, onRegistrationSuccess );
+				_chat.addEventListener( XIFFErrorEvent.XIFF_ERROR, onXIFFError );
+				_chat.addEventListener( PresenceEvent.PRESENCE, onPresence );
+				_chat.addEventListener( MessageEvent.MESSAGE, onMessage );
+				_chat.addEventListener( IncomingDataEvent.INCOMING_DATA, onIncomingData );
+				
+				register();	
+				
+				_chat.appendLog = appendLog;
+				_chat.clearTypeArea = clearTypeArea;
+			}
+			
+			private function connect():void {
+				_chat.connect(userDTO);
+			}
+			
+			private function disconnect():void {
+				_chat.disconnect();
+			}
+			
+			private function register():void {
+				_chat.register(userDTO);
+			}
+			
+			private function keyDownSend(event:KeyboardEvent):void {
+				if(event.keyCode == Keyboard.ENTER){
+					send();
+				}
+			}
+			
+			private function clickSend(event:MouseEvent):void {
+				send();
+			}
+			
+			private function send():void {
+				_chat.sendMessage(inputTextArea.text);
+			}
+			
+			private function onConnectSuccess(event:ConnectionSuccessEvent):void {
+				trace("Connection is connected.");
+			}
+			
+			private function onDisconnect(event:DisconnectionEvent):void {
+				trace("Connection is disconnected.");
+				cboStatus.enabled = false;
+			}
+			
+			private function onRegistrationSuccess(event:RegistrationSuccessEvent):void {
+				trace("Registration was successful");
+				Database.registeredUserDao.insert(userDTO);
+				connect();
+			}
+			
+			private function onXIFFError(event:XIFFErrorEvent):void {
+				if(event.errorMessage == "conflict"){
+					_chat.isRegisterUser = false;
+					connect();
+				}
+			}
+			
+			private function onLogin(event:LoginEvent):void {
+				trace(event.type);
+				cboStatus.enabled = true;
+				cboStatus.dataProvider = presenceDataProvider;
+			}
+			
+			private function onPresence(event:PresenceEvent):void {
+				trace(event.type);
+			}
+			
+			private function onMessage(event:MessageEvent):void {
+				trace("Message");
+			}
+			
+			private function onIncomingData(event:IncomingDataEvent):void {
+				_chat.connection.sendKeepAlive();
+			}
+			
+			private function onPresenceStateChange( event:ListEvent ):void {
+				_chat.updatePresence( cboStatus.value.toString(), cboStatus.text );
+			}
+			
+			private function appendLog( text:String ):void {
+				txtChatHistory.htmlText += ( txtChatHistory.htmlText == "" ? "" : "\n" ) + text;
+				callLater( updateLogScrollPosition );
+			}
+			
+			private function updateLogScrollPosition():void {
+				txtChatHistory.verticalScrollPosition = txtChatHistory.maxVerticalScrollPosition;
+			}
+			
+			private function clearTypeArea():void {
+				inputTextArea.text = "";
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Style source="styles.css"/>
+	
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar id="chatTitleBar" icon="@Embed(source='/assets/chat_icon.png')" title="{i18n._('Chat')}"/>
+		<mx:VBox width="100%" height="100%" top="30" paddingTop="10" paddingLeft="10" paddingBottom="10" paddingRight="10">
+			<mx:HBox width="100%">
+				<mx:ComboBox id="cboStatus" change="onPresenceStateChange(event)" width="100" />
+				<mx:TextInput id="inputTextArea" width="100%" height="21" borderStyle="inset" editable="true" keyDown="keyDownSend(event)" />
+				<mx:VBox horizontalAlign="right">
+					<mx:Button id="btnSend" label="Send" click="clickSend(event)"/>
+				</mx:VBox>
+			</mx:HBox>
+			<mx:TextArea id="txtChatHistory" width="100%" height="100%" borderStyle="inset" editable="false"/>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

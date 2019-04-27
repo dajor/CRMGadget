@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			
+			
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.lists.List;
+			import gadget.util.GUIUtils;
+			import gadget.util.Relation;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			[Embed(source='/assets/add.png')] [Bindable] private static var iconAdd:Class;
+			//[Embed(source='/assets/triangle-right.png')] [Bindable] private static var iconRight:Class;
+			
+			private var grid:AdvancedDataGrid= null;
+			private var rowIndex:int= -1;
+			private var _list:List;
+			public static const OP_COPY_FIELD:Array=[
+				"OwnerFullName",
+				"gadget_id",
+				"OpportunityId",
+				"OpportunityName",
+				"AccountName",
+				"AccountId",
+				"SalesStage",
+				"SalesStageId",
+				"Probability",
+				"CloseDate",
+				"CustomDate9",//Original Close Date
+				"CustomPickList0",//Business Area (CP)
+				"CustomPickList7",//Curve Type
+				"CustomDate26",//Stard Date
+				"CustomDate25",//end date				
+				"ModifiedDate",	
+				"Status",
+				"Membership",
+				"TradingPartner",
+				"categorySelected",
+				"CustomText37",//Total Calls Current Quarter
+				"CustomCurrency2",//Expenses
+				"group"
+				
+			];
+			
+			public function set list(value:List):void
+			{
+				_list = value;
+			}
+
+			public function get list():List
+			{
+				return _list;
+			}
+			private function refreshData(item:Object):void{
+				if(item != null){
+					var rows:ArrayCollection = grid.dataProvider as ArrayCollection;
+					var objClone:Object = new Object();
+					var qty:int = parseInt(item['CustomNumber0']);
+					var val:int = parseInt(item['CustomCurrency4']);
+					var total:int =  val * qty;
+					
+					
+					var obj:Object = ImpactCalendar.cloneObject(super.data);
+					obj["isChild"] = true;
+					obj["CustomPickList31"] = item['CustomPickList31'];
+					obj["CustomPickList34"] = item['CustomPickList34'];
+					obj["CustomNumber0"] = qty;
+					obj["CustomCurrency4"] = val;
+					obj["AnnualizedImpact"] = total;
+					rows.addItemAt(obj,grid.selectedIndex+1);
+					grid.selectedIndex=grid.selectedIndex+1;
+				}
+			}
+			private function newItem():Object{
+				var newObj:Object = new Object();
+				
+				//set only parent id field
+				var oidName:String = DAOUtils.getOracleId(super.data.gadget_type);
+				newObj[oidName] = super.data[oidName];						
+				newObj['Probability']=super.data['Probability'];
+				newObj['ExpectedRevenue']=super.data['ExpectedRevenue'];
+				newObj['OpportunitySalesStage']=super.data['SalesStage'];
+				return newObj;
+			}
+			
+			protected function buttonExpand_clickHandler(event:MouseEvent):void
+			{
+				if(super.data != null){
+					var newRow:Object = new Object();
+					for each(var f:String in OP_COPY_FIELD){
+						newRow[f] = super.data[f];
+					}
+					var rows:ArrayCollection = grid.dataProvider as ArrayCollection;
+					rows.addItemAt(newRow,grid.selectedIndex+1);
+				}else{
+					Alert.show("Please select other record","Info",Alert.OK,list);
+				}
+				
+				
+			}
+			override public function set data(item:Object):void
+			{
+				super.data = item;
+				/*
+				if(grid != null){
+					var rows:ArrayCollection = grid.dataProvider as ArrayCollection;
+					
+					var relation:Object =Relation.getRelation(Database.customObject7Dao.entity,Database.opportunityDao.entity);;
+					if(relation!=null && !item.isChild && !item.isAlready){
+						var dataPro:ArrayCollection = GUIUtils.getRelationList(relation, item);
+						var isChild:Boolean = false;
+						if(dataPro != null && dataPro.length>0){
+							var increase:int = 1;
+							for each(var co7:Object in dataPro){
+								var qty:int = parseInt(co7['CustomNumber0']);
+								var val:int = parseInt(co7['CustomCurrency4']);
+								var total:int =  val * qty;
+								if(!isChild){
+									item["CustomPickList31"] = co7['CustomPickList31'];
+									item["CustomPickList34"] = co7['CustomPickList34'];
+									item["CustomNumber0"] = qty;
+									item["CustomCurrency4"] = val;
+									item["AnnualizedImpact"] = total;
+									item["isAlready"] = true;
+									isChild = true;
+								}else{
+									var objClone:Object = new Object();
+									objClone["CustomPickList31"] = co7['CustomPickList31'];
+									objClone["CustomPickList34"] = co7['CustomPickList34'];
+									objClone["CustomNumber0"] = qty;
+									objClone["CustomCurrency4"] = val;
+									objClone["AnnualizedImpact"] = total;
+									objClone["isChild"] = isChild;
+									objClone["OwnerFullName"] = item["OwnerFullName"];
+									if(rowIndex != -1){
+										rows.addItemAt(objClone,rowIndex+increase);
+										increase++;
+									}
+									
+								}
+							}
+						}
+					}
+				}
+				*/
+				
+				var isVisible:Boolean = false;
+				if(item!=null && !item.isChild && !item.isNew && !item.isTotal && item.editable && item.origOP!=null){
+					isVisible = true;
+				}
+				
+				buttonExpand.visible=isVisible;
+			}
+			
+			override public function getStyle(styleProp:String):*
+			{
+				if("alternatingItemColors"==styleProp && super.data!=null){
+					var colors:Array = super.getStyle(styleProp);
+					if(!isNaN(super.data.group)&& colors!=null && colors.length>0){
+						var realCol:Array = new Array();
+						realCol.push(colors[super.data.group%colors.length]);
+						return realCol;
+					}
+				}
+				
+				return super.getStyle(styleProp);
+			}
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid = value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						rowIndex = list.rowIndex;
+					}
+					
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:LinkButton icon="{iconAdd}" id="buttonExpand" click="buttonExpand_clickHandler(event)"/>
+</s:MXAdvancedDataGridItemRenderer>

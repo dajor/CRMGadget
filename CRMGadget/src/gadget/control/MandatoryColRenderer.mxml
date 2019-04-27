@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.coreUI.util.StringUtils;
+			
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.listClasses.BaseListData;
+			private var col:AdvancedDataGridColumn=null;
+			public static const REPLACE_STYLE:Array = [
+				"selectionColor","rollOverColor","alternatingItemColors"
+			];
+			
+			
+			override public function getStyle(styleProp:String):*
+			{
+				if(col!=null && super.data!=null){//always red if an error
+					var realCol:Array = new Array();
+					if(super.data.isError && REPLACE_STYLE.indexOf(styleProp)!=-1 ){										
+						var val:Object = super.data[col.dataField];
+						if(val==null || StringUtils.isEmpty(val.toString())){
+							realCol.push(0xFF0000);
+							return realCol;
+						}
+						
+					}
+					if("alternatingItemColors"==styleProp){
+						//return normal color
+						var colors:Array = super.getStyle(styleProp);
+						if(!isNaN(super.data.group)&& colors!=null && colors.length>0){					
+							realCol.push(colors[super.data.group%colors.length]);
+							return realCol;
+						}	
+					}
+					
+				}
+				
+				return super.getStyle(styleProp);
+			}
+			
+			override public function set data(value:Object):void{		
+				super.data = value;		
+				if(col!=null){
+					if(data!=null){		
+//						if(col.labelFunction!=null){
+//						lblData.text = col.labelFunction(value,col);
+//						}else{
+//							lblData.text = value[col.dataField];
+//						}
+						lblData.text = col.itemToLabel(value);
+						
+					}
+					
+				}
+			}
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					var grid:AdvancedDataGrid = value.owner as AdvancedDataGrid;	
+					col= grid.columns[value.columnIndex];
+					
+				}
+			}
+		]]>
+	</fx:Script>
+	<s:Label id="lblData" top="4" left="5" right="5" bottom="5" verticalAlign="justify"/>
+</s:MXAdvancedDataGridItemRenderer>

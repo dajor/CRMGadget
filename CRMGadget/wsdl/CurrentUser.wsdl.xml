@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+	xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:xsdLocal1="urn:/crmondemand/xml/currentuser"
+	targetNamespace="urn:crmondemand/ws/currentuser/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/"
+	xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:tns="urn:crmondemand/ws/currentuser/">
+	<types>
+		<xsd:schema elementFormDefault="qualified"
+			attributeFormDefault="unqualified" targetNamespace="urn:crmondemand/ws/currentuser/"
+			xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:import namespace="urn:/crmondemand/xml/currentuser" />
+			<xsd:element name="CurrentUserWS_CurrentUserQueryPage_Input">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="UseChildAnd" minOccurs="0" type="xsd:string" />
+						<xsd:element name="PageSize" minOccurs="0" type="xsd:string" />
+						<xsd:element ref="xsdLocal1:ListOfCurrentUser" />
+						<xsd:element name="StartRowNum" minOccurs="0" type="xsd:string" />
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="CurrentUserWS_CurrentUserQueryPage_Output">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="LastPage" type="xsd:string" />
+						<xsd:element ref="xsdLocal1:ListOfCurrentUser" />
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+		</xsd:schema>
+		<xsd:schema elementFormDefault="qualified"
+			attributeFormDefault="unqualified" xmlns:xsdLocal1="urn:/crmondemand/xml/currentuser"
+			targetNamespace="urn:/crmondemand/xml/currentuser" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:annotation>
+				<xsd:documentation>Copyright (C) 2001, 2008, Oracle and/or its affiliates. All rights reserved. Siebel XSD Generation</xsd:documentation>
+			</xsd:annotation>
+			<xsd:element name="ListOfCurrentUser" type="xsdLocal1:ListOfCurrentUser" />
+			<xsd:complexType name="ListOfCurrentUserTopElmt">
+				<xsd:sequence>
+					<xsd:element name="ListOfCurrentUser" maxOccurs="1"
+						minOccurs="1" type="xsdLocal1:ListOfCurrentUser" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="ListOfCurrentUser">
+				<xsd:sequence>
+					<xsd:element name="CurrentUser" maxOccurs="unbounded"
+						minOccurs="0" type="xsdLocal1:CurrentUser" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="CurrentUser">
+				<xsd:sequence>
+					<xsd:element name="LastUpdated" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="UserId" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string30" />
+					<xsd:element name="CreatedDate" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string30" />
+					<xsd:element name="Alias" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string50" />
+					<xsd:element name="Status" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string30" />
+					<xsd:element name="CellularPhone" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="CreatedBy" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Department" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string75" />
+					<xsd:element name="EMail" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string50" />
+					<xsd:element name="EmployeeNumber" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string30" />
+					<xsd:element name="WorkFax" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="FirstName" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string50" />
+					<xsd:element name="CompanySignInId" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="IntegrationId" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string30" />
+					<xsd:element name="JobTitle" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string75" />
+					<xsd:element name="LastSignIn" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="ModifiedBy" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="LastName" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string50" />
+					<xsd:element name="ReportsTo" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="LeadLimit" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string22" />
+					<xsd:element name="MiddleName" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string50" />
+					<xsd:element name="UserSignInId" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string50" />
+					<xsd:element name="Division" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string75" />
+					<xsd:element name="MiscellaneousNumber1" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="MiscellaneousNumber2" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="MiscellaneousText1" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string255" />
+					<xsd:element name="MiscellaneousText2" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string255" />
+					<xsd:element name="WorkPhone" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="MrMrs" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string15" />
+					<xsd:element name="TimeZone" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="ExternalIdentifierForSingleSignOn"
+						maxOccurs="1" minOccurs="0" type="xsdLocal1:string100" />
+					<xsd:element name="Responsibility" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string50" />
+					<xsd:element name="PersonalAddress" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string200" />
+					<xsd:element name="LanguageName" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="LocaleName" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Company" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string50" />
+					<xsd:element name="PersonalAddress2" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string100" />
+					<xsd:element name="PersonalAddress3" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string100" />
+					<xsd:element name="City" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string50" />
+					<xsd:element name="Country" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string30" />
+					<xsd:element name="County" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string50" />
+					<xsd:element name="PostalCode" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string30" />
+					<xsd:element name="Province" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string50" />
+					<xsd:element name="State" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string10" />
+					<xsd:element name="ListOfSigninHistory" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:ListOfSigninHistory" />
+					<xsd:element name="ListOfQuota" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:ListOfQuota" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="ListOfSigninHistory">
+				<xsd:sequence>
+					<xsd:element name="SigninHistory" maxOccurs="unbounded"
+						minOccurs="0" type="xsdLocal1:SigninHistory" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="SigninHistory">
+				<xsd:sequence>
+					<xsd:element name="LastUpdated" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="Alias" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string50" />
+					<xsd:element name="SourceIPAddress" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string40" />
+					<xsd:element name="SignInStatus" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string30" />
+					<xsd:element name="SignInTime" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="AdditionalInformation" maxOccurs="1"
+						minOccurs="0" type="xsdLocal1:string250" />
+					<xsd:element name="ClientType" maxOccurs="1" minOccurs="0"
+						type="xsdLocal1:string30" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="ListOfQuota">
+				<xsd:sequence>
+					<xsd:element name="Quota" maxOccurs="unbounded"
+						minOccurs="0" type="xsdLocal1:Quota" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="Quota">
+				<xsd:sequence>
+					<xsd:element name="LastUpdated" maxOccurs="1"
+						minOccurs="0" type="xsd:string" />
+					<xsd:element name="Year" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Name" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Status" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="January" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="October" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="November" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="December" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="February" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="March" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="April" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="May" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="June" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="July" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="August" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="September" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+					<xsd:element name="Total" maxOccurs="1" minOccurs="0"
+						type="xsd:string" />
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:simpleType name="string250">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="250" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string50">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="50" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string10">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="10" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string255">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="255" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string15">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="15" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string75">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="75" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string40">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="40" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string30">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="30" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string200">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="200" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string100">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="100" />
+				</xsd:restriction>
+			</xsd:simpleType>
+			<xsd:simpleType name="string22">
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="22" />
+				</xsd:restriction>
+			</xsd:simpleType>
+		</xsd:schema>
+	</types>
+	<message name="CurrentUserWS_CurrentUserQueryPage_Input">
+		<part name="CurrentUserWS_CurrentUserQueryPage_Input" element="tns:CurrentUserWS_CurrentUserQueryPage_Input" />
+	</message>
+	<message name="CurrentUserWS_CurrentUserQueryPage_Output">
+		<part name="CurrentUserWS_CurrentUserQueryPage_Output" element="tns:CurrentUserWS_CurrentUserQueryPage_Output" />
+	</message>
+	<portType name="Default_Binding_CurrentUser">
+		<operation name="CurrentUserQueryPage">
+			<input message="tns:CurrentUserWS_CurrentUserQueryPage_Input" />
+			<output message="tns:CurrentUserWS_CurrentUserQueryPage_Output" />
+		</operation>
+	</portType>
+	<binding name="Default_Binding" type="tns:Default_Binding_CurrentUser">
+		<soap:binding transport="http://schemas.xmlsoap.org/soap/http"
+			style="document" />
+		<operation name="CurrentUserQueryPage">
+			<soap:operation
+				soapAction="document/urn:crmondemand/ws/currentuser/:CurrentUserQueryPage" />
+			<input>
+				<soap:body use="literal" />
+			</input>
+			<output>
+				<soap:body use="literal" />
+			</output>
+		</operation>
+	</binding>
+	<service name="CurrentUser">
+		<port binding="tns:Default_Binding" name="Default">
+			<soap:address
+				location="https://secure-ausomxapa.crmondemand.com/Services/Integration" />
+		</port>
+	</service>
+</definitions>

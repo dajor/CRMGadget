@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="400" height="350"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init()"
+	resizable="false" xmlns:control="gadget.control.*"
+	>
+	
+	<mx:RadioButtonGroup id="rdg"/>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSON;
+			import com.facebook.graph.FacebookDesktop;
+			
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+		    public var reload:Function;
+			[Bindable] private var profileProvider:ArrayCollection;
+			[Bindable] private var showSpinner:Boolean;
+			[Bindable] public var facebook:Boolean = true;
+			[Bindable] public var htmlViewer:HTMLViewer;
+			[Bindable] public var item:Object;
+			[Bindable] public var titleBarIcon:Class;
+			[Bindable] public var titleBarLabel:String;
+			protected static const APP_ID:String = "1403539456590947"; //Place your application id here
+			private static var token:String="";      
+			private function init():void {
+				if(facebook){
+					FacebookDesktop.manageSession = false;
+					FacebookDesktop.init(APP_ID);
+					
+					if(StringUtils.isEmpty(token)){
+						FacebookDesktop.login(handleLogin);
+						this.visible = false;
+					}
+				}
+				if((!StringUtils.isEmpty(token) || !facebook) && item != null && !StringUtils.isEmpty(item.ContactFirstName) && !StringUtils.isEmpty(item.ContactLastName)) {
+					txtFilter.text = item.ContactFirstName + " " + item.ContactLastName;
+					search(item.ContactFirstName,item.ContactLastName);
+				}
+			}
+			
+			protected function handleLogin(response:Object, fail:Object):void {
+				var isCloseAction:String = fail as String;
+				if(!StringUtils.isEmpty(isCloseAction) && isCloseAction == "user-canceled"){
+					this.close();
+				}
+				if (!response) { return; }
+				token = FacebookDesktop.getSession().accessToken.toString();
+				this.visible =true;
+			}
+			protected function searchBtn_clickHandler(event:MouseEvent):void
+			{
+				filterText();
+			}
+			
+			private function filterText():void {
+				var s:Array = txtFilter.text.split(/\s+/);
+				var firstName:String = "", lastName:String = "";
+				if(s.length > 0) {
+					if(s.length == 1) {
+						firstName = s[0];
+					}
+					else if(s.length >= 2) {
+						firstName = s[0];
+						lastName = s[1];
+					}
+					search(firstName, lastName);
+				}
+			}
+			
+			protected function saveBtn_clickHandler(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				var object:Object = rdg.selectedValue;
+				if(object != null) {
+					var loader:URLLoader = new URLLoader(new URLRequest(object.source));
+					loader.dataFormat = URLLoaderDataFormat.BINARY;
+					loader.addEventListener(Event.COMPLETE, function(e:Event):void {
+						var data:ByteArray = e.currentTarget.data as ByteArray;
+						Database.contactDao.updateImage(data as ByteArray, item);
+						
+						if(facebook) {
+							item.facebook = object.link;
+							item.linkedin = "";
+							Database.contactDao.updateFacebook(item);
+						
+						}else {
+							item.linkedin = object.link;
+							item.facebook = "";
+							Database.contactDao.updateLinkedin(item);
+						}
+						
+						if(htmlViewer != null) htmlViewer.close();
+						close();
+					    if(reload != null) reload();
+					});
+					
+				}
+			
+			}
+			
+			private function search(firstName:String,lastName:String):void {
+				try {
+					// facebook url : "http://www.facebook.com/search.php?q=sokchea+loeung";
+					// linkedin url : "http://www.linkedin.com/pub/dir/?first=Daniel&last=Jordan&search=Go";
+					toggleSpinner(true);
+					var url:String = facebook ? "https://graph.facebook.com/search?q="+ firstName + " " + lastName +"&fields=id,name,picture,email,link&type=user&access_token="+token : "http://www.linkedin.com/pub/dir/?first={FIRST_NAME}&last={LAST_NAME}&search=Go"; 
+					if(!facebook){
+						url = url.replace(/{FIRST_NAME}/gi, firstName).replace(/{LAST_NAME}/gi, lastName);
+					}
+					var loader:URLLoader = new URLLoader();				
+					var request:URLRequest = new URLRequest(url);
+					request.method = URLRequestMethod.GET;
+					request.contentType = "text/xml; charset=utf-8";
+					loader.load(request);
+					profileProvider = new ArrayCollection();
+					
+					loader.addEventListener(Event.COMPLETE, facebook ? facebookCompleted : linkedinCompleted);
+					
+					loader.addEventListener(IOErrorEvent.IO_ERROR, function(e:IOErrorEvent):void {
+						// handler error here
+						toggleSpinner(false);
+						trace(e.text);
+						Alert.show(e.text, i18n._('GLOBAL_ERROR'), Alert.OK, this);
+					});
+					
+				}catch(e:Error) {
+					trace(e.getStackTrace());
+				}
+			}
+			
+			private function linkedinCompleted(e:Event):void {
+				try {
+					var data:String = (e.currentTarget as URLLoader).data;
+					data = data.replace(new RegExp('<li>', 'gi'), '</li>'); // replace all unenclose li tag to enclose tag
+					var regex:RegExp = new RegExp('<ol id="result-set" class="photos">(.*)<div class="pagination">', 's');
+					var result:Array = data.match(regex);
+					if(result != null && result.length > 0) {
+						var s:String = result[0].toString().replace(new RegExp('<div class="pagination">', 'gi'), '');
+						var xmlResult:XML = new XML(s);
+						if(xmlResult != null) {
+							for each(var linkedinProfile:XML in xmlResult.li) {
+								var parentXML:XML = (linkedinProfile.descendants().(attribute("class") == "given-name")[0]).parent();
+								var name:String = parentXML.attribute("title");
+								var linkedin:String = parentXML.attribute("href");
+								var source:String;
+								if(linkedinProfile.a.attribute("class") == "profile-photo") {
+									source = (linkedinProfile.descendants().(attribute("class") == "photo")[0]).attribute("src");
+								}else {
+									source = null;
+								}
+								profileProvider.addItem({name: name, link: linkedin, source: source, rdg: rdg, facebook: facebook, selected: false});
+							}
+						}
+					}
+					toggleSpinner(false);
+				}catch(e:Error) {
+					trace(e.getStackTrace());
+				}
+			}
+			
+			private function facebookCompleted(e:Event):void {
+				try {
+					/*var xmlPrefs:XML = new XML((e.currentTarget as URLLoader).data);					
+					var xmlResult:XML = xmlPrefs.descendants().(attribute("id") == "pagelet_search_results_0").ul[0];
+					if(xmlResult != null) {
+					for each(var profil:XML in xmlResult.li) {
+					if(profil.div.attribute("class") == "UIImageBlock clearfix UIImageBlock_Entity") {
+					var facebook:String = (profil.descendants().(attribute("class") == "UIImageBlock_Image UIImageBlock_ENT_Image")[0]).attribute("href");
+					var source:String = (profil.descendants().(attribute("class") == "img")[0]).attribute("src");
+					var name:String = profil.descendants().(attribute("class") == "lfloat")[0];
+					profileProvider.addItem({name: name, link: facebook, source: source, rdg: rdg, facebook: facebook, selected: false});
+					}
+					}
+					}*/
+					var response:String = (e.currentTarget as URLLoader).data;
+					if(response != null){
+						var users:Object = JSON.decode(response);
+						if(users.data != null){
+							for each(var user:Object in users.data){
+								profileProvider.addItem({name: user.name, link: user.link, source: ((user.picture as Object).data as Object).url, rdg: rdg, facebook: "", selected: false});
+							}
+						}
+					}
+					toggleSpinner(false);
+				}catch(e:Error) {
+					trace(e.getStackTrace());
+				}
+			}
+			
+			private function toggleSpinner(play:Boolean):void {
+				if (play) {
+					showSpinner = play;
+					spinner.play();
+				}
+				else { 
+					showSpinner = play;
+					spinner.stop();
+				}
+			}
+			
+			
+			protected function txtFilter_keyDownHandler(event:KeyboardEvent):void
+			{
+				// TODO Auto-generated method stub
+				if(event.keyCode == Keyboard.ENTER) {
+					filterText();
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Canvas horizontalScrollPolicy="off" verticalScrollPolicy="off" styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<mx:Canvas id="windowTitleBar" backgroundColor = "#EEEEEE" styleName="titleBar" doubleClickEnabled="true" mouseDown="nativeWindow.startMove()" height="24" top="2" left="2" right="2">			
+			<mx:Image source="{titleBarIcon}" height="16" width="16" top="3" left="4"/>
+			<mx:Label id="titleLabel" text="{titleBarLabel}" top="0" left="22"/>
+			<mx:Button styleName="iconClose" height="16" width="16" top="2" right="4" click="close()"/>
+		</mx:Canvas>
+		<mx:Canvas width="100%" height="100%">
+			<mx:VBox width="100%" height="100%" verticalGap="8" top="35" left="8" right="8" bottom="8">
+				<mx:HBox width="100%" horizontalGap="12">
+					<mx:Label text="Filter"/>
+					<mx:TextInput id="txtFilter" focusIn="{txtFilter.text=''}" keyDown="txtFilter_keyDownHandler(event)"/>
+					<control:Spinner id="spinner" includeInLayout="{showSpinner}" visible="{showSpinner}" tickColor="#66aaff"/>
+					<mx:Button id="searchBtn" label="{i18n._('GLOBAL_SEARCH')}" click="searchBtn_clickHandler(event)"/>
+				</mx:HBox>
+				<mx:DataGrid width="100%" height="100%" showHeaders="false" sortableColumns="false" editable="false" dataProvider="{profileProvider}">
+					<mx:columns>
+						<mx:DataGridColumn itemRenderer="FacebookImageRenderer"/>
+					</mx:columns>
+				</mx:DataGrid>
+				<mx:HBox horizontalAlign="right" width="100%">
+					<mx:Button id="saveBtn" label="{!htmlViewer ? i18n._('GLOBAL_CREATE') : i18n._('GLOBAL_UPDATE')}" click="saveBtn_clickHandler(event)"/>
+					<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" right="0"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:Canvas>
+	</mx:Canvas>
+	
+</mx:Window>

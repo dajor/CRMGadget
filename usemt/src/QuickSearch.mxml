@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="440" height="450"
+	title="{i18n._('GLOBAL_QUICK_SEARCH')}" 
+	showFlexChrome="false" transparent="true" systemChrome="none" 
+	creationComplete="initEntities(); updateInfo(); searchInput.setFocus()" keyDown="keyDown(event)">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.DAO;
+			import gadget.dao.Database;
+			import gadget.dao.LinkDAO;
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.events.MenuEvent;
+
+			[Bindable] private var item:Object; 
+			[Bindable] private var allItems:ArrayCollection;
+			
+			//CRO 05.01.2011						
+			private const QUICKSEARCH_TITLEBAR_TITLE_QUICKSEARCH:String = 'GLOBAL_QUICK_SEARCH' ;
+			private const QUICKSEARCH_LABEL_RESULTS:String = 'GLOBAL_RESULTS' ;
+			private const QUICKSEARCH_LABEL_SEARCH:String = 'GLOBAL_SEARCH' ;
+			private const QUICKSEARCH_ALERT_MSG_ONLY_THE_FIRST_1000_MATCHING_ITEMS_ARE_SHOWN:String = 'GLOBAL_ONLY_THE_FIRST_1000_MATCHING_ITEMS_ARE_SHOWN' ;
+			private const QUICKSEARCH_ALERT_MSG_ITEMS_FOUND:String = 'GLOBAL_ITEMS_FOUND' ;
+			private const QUICKSEARCH_ALERT_MSG_PLEASE_ENTER_AT_LEASE_TOW_CHARACTERS_FOR_SEARCHS:String = 'GLOBAL_PLEASE_ENTER_AT_LEAST_TWO_CHARACTERS_FOR_SEARCH' ;
+			
+			
+			private var entities:ArrayCollection;
+			public var mainWindow:MainWindow;
+			
+			
+			private function initEntities():void {
+				var transactions:ArrayCollection = Database.transactionDao.listTransaction();
+				entities = new ArrayCollection();
+				for each (var transaction:Object in transactions) {
+					if (transaction.enabled) {
+						entities.addItem(transaction.entity);
+					}
+				} 
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function openDetail(data:Object):void {
+				if (data == null) return;
+				var selectedObject:Object = Database.getDao(data.gadget_type).findByGadgetId(data.gadget_id);
+				mainWindow.selectList(data.gadget_type).selectItem(selectedObject);
+				addEventListener(Event.CLOSE, function():void {mainWindow.selectList(data.gadget_type).editScreenDetail(selectedObject)});
+				close();
+			}
+			
+			private function doSearch():void {
+				if (searchInput.text.length >= 2) {
+					allItems = Database.linkDao.allItems(entities, searchInput.text.toUpperCase());
+				} else {
+					allItems = null;
+				}
+				updateInfo();
+				manageDisplayComboAction();
+			}
+			
+			private function updateInfo():void {
+				if (allItems != null && allItems.length == 1000) {
+					info.text = i18n._(QUICKSEARCH_ALERT_MSG_ONLY_THE_FIRST_1000_MATCHING_ITEMS_ARE_SHOWN);
+				}  else if (allItems != null) {
+			
+					info.text = allItems.length + " " + i18n._(QUICKSEARCH_ALERT_MSG_ITEMS_FOUND);
+				} else {
+					info.text = i18n._(QUICKSEARCH_ALERT_MSG_PLEASE_ENTER_AT_LEASE_TOW_CHARACTERS_FOR_SEARCHS);
+				}
+			}
+			
+			
+			public function doFilter():void {
+				
+				
+				var toggleBtns:Array = linklistBtns.getChildren();
+				entities = new ArrayCollection();
+				for each(var toggleBtn:Button in toggleBtns){
+					if (!toggleBtn.selected) entities.addItem(toggleBtn.data);	
+				}
+				doSearch();
+			}
+			
+			private function create():void {
+				this.close();
+				addEventListener(Event.CLOSE, function(event:Event):void {
+					var data:String = popB.data as String;
+					var obj:Object = new Object();
+					switch(data){
+						case "Account": obj.AccountName = searchInput.text; break;
+						case "Contact": obj.ContactLastName = searchInput.text; break;
+						case "Service Request": obj.SRNumber = searchInput.text; break;
+						case "Opportunity": obj.OpportunityName = searchInput.text; break;
+						case "Activity": obj.Subject = searchInput.text; break;
+						case "Product": obj.Name = searchInput.text; break;
+					}
+					mainWindow.selectList(data).openScreenCreate(obj);
+				});
+			}
+			
+			private function manageDisplayComboAction():void {
+				var bDisplay:Boolean = allItems != null && allItems.length == 0 ;
+				with(comboActionHBox){
+					visible = bDisplay;
+					includeInLayout = bDisplay;
+				}
+				if(bDisplay) loadPupupBData();
+			}
+			
+			private function loadPupupBData():void {
+				var myMenu:Menu = new Menu();
+				var listTransaction:ArrayCollection = Database.transactionDao.listTransaction();
+				var comboList:ArrayCollection = new ArrayCollection();
+				for(var i:int = 0; i < listTransaction.length; i++){
+					var transaction:Object = listTransaction[i];
+					if(transaction.enabled == 1){
+						comboList.addItem({label:"Create " + searchInput.text + " as " + Database.customLayoutDao.getDisplayName(transaction.entity), data:transaction.entity});
+					}		
+				}   
+				myMenu.dataProvider = comboList;
+				myMenu.selectedIndex = 0;       
+				myMenu.addEventListener("itemClick", function(event:MenuEvent):void {
+					var label:String = event.item.label;
+					var data:String = event.item.data;
+					popB.label = label;
+					popB.data = data;
+					popB.close();
+					myMenu.selectedIndex = event.index;
+				});
+				popB.popUp = myMenu;
+				popB.label = myMenu.dataProvider[myMenu.selectedIndex].label;
+				popB.data = myMenu.dataProvider[myMenu.selectedIndex].data;
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="440" height="450" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/search.png')" title="{i18n._(QUICKSEARCH_TITLEBAR_TITLE_QUICKSEARCH)}"/>
+		<mx:VBox top="32" left="16" right="16">
+			<mx:Form width="100%" paddingBottom="8">
+				<mx:Label id="info" left="0"/>
+				<mx:FormItem label="{i18n._(QUICKSEARCH_LABEL_SEARCH)}">
+					<mx:TextInput id="searchInput" change="doSearch()"/>
+				</mx:FormItem>
+				<mx:FormItem>
+					<mx:HBox id="linklistBtns" horizontalGap="0" width="80%">
+						<mx:Button click="doFilter()" toolTip="{Database.customLayoutDao.getPlural('Account')}" data="Account" toggle="true" width="33" cornerRadius="0"
+								   selectedDownIcon="{ImageUtils.getImageBW('Account')}" selectedOverIcon="{ImageUtils.getImageBW('Account')}" selectedUpIcon="{ImageUtils.getImageBW('Account')}"
+								   downIcon="{ImageUtils.getImage('Account')}" overIcon="{ImageUtils.getImage('Account')}" upIcon="{ImageUtils.getImage('Account')}"/>
+						<mx:Button click="doFilter()" toolTip="{Database.customLayoutDao.getPlural('Contact')}" data="Contact" toggle="true" width="33" cornerRadius="0" 
+								   selectedDownIcon="{ImageUtils.getImageBW('Contact')}" selectedOverIcon="{ImageUtils.getImageBW('Contact')}" selectedUpIcon="{ImageUtils.getImageBW('Contact')}"
+								   downIcon="{ImageUtils.getImage('Contact')}" overIcon="{ImageUtils.getImage('Contact')}" upIcon="{ImageUtils.getImage('Contact')}"/>
+						<mx:Button click="doFilter()" toolTip="{Database.customLayoutDao.getPlural('Opportunity')}" data="Opportunity" toggle="true" width="33" cornerRadius="0"
+								   selectedDownIcon="{ImageUtils.getImageBW('Opportunity')}" selectedOverIcon="{ImageUtils.getImageBW('Opportunity')}" selectedUpIcon="{ImageUtils.getImageBW('Opportunity')}" 
+								   downIcon="{ImageUtils.getImage('Opportunity')}" overIcon="{ImageUtils.getImage('Opportunity')}" upIcon="{ImageUtils.getImage('Opportunity')}"/>
+						<mx:Button click="doFilter()" toolTip="{Database.customLayoutDao.getPlural('Activity')}" data="Activity" toggle="true" width="33" cornerRadius="0"
+								   selectedDownIcon="{ImageUtils.getImageBW('Activity')}" selectedOverIcon="{ImageUtils.getImageBW('Activity')}" selectedUpIcon="{ImageUtils.getImageBW('Activity')}"
+								   downIcon="{ImageUtils.getImage('Activity')}" overIcon="{ImageUtils.getImage('Activity')}" upIcon="{ImageUtils.getImage('Activity')}"/>
+						<mx:Button click="doFilter()" toolTip="{Database.customLayoutDao.getPlural('Campaign')}" data="Campaign" toggle="true" width="33" cornerRadius="0"
+								   selectedDownIcon="{ImageUtils.getImageBW('Campaign')}" selectedOverIcon="{ImageUtils.getImageBW('Campaign')}" selectedUpIcon="{ImageUtils.getImageBW('Campaign')}"
+								   downIcon="{ImageUtils.getImage('Campaign')}" overIcon="{ImageUtils.getImage('Campaign')}" upIcon="{ImageUtils.getImage('Campaign')}"/>
+						<mx:Button click="doFilter()" toolTip="{Database.customLayoutDao.getPlural('Service Request')}" data="Service Request" toggle="true" width="33" cornerRadius="0"
+								   selectedDownIcon="{ImageUtils.getImageBW('Service Request')}" selectedOverIcon="{ImageUtils.getImageBW('Service Request')}" selectedUpIcon="{ImageUtils.getImageBW('Service Request')}"
+								   downIcon="{ImageUtils.getImage('Service Request')}" overIcon="{ImageUtils.getImage('Service Request')}" upIcon="{ImageUtils.getImage('Service Request')}"/>
+						<mx:Button click="doFilter()" toolTip="{Database.customLayoutDao.getPlural('Product')}" data="Product" toggle="true" width="33" cornerRadius="0"
+								   selectedDownIcon="{ImageUtils.getImageBW('Product')}" selectedOverIcon="{ImageUtils.getImageBW('Product')}" selectedUpIcon="{ImageUtils.getImageBW('Product')}"
+								   downIcon="{ImageUtils.getImage('Product')}" overIcon="{ImageUtils.getImage('Product')}" upIcon="{ImageUtils.getImage('Product')}"/>
+					</mx:HBox>	
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._(QUICKSEARCH_LABEL_RESULTS)}" width="100%">
+					<mx:List id="resultList" width="100%" dataProvider="{allItems}" rowHeight="27" rowCount="10" click="openDetail(resultList.selectedItem)">
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox horizontalScrollPolicy="off" horizontalAlign="left" horizontalGap="0">
+									<mx:Script>
+										<![CDATA[
+											import gadget.util.ImageUtils;
+										]]>
+									</mx:Script>
+									<mx:Image id="albumImage" source="{ImageUtils.getImage(data.gadget_type)}"/>
+									<mx:Label text="{data.name}" width="100%"/>
+								</mx:HBox>								
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:List>
+				</mx:FormItem>
+			</mx:Form>
+			<mx:Canvas width="100%">
+				<mx:HBox horizontalAlign="right" width="100%">
+					<mx:HBox id="comboActionHBox" horizontalAlign="left" visible="false" includeInLayout="false">						
+						<mx:PopUpButton textAlign="left" id="popB" click="create()"/>	
+					</mx:HBox>
+					<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="this.close()" right="0"/>	
+				</mx:HBox>					
+			</mx:Canvas>			
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

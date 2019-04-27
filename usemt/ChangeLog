@@ -1,0 +1,956 @@
+2010-08-02 VAHI
+	- WS2.0 filter only show up on WS2.0 enabled transactions
+	- WS2.0 filters no more show up in GUI except Preferences
+	- got rid of Incoming2TaskGroup, this can be done with IncomingTaskGroup
+	- IncomingSyncHistory implemented (we will need the gathered info in future)
+	- Added forgotten STOP handling for group0 (my bug)
+	- Sync abort now will always be told to the user (before stopping right after logout cycle pretended success).
+2010-08-03 VAHI
+    - All (old WS1.0 SyncV3) Objects are now working with WS2.0
+    - Mapping in util.ws20 hopefully is sane (as opposed to insane)
+    - Fixed the progress bar
+    - Fixed that Sync steps with 0 tasks now are skipped instead throw.
+    - Tested against Diversey and Demo
+    - LastSyncDAO/IncomingSyncDAO: better unsync plus fixes
+    - DroppableTable: More easy column syntax added
+2010-08-04:
+	- Database: Complete rewrite of the table create structure started
+	- com.adobe.* from http://github.com/mikechambers/as3corelib.git
+	- org.httpclient from http://github.com/gabriel/as3httpclient.git
+2010-08-05:
+	- gadget.sync.FieldManagementService with all associated things
+	- gadget.dao.GadgetDAO added
+2010-08-06:
+	- gadget.sync.ws20.AccountActivity started
+	- fix new error handling
+2010-08-08: (So)
+	- gadget.sync.ws20.AccountActivity finished
+	- gadget.sync.ws20.ContactActivity (untested)
+2010-08-09: (Mo)
+    - gadget.sync.ws20.CampaignActivity etc. added, too.
+    - gadget.sync.incoming.AccountTeam (started, plus DAO etc.)
+2010-08-10:
+    - gadget.sync.incoming.AccountTeam (aborted)
+	- gadget.sync.ws20.AccountAttachment (started)
+2010-08-11:
+	- fixed some bugs in the new code
+	- AccountAttachment works
+	- ContactAttachment etc. added
+	- Subobjects for Attachment/Activity removed in favor of
+	  All2Incoming and less code.
+	- Selection of the avtive SubObject now based on enabling
+	  both transaction
+	- preference response_log added, logs request/response into table
+	  error_log.  List of enable entities like "(AccountActivity)(...)",
+	  use "(*)" to enable logging of all requests.
+	- isLinearTask corrected
+	- AccountActivity etc. does not work as expected.
+	  ViewMode also hits the subobject, no way to change that?
+2010-08-12:
+	- Timo introduced to CRMGadget
+	- DateUtil now accepts Date() values
+	- Started to implement IncomingScoopActivity for Accounts
+2010-08-13:
+	- Finished IncomingScoopActivity for all other objects
+	- Fixed Sync bug: Activities cannot be changed anymore,
+	  because incoming overwrites them before they can be uploaded.
+2010-08-14:
+	- Now uses new Preferences setting to enable WS20 transactions.
+	- Bugfixes (wrongly successful failing linear tasks)
+    - V1.066 released
+    - SodUtils now has flags for ListOfAttachment present in WS2.0
+2010-08-15:
+	- IncomingActivityProduct - postponed: more complex than thought
+2010-08-16:
+	- Custom Object 2 (Big Machine) for download
+	(This included - again - a major rewrite of zillion of things.)
+2010-08-17:
+	- Fixed CustomObjectId in Custom Object 1 Attachment download.
+	- There is a problem downloading PDF in CampaignAttachment due
+	  to Siebel FS on BigMachine - cannot fix that (data error).
+	- CustomObject14 (Expenses)
+	- Implemented sodhost specific overrides as long as transactions
+	  are missing in GUI Preferences, see gadget.util.ws20.overrides
+	- Fixed serious bug in gadget.util.Table
+	- Fixed minor bug in gadget.util.Table
+	- Added Policy and PolicyHolder top level objects (untested)
+2010-08-18:
+	- Finished gadget.util.Table, now it supports indexes and unique
+	  indexes.
+2010-08-19
+	- Prepared to add 70 objects
+	- Improved gadget.util.Table (not yet checked in)
+	- Prepared for CustomRecordTypeService (not working yet, no checkin)
+2010-08-20
+    - Only phone calls
+2010-08-22
+	- Ignore NULL products
+2010-08-23
+	- Suppress SBL-ODS-50720
+	- CustomObject14Activity Scoop added
+2010-08-24
+	- Suppress SBL-ODS-50085
+2010-08-25
+	- Activity now supports CustomObject14Id for WS20
+2010-08-31
+	- Fix for CustomObject14Id not needed as everything works on my side.
+2010-09-14
+	- Fix ParentActivityId-Problem on CustomObject14.
+	  The problem was, that some cached data (field names) were
+	  altered implicitely when editing, such that unknown fields
+	  were propagated to Sync, but only if Expenses were edited before.
+2010-09-15
+	- CustomObject14 Deletes
+	- Ignore SBL-DAT-00215 error if Cascaded Picklists are missing
+	  (this are not all possible error codes seen with CP missing)
+	- Ignore Upload problems (missing record on the server side)
+	  reported as "missing" in the list and warning in the log.
+	- Activity upload via WS2.0 started, but not yet complete
+2010-09-16
+	- Added "ModifiedDate" to "User" (AllUsers) table (WS1.0 and WS2.0)
+	- Fixed Timezone issue for ISO SOD Dates
+	- Tried to fix WS2.0 download - send ModDate to ZULU time
+	  (needs thorough debugging)
+	- Fixed Deleted Item issue when more than 50 deleted items are received
+2010-09-17
+	- Ignore SBL-ODS-50085 (Access denied) when reading picklists
+	  (note that this is not only cosmetics, picklists are aborted else)
+	- Ignore SBL-EAI-04401 (wrong bounded picklist value) in Activity upload.
+	  Probably this type of error must be generally be processed by upload
+	  for all objects, as some record this record here refers to has
+	  gone on the remote side.  We should mark such records defective
+	  for post-processing by the user somehow.  And we need a general
+	  way to handle such problems in future.
+	- Ignore SBL-ODS-50720 on picklists as fault.
+	  Apparently the errors can show up as Siebel fault (HTTP status 200)
+	  or transport fault (HTTP status 4xx).  So in future I think we
+	  need somehow a combined error processing (currently it is
+	  completely different).
+	- sync_attachments now is honored for WS2.0, too.
+	- Handle SBL-DAT-00510 on outgoing objects.  In this case we have
+	  a serious data error (currently the bug with Activity changed
+	  to Expenses - which should only be the Activity-type). 
+2010-09-20
+	- Ignore case where CustomRecordTypeService is not supported by WS.
+	- Fixed SodUtil.  Errorneously "Custom Object 1" was added there,
+	  renaming the (correct) field "CustomObject1Id" into (wrong) "Id".
+	  This perhaps is correct in 100 years from now, but not today.
+	- Switched Outgoing from WS1.0 to WS2.0 for most Objects
+	  (if they are handled with WS2.0)
+	  This should fix some errors (and not introduce new ones, hopefully).
+	- OutgoingTaskGroup is parallel, so now outgoing WS2.0 is based
+	  on TaskGroupBase (which now can fully serve as standard TaskGroup).
+	- Fixed problem with old rip_retry code.
+	- Program startup: If an error occurs, "OK" now continues with the
+	  next step instead of restarting with init()
+	- Moved Attachment/Activity to All2bIncoming, as this must be done
+	  after all objects have been downloaded (else the IDs are missing).
+	- Allow subObject "Attachment" to fail if parental record is missing.
+2010-09-21
+	- Fixed Products incoming WS2.0.  Changed implicite SearchSpec into
+	  explicite SearchSpec as new in WS2.0.  Apparently implicite version
+	  (stated in the field) does no more work.
+	- removed (disabled) ignoreNullRecords from Products WS2.0
+	- Fixed missing field "Modified Date" in "Service Request".
+	- Added GETFIELDS_VERSION to GetFields to automate rerun of GetField
+	  on important changes.
+	- Fixed Attachment-ID-Issue for Custom Object 2
+	- Outgoing2.0 error SBL-EAI-04403 ignored (nonunique record)
+	- Outgoing2.0 now is the default.  Outgoing1.0 is deactivated currently.
+	- Try to set error state on faulted objects (those with outgoing errors)
+2010-09-22
+	- Added SBL-DAT-00542 (Access Denied) to the possible errors when uploading
+	  (this probably means, you are not authorized to write to that object.)
+	- Added nearly all other WS2.0 objects.  They are not activated in SodUtils,
+	  though.
+2010-09-23
+	- GetFields now is automatically full when SodUtils.FIELDS_TO_FIX changes.
+	  (based on md5(JSON(FIELDS_TO_FIX)))
+	- GetPicklists now is automatically full after GetFields was run.
+	- Enabled CustomObject7 for BigM
+	- Clear last_sync table on full sync, hopefully get rid of
+	  halfway synced objects which are no more enabled,
+	  such that the "need to sync"-message bubble in the GUI does
+	  no more show up.
+	- Wohoops - I added the "ListOf"-Columns, too.  Removed them (manually).
+2010-09-24
+	- Bugfix of ugly bug in OutgoingObjects where I forgot 2 characters on a variable.
+	  This error showed up in GetTime instead due to the weird nature of the current code.
+	- Fixed Relation.as for CustomObject7 -> Custom Object 2 relation
+	- Fixed enabled objects by default in ws20.as
+2010-09-28
+	- Added missing fields to Activity - it probably now can no more be
+	  synced with WS1.0.  Needed for CustomObject10 support of BigM.
+	- Suppressed warning on GetField - now uses optWarn.
+	  Picklists still take ages.
+	- Added all "Id" fields to CustomObject4 to 15.  It looks like
+	  GetField does not return those ever, and this might help us
+	  in future.  Still missing are similar fields in other objects.
+2010-09-29
+	- ReadPicklist: Increment viewable counter on Access Denied etc.,
+	  such that the user sees some progress.
+2010-09-30
+	- Made PicklistService warn if failed because remote is too slow.
+	  Diversey: Request takes 5 minutes(!), timeout is (due to OS)
+	  at 30 seconds, so we cannot fetch this currently.
+	  So we definitively need a better HTTP library soon!
+	- Enabled ModificationTracking.  When running "verbose" (see xml/)
+	  warning is printed when this object is not supported.
+	- ReadPicklist now deletes all Picklists before doing the rest.
+	- PreferencesDAO now has isEnv() and setEnv().
+	  Still missing: emptyEnv()
+	- Database.getDao() improved, should automatically adopt to
+	  new objects now.
+2010-10-01
+	- Removed getter sortColumn from BaseDAO and all other DAOs.
+	  Good thing to get rid of any getters with no real benefit.
+	  For now it is a deactivation, because there might be some
+	  cause for this old remains I am not aware of.
+	- sync.ws20.OutgoingObject now includes the Siebel error
+	  message when a warning comes up.
+2010-10-04
+	- Huge changes to support ActivityUser, ActivityProduct and
+	  ActivityContact
+2010-10-05
+	- Still working on subobjects
+2010-10-06
+	- request_log implemented in WebServiceBase to do
+	  SOAP-Request logging as wanted by Oracle.
+2010-10-07
+	- Uploading Sync for subobjects are incorrectly implemented.
+	  IT CANNOT BE DONE IN PARALLEL TO THE PARENTAL OBJECT.
+	  However it will be done this way for friday, as we do not
+	  have another chance.
+	- Fixed TIME WARP
+	- Deactivated DELETED-OBJECTS --- THIS MUST BE REENABLED LATER AGAIN
+2010-10-08
+	- AccessProfileService added
+2010-10-11
+	- No program changes
+2010-10-12
+	- No program changes
+2010-10-13
+	- Minor things
+2010-10-14
+	- Activity now no more fetched with WS1.0
+2010-10-15
+	- RoleService started
+2010-10-18
+	- RoleService finished
+	- User now no more fetched with WS1.0
+2010-10-19
+	- Fixed Custom Object 3 (DAO's entity was misspelled to CustomObject3)
+	- Fixed problem with new lowercase columns in tables.
+	- Fixed case when no login credentials are present
+2010-10-20
+	- Implemented kill bits for DAOs, needed for Activity.Product
+	- Table recreation to fix lowercase column name issue
+	- gadget.util.Startup
+2010-10-21
+	- Deactivated WS1.0 completely
+	- Removed bug in GetField, which did not remove renamed fields
+	- Deleted Objects now does not fail anymore
+	  It does not completely work though!
+	- Unsupported objects (if activated) only warn.
+2010-10-25
+	- gadget.util.SilentOOPS and .Debug added
+	- gadget.util.Table now has an Index creation callback
+	- ActivityDAO seems to have a bug on old date format.
+	  There is only one way to fix it:  Recalculate all Date-columns
+	  into the new format.  However we need the proper timezone
+	  when doing this.
+	- ContactAccountDAO added (Intersection Contact.Account)
+	  Account.Contact does not exist in WSDL.
+2010-10-26
+	- Activity.User fixed according to the idea of Arnaud:
+	  ContactId is found in the Id column which is a little bit strange.
+	  Hacked the DAO such that gadget_id is taken as a replacement
+	  of the missing OracleId.
+	- Fixed a major bug in g.u.Table, it now includes the UNIQUE
+	  property in the Hash, such that unique and nonunique indexes
+	  can be distinguished.  A complete rebuild of all indexes is
+	  needed for this, sigh.
+	- Spottet a problem in MofificationTracking, but shall stop work.
+---
+	- Fixed bug in SupportDAOimp for guessing the destination entity
+	- Fixed bug in CustomLayout.mxml, now more than 2 fields are supported
+	- MiniDetail refresh problem solved (not yet for related columns)
+	- Fields in SQLList can be hidden from list by prepending a dot (.).
+	  These fields then only show up in MiniDetail.
+	- SQLList works for Activity.Product, Activity.Contact and Activity.User
+    - Introduced DummySiebelRowId on Activity.Contact as we need this
+      to detect if it is an update or not.
+    - g.u.Table changed (again) to allow row creation hook to fire correctly.
+    - Sync hooks for Activtiy.Contact to correctly fill DummySiebelRowId
+    - OutgoingObjects now works for Activity.User and Activity.Contact
+    - Support of Picklists and Cascading Picklists in MiniDetail.
+      Currently enabled for Activity.Product (Call ProdDetail), other
+      names are unknown, so cannot support that there.
+2010-11-02
+#12 Fix RoleServiceSelectedTabDAO
+#12 Fix ReadPicklist
+#13 Fix PicklistServiceDAO (Issue 13)
+#39 OutgoingObject: Method 'WriteRecord' of business component 'Action' (integration component 'Activity') returned the following error:
+"'Account Id' is a required field for 'Account Call'.(SBL-ODS-50736)"(SBL-EAI-04376)
+2010-11-03
+
+
+CURRENTLY there still is much trouble with Daniel's account.
+Situation improves, but still unusable.
+
+######################################################################
+Currently fixing
+######################################################################
+----------------------------------------------------------------------
+Need to fix uploading sync for subobjects.
+----------------------------------------------------------------------
+Update related columns in MiniDetail on refresh (or generally?)
+----------------------------------------------------------------------
+
+######################################################################
+Important notes
+######################################################################
+----------------------------------------------------------------------
+When assosiating subObject with something and pressing CANCEL,
+the subObject still is added.  The bug is either that we must rollback
+or we must upload. 
+----------------------------------------------------------------------
+ModificationTracking needs fix to start at last full sync timestamp.
+ModificationTracking needs fix to delete processed records.
+----------------------------------------------------------------------
+Upload of Activities?
+----------------------------------------------------------------------
+Download of Procucts? (working for me with Diversey, 100000 Products)
+----------------------------------------------------------------------
+::::::: REQUEST :::::::: Product 0 0 false true ( &gt;= '06/09/2008 11:52:57' ) AND ( &lt;= '06/09/2008 11:59:21' )
+responselen 0
+TypeError: Error #1090: XML parser failure: element is malformed.
+TypeError: Error #1090: XML parser failure: element is malformed.
+
+	at gadget.sync::WebServiceBase/requestHandler()[C:\Users\Tino\Adobe Flash Builder 4\CRMGadget - CVS\src\gadget\sync\WebServiceBase.as:339]
+	at Function/http://adobe.com/AS3/2006/builtin::call()
+	at Function/<anonymous>()[C:\Users\Tino\Adobe Flash Builder 4\CRMGadget - CVS\src\gadget\sync\WebServiceBase.as:252]
+	at flash.events::EventDispatcher/dispatchEventFunction()
+	at flash.events::EventDispatcher/dispatchEvent()
+	at flash.net::URLLoader/onComplete()
+optWarn in Product request handler (uncompress): while decoding XML: received 0 bytes: Error #1090: XML parser failure: element is malformed.
+delay Product 8000
+----------------------------------------------------------------------
+
+######################################################################
+List of open Bugs:
+######################################################################
+----------------------------------------------------------------------
+Deleted Items: Delete things in DAOs like
+Activty***Task or "Pharma Call Products Detailed"
+----------------------------------------------------------------------
+Cannot perform DeleteRecord on the business component 'Action'(SBL-EAI-04421)
+----------------------------------------------------------------------
+Fix all what's left from the demo week.
+- WHICH ISSUES
+----------------------------------------------------------------------
+Implement dummy Picklist
+- Needs Admin
+- Quick fix on one situation is needed more quickly - implement on dummy wrapper
+----------------------------------------------------------------------
+Implement new Admin with various fixes
+- Needs 1W or longer
+----------------------------------------------------------------------
+Implement new Services
+- Take time and free time
+----------------------------------------------------------------------
+Reactivate DeletedObjects and check the cases from last Week.
+----------------------------------------------------------------------
+Implement all the other cases of SubObejcts
+- Which?
+----------------------------------------------------------------------
+Die Attachments sind inzwischen ziemlich "kaputt".  Das ist URALT-Code und wird in nächster Zeit durch Scooping ersetzt.
+Das geschieht aber erst, wenn der neue Scooping-Code aktiv wird.
+Und der wiederum basiert auf Code der durch die vollständig implementierten Unterobjekte eingeführt wird.
+Vorher steht aber noch der Deleted Objects Service und das Modification Tracking an.
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+Dummy Picklist wie?
+All die Murx Entities (deren SOD-Name anders ist als deren WSDL-Name)
+Den ganzen Missing Fields nachgehen
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+######################################################################
+TODO VAHI
+######################################################################
+> Custom Object 7
+> Custom Object 7 Update geht nicht - Da passiert nix
+----------------------------------------------------------------------
+> Custom Object 2
+> Custom Object 2 hat ein Fehler gemeldet mit Timezone
+----------------------------------------------------------------------
+> Field & Picklist
+> Dauert ewig - wirklich ewig bis der sync durch die Felder und Picklisten
+> durch ist
+----------------------------------------------------------------------
+Activity -> ListOfProductDetail -> Product
+----------------------------------------------------------------------
+Loop bei PRODUCTS?  WO STECKT DAS, wie kann ich es nachvollziehen?
+Scheint jetzt gefixt - war das Problem mit SearchSpec.
+----------------------------------------------------------------------
+SUPPORT-POST
+----------------------------------------------------------------------
+TaskGroup -> TaskGroupBase
+----------------------------------------------------------------------
+
+######################################################################
+To Check:
+######################################################################
+----------------------------------------------------------------------
+WHY IS THERE AN "Id" COLUMN IN TABLE customobject1 and
+WHEN WAS IT INTRODUCED?
+----------------------------------------------------------------------
+Probably fixed: Counts on Attachments
+----------------------------------------------------------------------
+Diversey:
+02:24:20 - Getting picklists from picklist service...
+02:27:35 - Error #2032: Stream Error. URL: https://secure-ausomxbfa.crmondemand.com/Services/cte/PicklistService
+Preparation takes around 5 Minutes(!) and a download of 6.8 MB (total run 7 minutes at my side).
+Is this normal or only on my side?
+Measured that this takes ages.
+We need an alternative HTTP libary.
+----------------------------------------------------------------------
+ws20.IncomingInterface.initXML is based on WebServiceIncoming.applyFilters()
+which is a little bit weird as we now use the SearchSpec.
+Does it work?  (According to SiebelDoc: Yes.  But we know this doc
+is wrong, as ModifiedDate does only work in SearchSpec.)
+----------------------------------------------------------------------
+
+######################################################################
+TODO LONG HAUL
+######################################################################
+----------------------------------------------------------------------
+Deleted objects: DATE is from the END of the request, not the START.
+This might miss some records due to race condition.
+----------------------------------------------------------------------
+If URL contains a space the login fails for apparently no reason.
+Enter BLANK https:// etc.  The blank is not really viewable.
+In input form, disable blanks, linefeeds etc..  Simple enough.
+Ditto login.  Ditto password?
+----------------------------------------------------------------------
+We need an error column on all records which are able to display
+some error string(!) to the user why this record has a problem.
+Then I am able to store all info about the problem of the record
+into this column, such that the user can post-process the record.
+(Currently records are only marked as Err but no additional info.)
+----------------------------------------------------------------------
+AllUser displays "NNN null have been synchonized" ->
+NULL shall be fixed, but is the output now sane?
+----------------------------------------------------------------------
+Handle SoD Faults and transport Faults the same way.  Seems that
+some environments use HTTP code 200, others 4xx, which currently
+needs TWO different handlers with different parameters and different
+returns.
+----------------------------------------------------------------------
+Check the WS1.0 to WS2.0 mapping with populated records.
+_nbItems is not reset to 0 (zeroed with object creation, but not nice)
+Change the names of the filters to something more reasonable
+----------------------------------------------------------------------
+Counts are still a little bit off:
+03:00:22 - Successful, 1584 records: Reading "Product" data from server
+$ sqlite3 gadget2go.sqlite 'select count(*) from product'
+1365
+----------------------------------------------------------------------
+Suppress ugly Access Denied in case something is enabled which shouldn't:
+03:06:57 - Error #2032: Stream Error. URL: https://secure-ausomxdba.crmondemand.com/Services/Integration;JSESSIONID=e44b6a2fdb77aa4fcafbad7f92ea7ca8ac500986298b39796e0ef97d1b8f5df1.e3iRbxmQbhb0axiRchqNchmMe0
+<SOAP-ENV:Fault xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+  <faultcode>SOAP-ENV:Server</faultcode>
+  <faultstring>Method 'Execute' of business component 'CustomObject14' (integration component 'CustomObject14') returned the following error:
+"Access denied.(SBL-DAT-00553)"(SBL-EAI-04376)</faultstring>
+  <detail>
+    <siebelf:siebdetail xmlns:siebelf="http://www.siebel.com/ws/fault">
+      <siebelf:logfilename>OnDemandServicesObjMgr_eng_13838.log</siebelf:logfilename>
+      <siebelf:errorstack>
+        <siebelf:error>
+          <siebelf:errorcode>(SBL-DAT-00553)</siebelf:errorcode>
+          <siebelf:errorsymbol/>
+          <siebelf:errormsg>Method 'Execute' of business component 'CustomObject14' (integration component 'CustomObject14') returned the following error:
+"Access denied.(SBL-DAT-00553)"(SBL-EAI-04376)</siebelf:errormsg>
+        </siebelf:error>
+      </siebelf:errorstack>
+    </siebelf:siebdetail>
+  </detail>
+</SOAP-ENV:Fault>
+----------------------------------------------------------------------
+
+######################################################################
+GetField bugs
+######################################################################
+----------------------------------------------------------------------
+no Allocation 'Allocation' is not a valid object name.(SBL-ODS-00187)
+no BusinessPlan 'BusinessPlan' is not a valid object name.(SBL-ODS-00187)
+no ContactLicense 'ContactLicense' is not a valid object name.(SBL-ODS-00187)
+no Dealer 'Dealer' is not a valid object name.(SBL-ODS-00187)
+no InventoryAuditReport 'InventoryAuditReport' is not a valid object name.(SBL-ODS-00187)
+no InventoryPeriod 'InventoryPeriod' is not a valid object name.(SBL-ODS-00187)
+----------------------------------------------------------------------
+CURRENTLY STOPPED EDIT AFTER InventoryPeriod
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+See CO10 - same for CO4 to 15
+----------------------------------------------------------------------
+missing field: entity Account table account field OriginatingPartnerChannelManagerAlias
+missing field: entity Account table account field OwnerPartnerChannelManagerAlias
+missing field: entity Account table account field PriceListStatus
+missing field: entity Account table account field PrincipalPartnerChannelManagerAlias
+missing field: entity Application table sod_application field AssociatedPartnerMainPhone
+missing field: entity Application table sod_application field CampaignStatus
+missing field: entity Application table sod_application field CampaignType
+missing field: entity Asset table sod_asset field AssetId
+missing field: entity Asset table sod_asset field OwnerAccountId
+missing field: entity Book table sod_book field BookId
+missing field: entity Coverage table sod_coverage field CoverageProductSub-Class
+missing field: entity Custom Object 1 table customobject1 field MedEdEventExternalSystemId
+missing field: entity Custom Object 1 table customobject1 field MedEdEventName
+missing field: entity Custom Object 1 table customobject1 field ParentExternalSystemId
+missing field: entity Custom Object 1 table customobject1 field ParentIntegrationId
+missing field: entity Custom Object 1 table customobject1 field ParentName
+missing field: entity Custom Object 2 table custom_object_2 field MedEdEventExternalSystemId
+missing field: entity Custom Object 2 table custom_object_2 field MedEdEventName
+missing field: entity Custom Object 2 table custom_object_2 field ParentExternalSystemId
+missing field: entity Custom Object 2 table custom_object_2 field ParentIntegrationId
+missing field: entity Custom Object 2 table custom_object_2 field ParentName
+missing field: entity Custom Object 3 table sod_customobject3 field MedEdEventExternalSystemId
+missing field: entity Custom Object 3 table sod_customobject3 field MedEdEventName
+missing field: entity Custom Object 3 table sod_customobject3 field ParentExternalSystemId
+missing field: entity Custom Object 3 table sod_customobject3 field ParentIntegrationId
+missing field: entity Custom Object 3 table sod_customobject3 field ParentName
+missing field: entity CustomObject10 table sod_customobject10 field AccreditationExternalSystemId
+missing field: entity CustomObject10 table sod_customobject10 field AccreditationName
+missing field: entity CustomObject10 table sod_customobject10 field AccreditationNum
+missing field: entity CustomObject10 table sod_customobject10 field AccreditationStatus
+missing field: entity CustomObject10 table sod_customobject10 field AccreditationType
+missing field: entity CustomObject10 table sod_customobject10 field AttachFileName
+missing field: entity CustomObject10 table sod_customobject10 field AttachFileSizeDisp
+missing field: entity CustomObject10 table sod_customobject10 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject10 table sod_customobject10 field BrokerProfileExternalSystemId
+missing field: entity CustomObject10 table sod_customobject10 field CampaignStatus
+missing field: entity CustomObject10 table sod_customobject10 field CampaignType
+missing field: entity CustomObject10 table sod_customobject10 field CertficationCertificationNum
+missing field: entity CustomObject10 table sod_customobject10 field CertficationExternalSystemId
+missing field: entity CustomObject10 table sod_customobject10 field CertficationName
+missing field: entity CustomObject10 table sod_customobject10 field CertficationStatus
+missing field: entity CustomObject10 table sod_customobject10 field CertficationType
+missing field: entity CustomObject10 table sod_customobject10 field CourseExternalSystemId
+missing field: entity CustomObject10 table sod_customobject10 field CourseID
+missing field: entity CustomObject10 table sod_customobject10 field CourseName
+missing field: entity CustomObject10 table sod_customobject10 field CourseStatus
+missing field: entity CustomObject10 table sod_customobject10 field CourseType
+missing field: entity CustomObject10 table sod_customobject10 field ExamExternalSystemId
+missing field: entity CustomObject10 table sod_customobject10 field ExamID
+missing field: entity CustomObject10 table sod_customobject10 field ExamName
+missing field: entity CustomObject10 table sod_customobject10 field ExamStatus
+missing field: entity CustomObject10 table sod_customobject10 field ExamType
+missing field: entity CustomObject10 table sod_customobject10 field PartnerMainPhone
+missing field: entity CustomObject11 table sod_customobject11 field AccreditationExternalSystemId
+missing field: entity CustomObject11 table sod_customobject11 field AccreditationName
+missing field: entity CustomObject11 table sod_customobject11 field AccreditationNum
+missing field: entity CustomObject11 table sod_customobject11 field AccreditationStatus
+missing field: entity CustomObject11 table sod_customobject11 field AccreditationType
+missing field: entity CustomObject11 table sod_customobject11 field AttachFileName
+missing field: entity CustomObject11 table sod_customobject11 field AttachFileSizeDisp
+missing field: entity CustomObject11 table sod_customobject11 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject11 table sod_customobject11 field BrokerProfileExternalSystemId
+missing field: entity CustomObject11 table sod_customobject11 field CampaignStatus
+missing field: entity CustomObject11 table sod_customobject11 field CampaignType
+missing field: entity CustomObject11 table sod_customobject11 field CertficationCertificationNum
+missing field: entity CustomObject11 table sod_customobject11 field CertficationExternalSystemId
+missing field: entity CustomObject11 table sod_customobject11 field CertficationName
+missing field: entity CustomObject11 table sod_customobject11 field CertficationStatus
+missing field: entity CustomObject11 table sod_customobject11 field CertficationType
+missing field: entity CustomObject11 table sod_customobject11 field CourseExternalSystemId
+missing field: entity CustomObject11 table sod_customobject11 field CourseID
+missing field: entity CustomObject11 table sod_customobject11 field CourseName
+missing field: entity CustomObject11 table sod_customobject11 field CourseStatus
+missing field: entity CustomObject11 table sod_customobject11 field CourseType
+missing field: entity CustomObject11 table sod_customobject11 field ExamExternalSystemId
+missing field: entity CustomObject11 table sod_customobject11 field ExamID
+missing field: entity CustomObject11 table sod_customobject11 field ExamName
+missing field: entity CustomObject11 table sod_customobject11 field ExamStatus
+missing field: entity CustomObject11 table sod_customobject11 field ExamType
+missing field: entity CustomObject11 table sod_customobject11 field PartnerMainPhone
+missing field: entity CustomObject12 table sod_customobject12 field AccreditationExternalSystemId
+missing field: entity CustomObject12 table sod_customobject12 field AccreditationName
+missing field: entity CustomObject12 table sod_customobject12 field AccreditationNum
+missing field: entity CustomObject12 table sod_customobject12 field AccreditationStatus
+missing field: entity CustomObject12 table sod_customobject12 field AccreditationType
+missing field: entity CustomObject12 table sod_customobject12 field AttachFileName
+missing field: entity CustomObject12 table sod_customobject12 field AttachFileSizeDisp
+missing field: entity CustomObject12 table sod_customobject12 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject12 table sod_customobject12 field BrokerProfileExternalSystemId
+missing field: entity CustomObject12 table sod_customobject12 field CampaignStatus
+missing field: entity CustomObject12 table sod_customobject12 field CampaignType
+missing field: entity CustomObject12 table sod_customobject12 field CertficationCertificationNum
+missing field: entity CustomObject12 table sod_customobject12 field CertficationExternalSystemId
+missing field: entity CustomObject12 table sod_customobject12 field CertficationName
+missing field: entity CustomObject12 table sod_customobject12 field CertficationStatus
+missing field: entity CustomObject12 table sod_customobject12 field CertficationType
+missing field: entity CustomObject12 table sod_customobject12 field CourseExternalSystemId
+missing field: entity CustomObject12 table sod_customobject12 field CourseID
+missing field: entity CustomObject12 table sod_customobject12 field CourseName
+missing field: entity CustomObject12 table sod_customobject12 field CourseStatus
+missing field: entity CustomObject12 table sod_customobject12 field CourseType
+missing field: entity CustomObject12 table sod_customobject12 field ExamExternalSystemId
+missing field: entity CustomObject12 table sod_customobject12 field ExamID
+missing field: entity CustomObject12 table sod_customobject12 field ExamName
+missing field: entity CustomObject12 table sod_customobject12 field ExamStatus
+missing field: entity CustomObject12 table sod_customobject12 field ExamType
+missing field: entity CustomObject12 table sod_customobject12 field PartnerMainPhone
+missing field: entity CustomObject13 table sod_customobject13 field AccreditationExternalSystemId
+missing field: entity CustomObject13 table sod_customobject13 field AccreditationName
+missing field: entity CustomObject13 table sod_customobject13 field AccreditationNum
+missing field: entity CustomObject13 table sod_customobject13 field AccreditationStatus
+missing field: entity CustomObject13 table sod_customobject13 field AccreditationType
+missing field: entity CustomObject13 table sod_customobject13 field AttachFileName
+missing field: entity CustomObject13 table sod_customobject13 field AttachFileSizeDisp
+missing field: entity CustomObject13 table sod_customobject13 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject13 table sod_customobject13 field BrokerProfileExternalSystemId
+missing field: entity CustomObject13 table sod_customobject13 field CampaignStatus
+missing field: entity CustomObject13 table sod_customobject13 field CampaignType
+missing field: entity CustomObject13 table sod_customobject13 field CertficationCertificationNum
+missing field: entity CustomObject13 table sod_customobject13 field CertficationExternalSystemId
+missing field: entity CustomObject13 table sod_customobject13 field CertficationName
+missing field: entity CustomObject13 table sod_customobject13 field CertficationStatus
+missing field: entity CustomObject13 table sod_customobject13 field CertficationType
+missing field: entity CustomObject13 table sod_customobject13 field CourseExternalSystemId
+missing field: entity CustomObject13 table sod_customobject13 field CourseID
+missing field: entity CustomObject13 table sod_customobject13 field CourseName
+missing field: entity CustomObject13 table sod_customobject13 field CourseStatus
+missing field: entity CustomObject13 table sod_customobject13 field CourseType
+missing field: entity CustomObject13 table sod_customobject13 field ExamExternalSystemId
+missing field: entity CustomObject13 table sod_customobject13 field ExamID
+missing field: entity CustomObject13 table sod_customobject13 field ExamName
+missing field: entity CustomObject13 table sod_customobject13 field ExamStatus
+missing field: entity CustomObject13 table sod_customobject13 field ExamType
+missing field: entity CustomObject13 table sod_customobject13 field PartnerMainPhone
+missing field: entity CustomObject14 table custom_object_14 field AccreditationExternalSystemId
+missing field: entity CustomObject14 table custom_object_14 field AccreditationName
+missing field: entity CustomObject14 table custom_object_14 field AccreditationNum
+missing field: entity CustomObject14 table custom_object_14 field AccreditationStatus
+missing field: entity CustomObject14 table custom_object_14 field AccreditationType
+missing field: entity CustomObject14 table custom_object_14 field AttachFileName
+missing field: entity CustomObject14 table custom_object_14 field AttachFileSizeDisp
+missing field: entity CustomObject14 table custom_object_14 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject14 table custom_object_14 field BrokerProfileExternalSystemId
+missing field: entity CustomObject14 table custom_object_14 field CampaignStatus
+missing field: entity CustomObject14 table custom_object_14 field CampaignType
+missing field: entity CustomObject14 table custom_object_14 field CertficationCertificationNum
+missing field: entity CustomObject14 table custom_object_14 field CertficationExternalSystemId
+missing field: entity CustomObject14 table custom_object_14 field CertficationName
+missing field: entity CustomObject14 table custom_object_14 field CertficationStatus
+missing field: entity CustomObject14 table custom_object_14 field CertficationType
+missing field: entity CustomObject14 table custom_object_14 field CourseExternalSystemId
+missing field: entity CustomObject14 table custom_object_14 field CourseID
+missing field: entity CustomObject14 table custom_object_14 field CourseName
+missing field: entity CustomObject14 table custom_object_14 field CourseStatus
+missing field: entity CustomObject14 table custom_object_14 field CourseType
+missing field: entity CustomObject14 table custom_object_14 field ExamExternalSystemId
+missing field: entity CustomObject14 table custom_object_14 field ExamID
+missing field: entity CustomObject14 table custom_object_14 field ExamName
+missing field: entity CustomObject14 table custom_object_14 field ExamStatus
+missing field: entity CustomObject14 table custom_object_14 field ExamType
+missing field: entity CustomObject14 table custom_object_14 field PartnerMainPhone
+missing field: entity CustomObject15 table sod_customobject15 field AccreditationExternalSystemId
+missing field: entity CustomObject15 table sod_customobject15 field AccreditationName
+missing field: entity CustomObject15 table sod_customobject15 field AccreditationNum
+missing field: entity CustomObject15 table sod_customobject15 field AccreditationStatus
+missing field: entity CustomObject15 table sod_customobject15 field AccreditationType
+missing field: entity CustomObject15 table sod_customobject15 field AttachFileName
+missing field: entity CustomObject15 table sod_customobject15 field AttachFileSizeDisp
+missing field: entity CustomObject15 table sod_customobject15 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject15 table sod_customobject15 field BrokerProfileExternalSystemId
+missing field: entity CustomObject15 table sod_customobject15 field CampaignStatus
+missing field: entity CustomObject15 table sod_customobject15 field CampaignType
+missing field: entity CustomObject15 table sod_customobject15 field CertficationCertificationNum
+missing field: entity CustomObject15 table sod_customobject15 field CertficationExternalSystemId
+missing field: entity CustomObject15 table sod_customobject15 field CertficationName
+missing field: entity CustomObject15 table sod_customobject15 field CertficationStatus
+missing field: entity CustomObject15 table sod_customobject15 field CertficationType
+missing field: entity CustomObject15 table sod_customobject15 field CourseExternalSystemId
+missing field: entity CustomObject15 table sod_customobject15 field CourseID
+missing field: entity CustomObject15 table sod_customobject15 field CourseName
+missing field: entity CustomObject15 table sod_customobject15 field CourseStatus
+missing field: entity CustomObject15 table sod_customobject15 field CourseType
+missing field: entity CustomObject15 table sod_customobject15 field ExamExternalSystemId
+missing field: entity CustomObject15 table sod_customobject15 field ExamID
+missing field: entity CustomObject15 table sod_customobject15 field ExamName
+missing field: entity CustomObject15 table sod_customobject15 field ExamStatus
+missing field: entity CustomObject15 table sod_customobject15 field ExamType
+missing field: entity CustomObject15 table sod_customobject15 field PartnerMainPhone
+missing field: entity CustomObject4 table sod_customobject4 field AccreditationExternalSystemId
+missing field: entity CustomObject4 table sod_customobject4 field AccreditationName
+missing field: entity CustomObject4 table sod_customobject4 field AccreditationNum
+missing field: entity CustomObject4 table sod_customobject4 field AccreditationStatus
+missing field: entity CustomObject4 table sod_customobject4 field AccreditationType
+missing field: entity CustomObject4 table sod_customobject4 field AttachFileName
+missing field: entity CustomObject4 table sod_customobject4 field AttachFileSizeDisp
+missing field: entity CustomObject4 table sod_customobject4 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject4 table sod_customobject4 field BrokerProfileExternalSystemId
+missing field: entity CustomObject4 table sod_customobject4 field CampaignStatus
+missing field: entity CustomObject4 table sod_customobject4 field CampaignType
+missing field: entity CustomObject4 table sod_customobject4 field CertficationCertificationNum
+missing field: entity CustomObject4 table sod_customobject4 field CertficationExternalSystemId
+missing field: entity CustomObject4 table sod_customobject4 field CertficationName
+missing field: entity CustomObject4 table sod_customobject4 field CertficationStatus
+missing field: entity CustomObject4 table sod_customobject4 field CertficationType
+missing field: entity CustomObject4 table sod_customobject4 field CourseExternalSystemId
+missing field: entity CustomObject4 table sod_customobject4 field CourseID
+missing field: entity CustomObject4 table sod_customobject4 field CourseName
+missing field: entity CustomObject4 table sod_customobject4 field CourseStatus
+missing field: entity CustomObject4 table sod_customobject4 field CourseType
+missing field: entity CustomObject4 table sod_customobject4 field ExamExternalSystemId
+missing field: entity CustomObject4 table sod_customobject4 field ExamID
+missing field: entity CustomObject4 table sod_customobject4 field ExamName
+missing field: entity CustomObject4 table sod_customobject4 field ExamStatus
+missing field: entity CustomObject4 table sod_customobject4 field ExamType
+missing field: entity CustomObject4 table sod_customobject4 field PartnerMainPhone
+missing field: entity CustomObject5 table sod_customobject5 field AccreditationExternalSystemId
+missing field: entity CustomObject5 table sod_customobject5 field AccreditationName
+missing field: entity CustomObject5 table sod_customobject5 field AccreditationNum
+missing field: entity CustomObject5 table sod_customobject5 field AccreditationStatus
+missing field: entity CustomObject5 table sod_customobject5 field AccreditationType
+missing field: entity CustomObject5 table sod_customobject5 field AttachFileName
+missing field: entity CustomObject5 table sod_customobject5 field AttachFileSizeDisp
+missing field: entity CustomObject5 table sod_customobject5 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject5 table sod_customobject5 field BrokerProfileExternalSystemId
+missing field: entity CustomObject5 table sod_customobject5 field CampaignStatus
+missing field: entity CustomObject5 table sod_customobject5 field CampaignType
+missing field: entity CustomObject5 table sod_customobject5 field CertficationCertificationNum
+missing field: entity CustomObject5 table sod_customobject5 field CertficationExternalSystemId
+missing field: entity CustomObject5 table sod_customobject5 field CertficationName
+missing field: entity CustomObject5 table sod_customobject5 field CertficationStatus
+missing field: entity CustomObject5 table sod_customobject5 field CertficationType
+missing field: entity CustomObject5 table sod_customobject5 field CourseExternalSystemId
+missing field: entity CustomObject5 table sod_customobject5 field CourseID
+missing field: entity CustomObject5 table sod_customobject5 field CourseName
+missing field: entity CustomObject5 table sod_customobject5 field CourseStatus
+missing field: entity CustomObject5 table sod_customobject5 field CourseType
+missing field: entity CustomObject5 table sod_customobject5 field ExamExternalSystemId
+missing field: entity CustomObject5 table sod_customobject5 field ExamID
+missing field: entity CustomObject5 table sod_customobject5 field ExamName
+missing field: entity CustomObject5 table sod_customobject5 field ExamStatus
+missing field: entity CustomObject5 table sod_customobject5 field ExamType
+missing field: entity CustomObject5 table sod_customobject5 field PartnerMainPhone
+missing field: entity CustomObject6 table sod_customobject6 field AccreditationExternalSystemId
+missing field: entity CustomObject6 table sod_customobject6 field AccreditationName
+missing field: entity CustomObject6 table sod_customobject6 field AccreditationNum
+missing field: entity CustomObject6 table sod_customobject6 field AccreditationStatus
+missing field: entity CustomObject6 table sod_customobject6 field AccreditationType
+missing field: entity CustomObject6 table sod_customobject6 field AttachFileName
+missing field: entity CustomObject6 table sod_customobject6 field AttachFileSizeDisp
+missing field: entity CustomObject6 table sod_customobject6 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject6 table sod_customobject6 field BrokerProfileExternalSystemId
+missing field: entity CustomObject6 table sod_customobject6 field CampaignStatus
+missing field: entity CustomObject6 table sod_customobject6 field CampaignType
+missing field: entity CustomObject6 table sod_customobject6 field CertficationCertificationNum
+missing field: entity CustomObject6 table sod_customobject6 field CertficationExternalSystemId
+missing field: entity CustomObject6 table sod_customobject6 field CertficationName
+missing field: entity CustomObject6 table sod_customobject6 field CertficationStatus
+missing field: entity CustomObject6 table sod_customobject6 field CertficationType
+missing field: entity CustomObject6 table sod_customobject6 field CourseExternalSystemId
+missing field: entity CustomObject6 table sod_customobject6 field CourseID
+missing field: entity CustomObject6 table sod_customobject6 field CourseName
+missing field: entity CustomObject6 table sod_customobject6 field CourseStatus
+missing field: entity CustomObject6 table sod_customobject6 field CourseType
+missing field: entity CustomObject6 table sod_customobject6 field ExamExternalSystemId
+missing field: entity CustomObject6 table sod_customobject6 field ExamID
+missing field: entity CustomObject6 table sod_customobject6 field ExamName
+missing field: entity CustomObject6 table sod_customobject6 field ExamStatus
+missing field: entity CustomObject6 table sod_customobject6 field ExamType
+missing field: entity CustomObject6 table sod_customobject6 field PartnerMainPhone
+missing field: entity CustomObject7 table sod_customobject7 field AccreditationExternalSystemId
+missing field: entity CustomObject7 table sod_customobject7 field AccreditationName
+missing field: entity CustomObject7 table sod_customobject7 field AccreditationNum
+missing field: entity CustomObject7 table sod_customobject7 field AccreditationStatus
+missing field: entity CustomObject7 table sod_customobject7 field AccreditationType
+missing field: entity CustomObject7 table sod_customobject7 field AttachFileName
+missing field: entity CustomObject7 table sod_customobject7 field AttachFileSizeDisp
+missing field: entity CustomObject7 table sod_customobject7 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject7 table sod_customobject7 field BrokerProfileExternalSystemId
+missing field: entity CustomObject7 table sod_customobject7 field CampaignStatus
+missing field: entity CustomObject7 table sod_customobject7 field CampaignType
+missing field: entity CustomObject7 table sod_customobject7 field CertficationCertificationNum
+missing field: entity CustomObject7 table sod_customobject7 field CertficationExternalSystemId
+missing field: entity CustomObject7 table sod_customobject7 field CertficationName
+missing field: entity CustomObject7 table sod_customobject7 field CertficationStatus
+missing field: entity CustomObject7 table sod_customobject7 field CertficationType
+missing field: entity CustomObject7 table sod_customobject7 field CourseExternalSystemId
+missing field: entity CustomObject7 table sod_customobject7 field CourseID
+missing field: entity CustomObject7 table sod_customobject7 field CourseName
+missing field: entity CustomObject7 table sod_customobject7 field CourseStatus
+missing field: entity CustomObject7 table sod_customobject7 field CourseType
+missing field: entity CustomObject7 table sod_customobject7 field ExamExternalSystemId
+missing field: entity CustomObject7 table sod_customobject7 field ExamID
+missing field: entity CustomObject7 table sod_customobject7 field ExamName
+missing field: entity CustomObject7 table sod_customobject7 field ExamStatus
+missing field: entity CustomObject7 table sod_customobject7 field ExamType
+missing field: entity CustomObject7 table sod_customobject7 field PartnerMainPhone
+missing field: entity CustomObject8 table sod_customobject8 field AccreditationExternalSystemId
+missing field: entity CustomObject8 table sod_customobject8 field AccreditationName
+missing field: entity CustomObject8 table sod_customobject8 field AccreditationNum
+missing field: entity CustomObject8 table sod_customobject8 field AccreditationStatus
+missing field: entity CustomObject8 table sod_customobject8 field AccreditationType
+missing field: entity CustomObject8 table sod_customobject8 field AttachFileName
+missing field: entity CustomObject8 table sod_customobject8 field AttachFileSizeDisp
+missing field: entity CustomObject8 table sod_customobject8 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject8 table sod_customobject8 field BrokerProfileExternalSystemId
+missing field: entity CustomObject8 table sod_customobject8 field CampaignStatus
+missing field: entity CustomObject8 table sod_customobject8 field CampaignType
+missing field: entity CustomObject8 table sod_customobject8 field CertficationCertificationNum
+missing field: entity CustomObject8 table sod_customobject8 field CertficationExternalSystemId
+missing field: entity CustomObject8 table sod_customobject8 field CertficationName
+missing field: entity CustomObject8 table sod_customobject8 field CertficationStatus
+missing field: entity CustomObject8 table sod_customobject8 field CertficationType
+missing field: entity CustomObject8 table sod_customobject8 field CourseExternalSystemId
+missing field: entity CustomObject8 table sod_customobject8 field CourseID
+missing field: entity CustomObject8 table sod_customobject8 field CourseName
+missing field: entity CustomObject8 table sod_customobject8 field CourseStatus
+missing field: entity CustomObject8 table sod_customobject8 field CourseType
+missing field: entity CustomObject8 table sod_customobject8 field ExamExternalSystemId
+missing field: entity CustomObject8 table sod_customobject8 field ExamID
+missing field: entity CustomObject8 table sod_customobject8 field ExamName
+missing field: entity CustomObject8 table sod_customobject8 field ExamStatus
+missing field: entity CustomObject8 table sod_customobject8 field ExamType
+missing field: entity CustomObject8 table sod_customobject8 field PartnerMainPhone
+missing field: entity CustomObject9 table sod_customobject9 field AccreditationExternalSystemId
+missing field: entity CustomObject9 table sod_customobject9 field AccreditationName
+missing field: entity CustomObject9 table sod_customobject9 field AccreditationNum
+missing field: entity CustomObject9 table sod_customobject9 field AccreditationStatus
+missing field: entity CustomObject9 table sod_customobject9 field AccreditationType
+missing field: entity CustomObject9 table sod_customobject9 field AttachFileName
+missing field: entity CustomObject9 table sod_customobject9 field AttachFileSizeDisp
+missing field: entity CustomObject9 table sod_customobject9 field BrokerProfileBrokerProfileName
+missing field: entity CustomObject9 table sod_customobject9 field BrokerProfileExternalSystemId
+missing field: entity CustomObject9 table sod_customobject9 field CampaignStatus
+missing field: entity CustomObject9 table sod_customobject9 field CampaignType
+missing field: entity CustomObject9 table sod_customobject9 field CertficationCertificationNum
+missing field: entity CustomObject9 table sod_customobject9 field CertficationExternalSystemId
+missing field: entity CustomObject9 table sod_customobject9 field CertficationName
+missing field: entity CustomObject9 table sod_customobject9 field CertficationStatus
+missing field: entity CustomObject9 table sod_customobject9 field CertficationType
+missing field: entity CustomObject9 table sod_customobject9 field CourseExternalSystemId
+missing field: entity CustomObject9 table sod_customobject9 field CourseID
+missing field: entity CustomObject9 table sod_customobject9 field CourseName
+missing field: entity CustomObject9 table sod_customobject9 field CourseStatus
+missing field: entity CustomObject9 table sod_customobject9 field CourseType
+missing field: entity CustomObject9 table sod_customobject9 field ExamExternalSystemId
+missing field: entity CustomObject9 table sod_customobject9 field ExamID
+missing field: entity CustomObject9 table sod_customobject9 field ExamName
+missing field: entity CustomObject9 table sod_customobject9 field ExamStatus
+missing field: entity CustomObject9 table sod_customobject9 field ExamType
+missing field: entity CustomObject9 table sod_customobject9 field PartnerMainPhone
+missing field: entity DealRegistration table sod_dealregistration field E-mail
+missing field: entity DealRegistration table sod_dealregistration field LeadExternalSystemId
+missing field: entity DealRegistration table sod_dealregistration field LeadFirstName
+missing field: entity DealRegistration table sod_dealregistration field LeadFullName
+missing field: entity DealRegistration table sod_dealregistration field LeadIntegrationId
+missing field: entity DealRegistration table sod_dealregistration field LeadLastName
+missing field: entity DealRegistration table sod_dealregistration field ObjectiveExternalSystemId
+missing field: entity DealRegistration table sod_dealregistration field ObjectiveName
+missing field: entity DealRegistration table sod_dealregistration field OriginatingPartnerMainPhone
+missing field: entity DealRegistration table sod_dealregistration field OwnerPartnerMainPhone
+missing field: entity DealRegistration table sod_dealregistration field PartnerMainPhone
+missing field: entity FinancialAccount table sod_financialaccount field CampaignStatus
+missing field: entity FinancialAccount table sod_financialaccount field CampaignType
+missing field: entity FinancialAccountHolding table sod_financialaccountholding field FinancialProductSub-Class
+missing field: entity FinancialPlan table sod_financialplan field CampaignStatus
+missing field: entity FinancialPlan table sod_financialplan field CampaignType
+missing field: entity FinancialProduct table sod_financialproduct field ParentFinancialProductSub-Class
+missing field: entity FinancialProduct table sod_financialproduct field Sub-Class
+missing field: entity FinancialTransaction table sod_financialtransaction field FinancialProductSub-Class
+missing field: entity Fund table sod_fund field BalanceAfterPre-Approvals
+missing field: entity Fund table sod_fund field TotalPre-Approved
+missing field: entity Group table sod_group field UserGroupId
+missing field: entity Household table sod_household field HouseholdId
+missing field: entity Lead table lead field ObjectiveExternalSystemId
+missing field: entity Lead table lead field ObjectiveObjectiveName
+missing field: entity MDFRequest table sod_mdfrequest field CampaignStatus
+missing field: entity MDFRequest table sod_mdfrequest field CampaignType
+missing field: entity MDFRequest table sod_mdfrequest field ObjectiveExternalSystemId
+missing field: entity MDFRequest table sod_mdfrequest field ObjectiveName
+missing field: entity MDFRequest table sod_mdfrequest field OriginallyPre-ApprovedAmount
+missing field: entity MDFRequest table sod_mdfrequest field OriginatingPartnerAccountMainPhone
+missing field: entity MDFRequest table sod_mdfrequest field OwnerPartnerAccountMainPhone
+missing field: entity MDFRequest table sod_mdfrequest field Pre-ApprovalDate
+missing field: entity MDFRequest table sod_mdfrequest field PrincipalPartnerAccountMainPhone
+missing field: entity Note table sod_note field NoteId
+missing field: entity Opportunity table opportunity field OriginatingPartnerChannelManagerAlias
+missing field: entity Opportunity table opportunity field PrincipalPartnerChannelManagerAlias
+missing field: entity Policy table policy field CampaignStatus
+missing field: entity Policy table policy field CampaignType
+missing field: entity Policy table policy field PrimaryAgencyMainPhone
+missing field: entity Portfolio table sod_portfolio field CreatedByDate
+missing field: entity Portfolio table sod_portfolio field PortfolioId
+missing field: entity SPRequest table sod_sprequest field ObjectiveExternalSystemId
+missing field: entity SPRequest table sod_sprequest field ObjectiveName
+missing field: entity SPRequest table sod_sprequest field OriginallyPre-ApprovedAmount
+missing field: entity SPRequest table sod_sprequest field OriginatingPartnerAccountMainPhone
+missing field: entity SPRequest table sod_sprequest field OwnerPartnerAccountMainPhone
+missing field: entity SPRequest table sod_sprequest field PrincipalPartnerAccountMainPhone
+missing field: entity Service Request table service field ObjectiveExternalSystemId
+missing field: entity Service Request table service field ObjectiveObjectiveName
+missing field: entity Solution table sod_solution field LastUpdated
+missing field: entity Solution table sod_solution field SolutionId
+missing field: entity Vehicle table sod_vehicle field VehicleId
+----------------------------------------------------------------------
+
+
+######################################################################
+Old Stuff, still open?
+######################################################################
+----------------------------------------------------------------------
+MappingObject!
+ListOfUser
+ListOfContact
+----------------------------------------------------------------------
+Insurance
+Call Report
+Test
+----------------------------------------------------------------------
+ContactAttachment (BigMachine) -> Reduce pagesize if attachment fails.
+----------------------------------------------------------------------
+
+TransactionDAO:
+
+CRMGadget transaction. vs. Siebel (ViewMode)
+Model based on Siebel Documentation which is
+a little bit unclear.
+ 
+  +-------------+
+  ! My          !
+  ! (Personal)  !
+  +------o------+
+         !
+         +---------------------+
+         !                     !
+  +------o------+    +---------o---------+
+  ! My Team     !    ! Employee          !
+  ! (Sales Rep) !    ! (EmployeeManager) !
+  +------o------+    +---------o---------+
+         !                     !
+         +---------------------+
+         !
+ +-------o-------+
+ ! Employee Team !
+ ! (Manager)     !
+ +-------o-------+
+         !
++--------+--------+
+! My Organization !   Unclear if team must
+! (Organization)  !   be in Organization.
++--------+--------+
+         !
+  +------o------+        +-------------+
+  ! All         ! /----\ ! All Book    !
+  ! (Broadest)  ! \----/ ! (AllBooks)  !
+  +-------------+        +-------------+
+
+  
+##############################################################################

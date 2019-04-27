@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.service.PicklistService;
+			import gadget.util.NumberLocaleUtils;
+			import gadget.util.NumberUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+
+
+		
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid = null;
+			override public function set data(value:Object):void
+			{
+				super.data = value;
+				if(value != null){
+					var fyTarget:Number = value.FYTarget==null?0:Number(parseFloat(value.FYTarget));
+					var forecast:Number = value.Forecast==null?0:Number(parseFloat(value.Forecast));
+					var totalVaiance:Number = forecast-fyTarget  ;
+					super.data["variance"] = totalVaiance;
+					
+					cal.text = NumberLocaleUtils.format(super.data["variance"]);
+					grid.invalidateList();
+				}
+				
+			}
+			
+			override public function set listData(value:BaseListData):void
+			{
+				// TODO Auto Generated method stub
+				super.listData = value;
+				if(value!=null){
+					grid = value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						
+					}
+					
+				}
+			}
+
+		]]>
+		
+	</fx:Script>
+	<mx:Label id="cal" textAlign="right" width="100%"/>
+</s:MXAdvancedDataGridItemRenderer>

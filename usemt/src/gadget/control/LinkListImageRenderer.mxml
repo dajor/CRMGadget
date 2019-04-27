@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	creationComplete="addContextMenu();"
+	horizontalScrollPolicy="off" 
+	horizontalAlign="left"
+	horizontalGap="0">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.lists.LinkList;
+			import gadget.lists.List;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			
+			import mx.controls.Alert;
+			import mx.controls.DataGrid;
+			
+			
+			private function addContextMenu():void 
+			{
+				var customContextMenu:ContextMenu = new ContextMenu();
+				customContextMenu.hideBuiltInItems();
+				var menuItem:ContextMenuItem = new ContextMenuItem("Remove Link");
+				menuItem.addEventListener(ContextMenuEvent.MENU_ITEM_SELECT, removeLinkHandler);
+				customContextMenu.customItems.push(menuItem);
+				this.contextMenu = customContextMenu;
+			}
+
+			private function removeLinkHandler(evt:ContextMenuEvent):void
+			{
+				var obj:Object = (evt.contextMenuOwner as LinkListImageRenderer).data;
+				var linkList:LinkList = (evt.contextMenuOwner.parent.parent.parent as LinkList);
+				linkList.removeLink(obj);
+			}
+	
+
+	        [Embed(source='/assets/black_triangle.gif')] [Bindable] public var linkImg:Class;
+
+		    
+		    private function linkToObjectDetail():void {
+				var mainWindow:MainWindow = this.parentApplication as MainWindow;
+				var list:List = mainWindow.selectList(data.gadget_type);
+				//Bug #1728 CRO    //visible task list instead when list show hometask
+				if(data.gadget_type == Database.activityDao.entity){
+					list.showListTasks();
+				}
+				var subType:int = 0;
+				list.filter = Database.filterDao.getObjectFilter(data.gadget_type, subType);
+				list.selectItem(Database.getDao(data.gadget_type).findByGadgetId(data.gadget_id));
+				mainWindow.filterList.filterGrid.selectedIndex = subType;
+		    }
+		    
+		]]>
+	</mx:Script>
+	<mx:Image id="albumImage" source="{ImageUtils.getImage(data.gadget_type,0,data.primary)}"/>
+	<mx:Label text="{data.name}" width="215"/>
+	<mx:Image id="link_image" source="{linkImg}" click="linkToObjectDetail();"/>
+</mx:HBox>

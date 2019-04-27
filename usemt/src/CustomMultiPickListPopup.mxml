@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="480" height="340"
+	title="{i18n._('Add value')}"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init()"
+	
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			
+			import mx.collections.ArrayCollection;
+			
+					
+			[Bindable] public var picklist:Object;
+			private function init():void {	
+				
+				mltValue.availableItems = picklist.availableItems;
+				mltValue.selectedItems = picklist.selectedItems;
+			}
+			public var onOkMultiPicklist:Function;
+			
+			private function update_clickHanler(event:MouseEvent):void {
+				onOkMultiPicklist(mltValue.selectedItems);
+				close();				
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="480" height="340" right="0" bottom="0">
+		<control:TitleBar title="{i18n._('Add conditions')}" id="titlebar" y="2" x="25"/>
+		<mx:VBox top="36" left="8" right="8" bottom="8">
+			<mx:Canvas width="95%" height="210">
+				<mx:HBox paddingTop="20">
+					<control:MultiSelectList id="mltValue" width="400" />
+				</mx:HBox>
+			</mx:Canvas>	
+			<mx:Canvas width="95%" height="50">
+				<mx:HBox width="100%" horizontalAlign="right">
+					<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" right="0" icon="{ImageUtils.cancelIcon}"/>
+					<mx:Button id="createBtn" label="{i18n._('GLOBAL_ADD')}" click="update_clickHanler(event)" right="0" icon="{ImageUtils.acceptIcon}"/>
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

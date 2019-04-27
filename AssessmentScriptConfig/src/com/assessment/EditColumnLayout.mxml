@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%"
+		   creationComplete="init()" xmlns:components="com.shinynet.shinylib.components.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.IWindow;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.utils.StringUtil;
+			[Bindable]  
+			public var iAseesment:IAssessment;
+			[Bindable]  
+			public var assessementLayout:AssessmentConfLayout;			
+			private var _listColumns:ArrayCollection;
+			private var _currentSelected:DtoColumn;
+			
+			[Bindable]
+			private var _listColDataType:ArrayCollection = new ArrayCollection([DtoColumn.CHECK_BOX_TYPE,DtoColumn.DATE_TYPE,DtoColumn.RADIO_TYPE,DtoColumn.TEXT_TYPE]);
+			
+			protected function saveAndNew():void{
+				if(saveColumn()){
+					onNew();
+				}	
+			}
+			
+			private function checkExistColName():Boolean{
+				var data:ArrayCollection = datagrid.dataProvider as ArrayCollection;
+				if(data != null && data.length >0){
+					for each(var o:DtoColumn in data){
+						if(txtColumnTitle.text == o.title){
+							return true && _currentSelected!=o;
+						}
+					}
+				}
+				return false;
+			}
+			
+			
+			protected function saveColumn():Boolean{
+				
+				if(StringUtils.isEmpty(txtColumnTitle.text)){
+					Alert.show(iAseesment.translate("COLUMN_TITLE_IS_MANDATORY@Column Title is mandatory"), iAseesment.translate('GLOBAL_INVALID_FORM'), Alert.OK, this);
+					return false;
+				}else{					
+					if(checkExistColName()){
+						Alert.show(iAseesment.translate("COLUMN_TITLE_IS_EXIST@Column Title is already exist."), iAseesment.translate('GLOBAL_INVALID_FORM'), Alert.OK, this);
+						return false;
+					}
+					
+					if(_currentSelected==null){
+						_currentSelected = new DtoColumn();
+						_listColumns.addItem(_currentSelected);
+						_currentSelected.isDefault = false;
+						_currentSelected.order = _listColumns.length;
+						var dto:DtoConfiguration = assessementLayout.cboMappingModel.selectedItem as DtoConfiguration;
+					
+						if(dto != null){
+							_currentSelected.modelId = dto.recordId ;
+						}
+						
+					}
+					_currentSelected.title = txtColumnTitle.text;
+					_currentSelected.description = txtDescription.text;
+					_currentSelected.dataType= colDataType.selectedItem as String;
+					_currentSelected.isHasSumField = chkIsSum.selected;
+					//datagrid.selectedItem = _currentSelected;
+					iAseesment.saveMappingTableColumn(_currentSelected);
+					enableButton(_currentSelected,true);
+				}
+				
+				return true;
+				
+			}
+			// CH : need to refresh in Mobile Configurator
+			protected function refreshMappingGrid():void{
+				if(assessementLayout!=null){
+					assessementLayout.initMappingTableColumn();
+					assessementLayout.reloadGridSumField();
+				}
+			}
+			
+			
+			protected function onRowSelection():void{
+				_currentSelected = datagrid.selectedItem as DtoColumn;				
+				enableButton(_currentSelected,false);
+				if(_currentSelected!=null){
+					txtColumnTitle.text = _currentSelected.title;
+					txtDescription.text = _currentSelected.description;
+					colDataType.selectedItem = _currentSelected.dataType;
+					chkIsSum.selected = _currentSelected.isHasSumField;
+					enableDetail(true);
+				}else{
+					enableDetail(false);
+				}
+				
+			}
+			
+			protected function onNew():void{
+				_currentSelected = null;
+				enableDetail(true,true);
+				enableButton(null);
+				txtColumnTitle.text='';
+				txtDescription.text = '';
+				colDataType.selectedItem=DtoColumn.TEXT_TYPE;//default value
+				chkIsSum.selected = false;
+				
+			}
+			
+			protected function enableButton(colSelected:DtoColumn,setAsSelected:Boolean=true):void{
+				if(colSelected!=null){
+					btnmoveDown.enabled=_listColumns.getItemIndex(colSelected)<_listColumns.length-1;
+					btnmoveUp.enabled = _listColumns.getItemIndex(colSelected)>0;
+					btnDelet.enabled = colSelected!=null && !colSelected.isDefault;
+					if(setAsSelected){
+						datagrid.selectedItem = colSelected;
+					}
+					
+				}else{
+					btnmoveDown.enabled = false;
+					btnmoveUp.enabled = false;
+					btnDelet.enabled = false;
+				}
+			}
+			
+			protected function onCancel():void{
+				enableDetail(false);
+				enableButton(null);
+				datagrid.selectedIndex = -1;
+			}
+			
+			protected function onMoveUp():void{
+				var colSelected:DtoColumn = datagrid.selectedItem as DtoColumn;			
+				var order:int = _listColumns.getItemIndex(colSelected);
+				var colMoveDown:DtoColumn = _listColumns.getItemAt(order-1) as DtoColumn;
+				_listColumns.removeItemAt(order);
+				_listColumns.addItemAt(colSelected,order-1);	
+				var orderDown:int = colSelected.order;
+				colSelected.order=colMoveDown.order;
+				colMoveDown.order = orderDown;
+				iAseesment.saveMappingTableColumn(colSelected);
+				iAseesment.saveMappingTableColumn(colMoveDown);
+				datagrid.validateNow();
+				enableButton(colSelected);
+			}
+			
+			protected function onMoveDown():void{
+				var colSelected:DtoColumn = datagrid.selectedItem as DtoColumn;			
+				var order:int = _listColumns.getItemIndex(colSelected);
+				var moveUp:DtoColumn = _listColumns.getItemAt(order+1) as DtoColumn;
+				_listColumns.removeItemAt(order);
+				_listColumns.addItemAt(colSelected,order+1);				
+				var orderDown:int = colSelected.order;
+				colSelected.order=moveUp.order;
+				moveUp.order = orderDown;
+				iAseesment.saveMappingTableColumn(colSelected);
+				iAseesment.saveMappingTableColumn(moveUp);
+				datagrid.validateNow();
+				enableButton(colSelected);
+			}
+			public final  function onDelete():void{
+				Alert.show(iAseesment.translate("GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE@Are you sure you want to delete?"), iAseesment.translate('GLOBAL_DELETE@Delete'), Alert.YES | Alert.NO, this, alertListener, null, Alert.NO);
+				
+				function alertListener(eventObj:CloseEvent):void {
+					// Check to see if the OK button was pressed.
+					if (eventObj.detail==Alert.YES) {
+						var dtoCol:DtoColumn = datagrid.selectedItem as DtoColumn;
+						iAseesment.deleteMappingTableColumn(dtoCol);
+						//iAseesment.deleteSumField(dtoCol.recordId);
+						//assessementLayout.reloadGridSumField();
+
+						_listColumns.removeItemAt(_listColumns.getItemIndex(datagrid.selectedItem));						
+						datagrid.selectedIndex=-1;
+						reindexAfterDelete();
+						enableDetail(false,true);
+						enableButton(null);
+						txtColumnTitle.text='';
+						txtDescription.text = '';
+						chkIsSum.selected = false;
+						colDataType.selectedIndex=-1;
+					}
+				}
+			}
+			
+			private function getDisplayName(item:Object,col:AdvancedDataGridColumn =null):String{
+				var key:String = null;
+				if(col!=null){
+					key = item[col.dataField];
+				}else{
+					key = item as String;
+				}
+				return iAseesment.translate(key);
+			}
+			
+			protected function reindexAfterDelete():void{
+				var i:int = 1;
+				for each(var col:DtoColumn in _listColumns){
+					col.order = i;
+					iAseesment.saveMappingTableColumn(col);
+					i++;
+				}
+			}
+			
+			private function  enableDetail(edit:Boolean,isClearSelected:Boolean=false):void{	
+				txtColumnTitle.enabled=edit;
+				txtDescription.enabled = edit;
+				colDataType.enabled= edit;
+				btnSave.enabled=edit;
+				chkIsSum.enabled = edit;
+				if(isClearSelected){
+					datagrid.selectedIndex=-1;		
+				}
+				
+			}
+			
+			protected function closeWindow():void{
+				var parentContainer:DisplayObjectContainer = this.parent;
+				while(parentContainer!=null){
+					if(parentContainer is IWindow){
+						IWindow(parentContainer).close();
+						break;
+					}
+					parentContainer=parentContainer.parent;
+				}
+			}
+			
+			protected function init():void
+			{
+				var dto:DtoConfiguration = assessementLayout.cboMappingModel.selectedItem as DtoConfiguration;
+				_listColumns = iAseesment.getMappingTableSetting(dto.recordId);
+				datagrid.dataProvider = _listColumns;
+				enableDetail(false);
+			}
+		]]>
+	</mx:Script>
+	<mx:VBox width="100%" height="100%">
+		
+		
+		<mx:Form width="100%" height="100%" >
+			<mx:FormItem width="100%">										
+				<mx:HBox width="100%">
+					<mx:AdvancedDataGrid height="200" id="datagrid"  top="0" width="315" doubleClickEnabled="false" click="onRowSelection()" >
+						<mx:columns>
+							<mx:AdvancedDataGridColumn  dataField="title" sortable="false" headerText="{iAseesment.translate('GLOBAL_COL_Title@Column Title')}"/>
+							<mx:AdvancedDataGridColumn  dataField="description" sortable="false" headerText="{iAseesment.translate('GLOBAL_DESCRIPTION@Description')}"/>
+							<mx:AdvancedDataGridColumn dataField="dataType" labelFunction="getDisplayName" sortable="false" headerText="{iAseesment.translate('GLOBAL_DATA_TYPE@Data Type')}"/>									
+							<mx:AdvancedDataGridColumn dataField="isHasSumField" sortable="false" headerText="{iAseesment.translate('GLOBAL_HAS_SUM_FIELD@Has Sum Field')}"/>
+						</mx:columns>
+					</mx:AdvancedDataGrid>
+					<mx:VBox width="120">
+						<mx:Button  label="{iAseesment.translate('GLOBAL_ADD_NEW@Add New')}" id="btnAdd" width="120" click="onNew()" />
+						<mx:Button label="{iAseesment.translate('GLOBAL_MOVEUP@Move Up')}" id="btnmoveUp" width="120" enabled="false" click="onMoveUp()"/>
+						<mx:Button label="{iAseesment.translate('GLOBAL_MOVEDown@Move Down')}" id="btnmoveDown" width="120" enabled="false" click="onMoveDown()"/>
+						<mx:Button label="{iAseesment.translate('GLOBAL_DELETE@Delete')}" id="btnDelet" width="120" enabled="false" click="onDelete()"/>
+					</mx:VBox>
+				</mx:HBox>
+			</mx:FormItem>
+			
+			
+			<components:FieldSet width="100%" gap="6" paddingLeft="10" cornerRadius="8" legend="{iAseesment.translate('GLOBAL_DETAIL@Detail')}" skinClass="com.shinynet.shinylib.skins.FieldSetSkin">
+				
+				<mx:VBox paddingTop="15" width="100%">
+					<mx:FormItem required="true" width="100%">
+						<mx:HBox width="100%">
+							<mx:Label width="150" text="{iAseesment.translate('GLOBAL_COL_Title@Column Title')}"/>
+							<mx:TextInput  width="200" id="txtColumnTitle"/>									
+						</mx:HBox>
+					</mx:FormItem>
+					
+					<mx:FormItem width="100%">
+						<mx:HBox width="100%">
+							<mx:Label width="150" text="{iAseesment.translate('GLOBAL_DESCRIPTION@Description')}"/>
+							<mx:TextInput  width="200" id="txtDescription"/>									
+						</mx:HBox>
+					</mx:FormItem>
+					
+					<mx:FormItem required="false" width="100%">
+						<mx:HBox width="100%">
+							<mx:Label width="150" text="{iAseesment.translate('GLOBAL_DATA_TYPE@Data Type')}"/>
+							<mx:ComboBox id="colDataType" labelFunction="getDisplayName" dataProvider="{_listColDataType}"/>													
+						</mx:HBox>
+					</mx:FormItem>		
+					<mx:FormItem required="false" width="100%">
+						<mx:HBox width="100%">
+							<mx:Label width="150" text="{iAseesment.translate('GLOBAL_HAS_SUM_FIELD@Has Sum Field')}"/>
+							<mx:CheckBox id="chkIsSum"/>						
+						</mx:HBox>
+					</mx:FormItem>		
+					<mx:HBox paddingLeft="15" width="100%" paddingBottom="10" paddingRight="20" horizontalAlign="right" >								
+						<mx:Button label="{iAseesment.translate('GLOBAL_CANCEL@Cancel')}" click="onCancel()"/>
+						<mx:Button  label="{iAseesment.translate('GLOBAL_SAVE@Save')}" id="btnSave" click="saveColumn()" />
+						<mx:Button  label="{iAseesment.translate('GLOBAL_SAVE_AND_NEW@Save and New')}" id="btnSaveNew" click="saveAndNew()" />
+					</mx:HBox>
+					
+				</mx:VBox>
+			</components:FieldSet>
+		</mx:Form>
+		<mx:HBox paddingLeft="15" width="100%" paddingBottom="10" paddingRight="20" horizontalAlign="right"  >
+			<mx:Button  label="{iAseesment.translate('GLOBAL_CLOSE@Close')}" id="btnClose" click="{closeWindow();}"/>		
+		</mx:HBox>
+	</mx:VBox >
+</mx:Canvas>

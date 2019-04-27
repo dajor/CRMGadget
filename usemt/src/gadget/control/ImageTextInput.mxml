@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas width="100%" xmlns:mx="http://www.adobe.com/2006/mxml" creationComplete="init(event)">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			[Bindable] public var item:Object;
+			[Bindable] public var clickFunc:Function;
+			[Bindable] public var textchange:Function;
+			private var _text:String='';
+			
+			
+			
+			private function removeRelation():void {
+				text = '';				
+				if(item==null) return;
+				//CH : clear reference fields
+				if(data.keySrc != null) {
+					item.data[data.keySrc] = "";
+					for each(var element_name:String in data.labelSrc){
+						item.data[element_name] = "";
+					}
+				}else{
+					//Mony-clear referenc fields
+					var strTableFinder:String = Database.fieldFinderDAO.getFinderTableName(data);
+					var finder:Object = Database.finderDAO.read({'id':strTableFinder});
+					var fieldsMap:ArrayCollection = Database.finderMapDAO.read(finder);
+					for each(var fieldMap:Object in fieldsMap){
+						item.data[fieldMap.field] = "";
+					}
+				}
+			}
+			
+		
+
+			public function get text():String
+			{
+				if(embedText!=null){
+					return embedText.text;
+				}
+				return _text;
+			}
+
+			public function set text(value:String):void
+			{	
+				var ischange:Boolean = this._text!=value;
+				_text = value;
+				if(embedText!=null){
+					embedText.text = value;
+					if(ischange && textchange!=null){
+						textchange(value);
+					}
+				}
+				
+			}
+
+			
+			protected function init(event:FlexEvent):void
+			{
+				if(_text==null){
+					_text = '';	
+				}
+				embedText.text = _text;
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:HBox width="100%">
+		<mx:Canvas width="95%">			
+			<mx:TextInput id="embedText"  data="{data}" editable="false" click="clickFunc(event)"  width="100%"/>
+			<mx:Image source="@Embed('/assets/search.png')" verticalCenter="0" right="5"/>
+		</mx:Canvas>
+		<mx:LinkButton icon="@Embed('/assets/delete.png')" click="{removeRelation()}"/>
+	</mx:HBox>
+	
+</mx:Canvas>

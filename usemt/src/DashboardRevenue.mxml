@@ -1,0 +1,1083 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	width="100%" height="100%" 
+	xmlns:form="gadget.form.*" 
+	initialize="initial()"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.rtc.sharedManagers.descriptors.FileDescriptor;
+			import com.adobe.utils.DateUtil;
+			import com.as3xls.xls.ExcelFile;
+			import com.as3xls.xls.Sheet;
+			import com.hurlant.util.der.Integer;
+			
+			import flex.lang.reflect.Field;
+			
+			import gadget.control.LinkButtonColRenderer;
+			import gadget.control.LinkButtonRevenueColRenderer;
+			import gadget.control.NumberColRenderer;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.util.CurrencyUtils;
+			import gadget.util.DashboardUtils;
+			import gadget.util.DateUtils;
+			import gadget.util.ExportExcelUtils;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.NumberUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.Grouping;
+			import mx.collections.GroupingCollection2;
+			import mx.collections.GroupingField;
+			import mx.collections.SummaryField2;
+			import mx.collections.SummaryRow;
+			import mx.containers.Form;
+			import mx.containers.HBox;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.DateField;
+			import mx.controls.HTML;
+			import mx.controls.Label;
+			import mx.controls.TextInput;
+			import mx.controls.VRule;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.events.AdvancedDataGridEvent;
+			import mx.events.CloseEvent;
+			import mx.events.IndexChangedEvent;
+			import mx.events.ItemClickEvent;
+			import mx.formatters.DateFormatter;
+			import mx.managers.DragManager;
+			import mx.managers.SystemManager;
+			import mx.utils.ObjectUtil;
+			import mx.utils.StringUtil;
+			
+			import org.igniterealtime.xiff.data.whiteboard.Path;
+			[Embed(source='/assets/sync.png')] [Bindable] public static var refreshIcon:Class;
+			[Embed(source='/assets/upload_config.png')] [Bindable] public static var importIcon:Class;
+			[Embed(source='/assets/search.png')] [Bindable] public static var searchIcon:Class;
+			private static const GLOBAL_EDIT:String = 'PREFERENCES_LINKBUTTON_TOOLTIP_IMPORT_CONFIGURATION';
+			private var txtSearch:TextInput = null;
+			private var numOfPage:int = 4;
+			private var fields:ArrayCollection;
+			[Bindable] private var innerCanvasL:Array = new Array();
+			[Bindable] private var leftFormL:Array = new Array();
+			[Bindable] private var vRuleL:Array = new Array();
+			[Bindable] private var rightFormL:Array = new Array();
+			[Bindable] private var heightLeftL:Array = new Array();
+			[Bindable] private var heightRightL:Array = new Array();
+			[Bindable] public var list:List;
+			
+			private var grid1:AdvancedDataGrid = null;
+			private var grid2:AdvancedDataGrid = null;
+			public static const Account1:String = "Account1";
+			public static const Account2:String = "Account2";
+			public static const Dashboard1:String = "Dashboard1";
+			public static const Dashboard2:String = "Dashboard2";
+			private var lblLog1:Label = null;
+			private var lblLog2:Label = null;
+			public static  var sortedColumn:String;
+			private var html:HTML = null;
+			private var grid4:AdvancedDataGrid = null;
+			private var listOppAllMonth:ArrayCollection = null;
+				
+			[Bindable]private var month:ArrayCollection = new ArrayCollection([
+				//{label:"All", data:"All"},
+				{label:"January", data:"0"},
+				{label:"February", data:"1"},
+				{label:"March", data:"2"},
+				{label:"April", data:"3"},
+				{label:"May", data:"4"},
+				{label:"June", data:"5"},
+				{label:"July", data:"6"},
+				{label:"August", data:"7"},
+				{label:"September", data:"8"},
+				{label:"October", data:"9"},
+				{label:"November", data:"10"},
+				{label:"December", data:"11"}]);
+			private var tabTitle:Array =["Rev by Brand","Rev by Acct","Oppty Totals","Oppty Details"];
+			public static var colAccP2:ArrayCollection = new ArrayCollection([
+				{element_name:"BusinessArea",label:"Business Area"},{element_name:"Territory",label:"Territory"},
+				{element_name:"Catalog",label:"Catalog"},{element_name:"Description",label:"Description"},
+				{element_name:"TM",label:"TM"},
+				{element_name:"Group_",label:"Group"},{element_name:"Brand",label:"Brand"},
+				{element_name:"TMID",label:"TM ID"},{element_name:"RM",label:"RM"},
+				{element_name:"RMID",label:"RM ID"},{element_name:"Prior Day Revenue",label:"PriorDayRevenue"},
+				{element_name:"MonthRevenue",label:"Month Revenue"},{element_name:"QTDRevenue",label:"QTD Revenue"},
+				{element_name:"YTDRevenue",label:"YTD Revenue"},{element_name:"MATRevenue",label:"MAT Revenue"},
+				{element_name:"YTDGrowth",label:"YTD Growth"},{element_name:"LY MonthRevenue",label:"LY Month Revenue"},
+				{element_name:"LYQTD Revenue",label:"LY QTD Revenue"},{element_name:"LYYTDRevenue",label:"LY YTD Revenue"}
+				,{element_name:"LYMATRevenue",label:"LY MAT Revenue"}
+			]);
+			
+			public static var colDP1:ArrayCollection = new ArrayCollection([
+				{element_name:"BusinessArea",label:"Business Area"},
+				{element_name:"Territory",label:"Territory"},{element_name:"TM",label:"TM"},
+				{element_name:"Group_",label:"Group"},{element_name:"Brand",label:"Brand"},
+				{element_name:"TMID",label:"TM ID"},{element_name:"RM",label:"RM"},
+				{element_name:"RMID",label:"RM ID"},{element_name:"Prior Day Revenue",label:"PriorDayRevenue"},
+				{element_name:"MonthRevenue",label:"Month Revenue"},{element_name:"QTDRevenue",label:"QTD Revenue"},
+				{element_name:"YTDRevenue",label:"YTD Revenue"},{element_name:"MATRevenue",label:"MAT Revenue"},
+				{element_name:"YTDGrowth",label:"YTD Growth"},{element_name:"LY MonthRevenue",label:"LY Month Revenue"},
+				{element_name:"LYQTD Revenue",label:"LY QTD Revenue"},{element_name:"LYYTDRevenue",label:"LY YTD Revenue"}
+				,{element_name:"LYMATRevenue",label:"LY MAT Revenue"}
+			]);
+
+			public static var colDP2:ArrayCollection = new ArrayCollection([
+				{element_name:"Territory",label:"Territory"},
+				{element_name:"ShipToName",label:"Ship To Name"},{element_name:"ShipTo",label:"Ship To"},
+				{element_name:"ShipToPrimary",label:"Ship To Primary"},{element_name:"TM",label:"TM"},
+				{element_name:"TMID",label:"TM ID"},{element_name:"RM",label:"RM"},
+				{element_name:"RMID",label:"RM ID"},{element_name:"Prior Day Revenue",label:"PriorDayRevenue"},
+				{element_name:"MonthRevenue",label:"Month Revenue"},{element_name:"QTDRevenue",label:"QTD Revenue"},
+				{element_name:"YTDRevenue",label:"YTD Revenue"},{element_name:"MATRevenue",label:"MAT Revenue"},
+				{element_name:"YTDGrowth",label:"YTD Growth"},{element_name:"LY MonthRevenue",label:"LY Month Revenue"},
+				{element_name:"LYQTD Revenue",label:"LY QTD Revenue"},{element_name:"LYYTDRevenue",label:"LY YTD Revenue"}
+				,{element_name:"LYMATRevenue",label:"LY MAT Revenue"}
+			]);
+
+			private var colDP3:ArrayCollection = new ArrayCollection([
+				{element_name:"month",label:""},
+				{element_name:"open",label:"Closed/Won"},{element_name:"won",label:"Closed/Won"},
+				{element_name:"lost",label:"Closed/Lost"}
+			]);
+			
+		
+			private var colDP4:ArrayCollection = new ArrayCollection([
+				{element_name:"OwnerFullName",label:"Opportunity Owner"},{element_name:"SalesStage",label:"Sales Stage"},
+				{element_name:"CloseDate",label:"Close Date"},{element_name:"AccountName",label:"Account Name"},
+				{element_name:"OpportunityName",label:"Opportunity Name"},{element_name:"Description",label:"Opportunity Description"},
+				{element_name:"Revenue",label:"Revenue"}
+			]);
+
+			private var labelTitle1:Label = null;
+			private var labelTitle2:Label = null;
+			private function getListButtons():ArrayCollection {
+				var buttons:ArrayCollection = new ArrayCollection();
+				buttons.addItem({label:i18n._(GLOBAL_EDIT),  icon:importIcon});
+				return buttons;
+			}
+			
+			private function initial():void {
+				layoutImportButton.setStyle("horizontalAlign","right");;
+				initTab();
+				//initForm();
+			}
+			
+			private static function sortNumberic(obj1:Object, obj2:Object):int
+			{
+				
+				return ObjectUtil.numericCompare(parseFloat(obj1[sortedColumn]),parseFloat(obj2[sortedColumn]));
+			}
+			
+			public static function getGridTab1(isAccountPage:Boolean=false):AdvancedDataGrid{
+				var grid:AdvancedDataGrid = new AdvancedDataGrid();
+				var columns:Array = new Array();
+				if(isAccountPage){
+					var colBusiness:AdvancedDataGridColumn =createColumn("Business Area","BusinessArea");
+					//colBusiness.width = 120;
+					columns.push(colBusiness);
+				}else{
+					columns.push(createColumn("Territory","Territory"));
+				}
+				
+				//columns.push(createColumn("Group","Group_"));
+				//columns.push(createColumn("Brand","Brand"));
+				columns.push(createColumn("TM Name","TM"));
+//				columns.push(createColumn("Prior Day Revenue","PriorDayRevenue"));
+				col = createColumn("Prior Day Revenue","PriorDayRevenue",null,true);
+				columns.push(col);
+				col.setStyle("textAlign","right");
+				
+				columns.push(createColumnCurrency("Month Revenue","MonthRevenue"));
+				columns.push(createColumnCurrency("QTD Revenue","QTDRevenue"));
+				columns.push(createColumnCurrency("YTD Revenue","YTDRevenue"));
+				columns.push(createColumnCurrency("MAT Revenue","MATRevenue"));
+				
+				var col:AdvancedDataGridColumn =createColumn("YTD Growth","YTDGrowth",null,true)
+				columns.push(col);
+				var renderer:ClassFactory = new ClassFactory(PercentageColRender);
+				col.itemRenderer = renderer;
+				
+				columns.push(createColumnCurrency("LY Month Revenue","LYMonthRevenue"));
+				columns.push(createColumnCurrency("LY QTD Revenue","LYQTDRevenue"));
+				columns.push(createColumnCurrency("LY YTD Revenue","LYYTDRevenue"));
+				columns.push(createColumnCurrency("LY MAT Revenue","LYMATRevenue"));
+				
+				grid.columns = columns;
+				
+				grid.percentWidth = 100;
+				grid.percentHeight = 100;
+				return grid;
+			}
+			public static function getGridTab2(renderer:ClassFactory=null):AdvancedDataGrid{
+				var grid:AdvancedDataGrid = new AdvancedDataGrid();
+				grid.percentWidth = 100;
+				grid.addEventListener(AdvancedDataGridEvent.SORT,function (e:AdvancedDataGridEvent):void{
+					sortedColumn = e.dataField;
+				});
+				var columns:Array = new Array();
+//				columns.push(createColumn("Ship To Name","ShipToName"));
+				columns.push(createColumn("Territory","Territory"));
+				columns.push(createColumn("TM Name","TM"));
+				var col:AdvancedDataGridColumn = createColumn("Ship To Name","ShipToName");
+				col.width = 200;
+				columns.push(col);
+				
+				//columns.push(createColumn("Ship To Primary","ShipToPrimary"));
+//				var col:AdvancedDataGridColumn = createColumn("Ship To Primary","ShipToPrimary");
+				if(renderer != null){
+					
+					//renderer.properties["parentEntity"]=linkFields[col.dataField];	
+					col.itemRenderer = renderer;
+				}
+				col =createColumn("Ship To","ShipTo");
+				col.sortCompareFunction = sortNumberic;
+				columns.push(col);
+				
+				col = createColumn("Ship To Primary","ShipToPrimary");
+				col.sortCompareFunction = sortNumberic;
+				columns.push(col);
+				col = createColumn("Prior Day Revenue","PriorDayRevenue",null,true);
+				columns.push(col);
+				col.setStyle("textAlign","right");
+//				columns.push(createColumn("Prior Day Revenue","PriorDayRevenue"));
+				columns.push(createColumnCurrency("Month Revenue","MonthRevenue"));
+				
+				columns.push(createColumnCurrency("QTD Revenue","QTDRevenue"));
+				columns.push(createColumnCurrency("YTD Revenue","YTDRevenue"));
+				columns.push(createColumnCurrency("MAT Revenue","MATRevenue"));
+				
+				//columns.push(createColumn("YTD Growth","YTDGrowth"));
+				
+				col =createColumn("YTD Growth","YTDGrowth",null,true)
+				columns.push(col);
+				var rendererPercentage:ClassFactory = new ClassFactory(PercentageColRender);
+				col.itemRenderer = rendererPercentage;
+				
+				columns.push(createColumnCurrency("LY Month Revenue","LYMonthRevenue"));
+				columns.push(createColumnCurrency("LY QTD Revenue","LYQTDRevenue"));
+				columns.push(createColumnCurrency("LY YTD Revenue","LYYTDRevenue"));
+				columns.push(createColumnCurrency("LY MAT Revenue","LYMATRevenue"));
+				//columns.push(createColumn("Product Family","ProductFamily"));
+				
+				grid.columns = columns;
+				
+				grid.percentHeight = 100;
+				return grid;
+			}
+			
+			public static function getGridAccountTab2():AdvancedDataGrid{
+				var grid:AdvancedDataGrid = new AdvancedDataGrid();
+				grid.percentWidth = 100;
+				var columns:Array = new Array();
+			
+				columns.push(createColumn("Business Area","BusinessArea"));
+				//columns.push(createColumn("Group","Group_"));
+				//columns.push(createColumn("Brand","Brand"));
+				columns.push(createColumn("Catalog","Catalog"));
+				columns.push(createColumn("Description","Description"));
+				col = createColumn("Prior Day Revenue","PriorDayRevenue",null,true);
+				col.setStyle("textAlign","right");
+				columns.push(col);
+				
+				columns.push(createColumnCurrency("Month Revenue","MonthRevenue"));
+				
+				columns.push(createColumnCurrency("QTD Revenue","QTDRevenue"));
+				columns.push(createColumnCurrency("YTD Revenue","YTDRevenue"));
+				columns.push(createColumnCurrency("MAT Revenue","MATRevenue"));
+				
+				//columns.push(createColumn("YTD Growth","YTDGrowth"));
+				
+				var col:AdvancedDataGridColumn =createColumn("YTD Growth","YTDGrowth")
+				columns.push(col);
+				var rendererPercentage:ClassFactory = new ClassFactory(PercentageColRender);
+				col.itemRenderer = rendererPercentage;
+				
+				columns.push(createColumnCurrency("LY Month Revenue","LYMonthRevenue"));
+				columns.push(createColumnCurrency("LY QTD Revenue","LYQTDRevenue"));
+				columns.push(createColumnCurrency("LY YTD Revenue","LYYTDRevenue"));
+				columns.push(createColumnCurrency("LY MAT Revenue","LYMATRevenue"));
+				//columns.push(createColumn("Product Family","ProductFamily"));
+				
+				grid.columns = columns;
+				
+				grid.percentHeight = 100;
+				return grid;
+			}
+			
+			private function getGridTab4():AdvancedDataGrid{
+				var grid:AdvancedDataGrid = new AdvancedDataGrid();
+				grid.percentWidth = 100;
+				var columns:Array = new Array();
+				var renderer:ClassFactory = new ClassFactory(LinkButtonRevenueColRenderer);
+				renderer.properties = new Object();
+				renderer.properties["list"]= list;
+				
+				columns.push(createColumn("Opportunity Owner","OwnerFullName"));
+				columns.push(createColumn("Sales Stage","SalesStage"));
+				columns.push(createColumn("Close Date","CloseDate"));
+				columns.push(createColumn("Account Name","AccountName",renderer));
+				columns.push(createColumn("Opportunity Name","OpportunityName",renderer));
+				columns.push(createColumn("Opportunity Description","Description"));
+				columns.push(createColumnCurrency("Revenue","Revenue"));
+				grid.columns = columns;
+				
+				grid.percentHeight = 100;
+				return grid;
+			}
+			public static function createColumn(header:String,dataField:String,renderer:ClassFactory = null,isSortNumberic:Boolean=false):AdvancedDataGridColumn{
+				var col:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+				col.dataField = dataField;
+				col.headerText = header;
+				if(isSortNumberic){
+					col.sortCompareFunction = sortNumberic;
+				}
+				
+				if(renderer != null){
+					col.itemRenderer = renderer;
+				}
+				col.headerWordWrap = true;
+				return col;
+			}
+			public static function createColumnCurrency(header:String,dataField:String):AdvancedDataGridColumn{
+				var col:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+				col.dataField = dataField;
+				col.headerText = header;
+					col.sortCompareFunction = sortNumberic;
+				col.headerWordWrap = true;
+				var rendererPercentage:ClassFactory = new ClassFactory(NumberColRenderer);
+				col.itemRenderer = rendererPercentage;
+				return col;
+			}
+			
+			public static function drawTitle(lableTitle1:Label,dataType:String):void{
+				var listTitle:ArrayCollection = Database.revenueDao.query("Data_Type='"+dataType+"' AND month !='' limit 1");
+				
+				var objectTitle:Object = null;
+				
+				var month:String = "";
+				var importedDate:String = null;
+				var formatter:DateFormatter = new DateFormatter(); 
+				formatter.formatString = "MMM YY"; 
+				if(listTitle != null && listTitle.length>0){
+					objectTitle = listTitle[0];
+					month = objectTitle["Month"];
+					importedDate = objectTitle["AsofDate"];
+					lableTitle1.setStyle("fontSize","12");
+					lableTitle1.setStyle("fontWeight","bold");
+					lableTitle1.text = formatter.format(month) + " - " +importedDate;
+				}
+			}
+			
+			private function initTab():void {
+				//var grid3:AdvancedDataGrid = null;
+				
+				html = new HTML();
+
+				for(var p:int = 0; p < numOfPage; p++){
+					var innerCanvas:Canvas = new Canvas();
+					innerCanvas.horizontalScrollPolicy = "off";
+					innerCanvas.percentWidth = 100;
+					innerCanvas.percentHeight = 100;
+					
+					var hBox:HBox = new HBox();
+					hBox.setStyle('horizontalGap', 0);
+					hBox.percentWidth = 100;
+					hBox.percentHeight = 100;
+					
+					
+					//leftForm.setStyle('verticalGap', 2);
+					
+					//var vRule:VRule = new VRule();
+					//vRule.percentHeight = 100;
+					
+					var btnExportExcel:LinkButton = new LinkButton();
+					btnExportExcel.label = "Export Excel";
+					btnExportExcel.setStyle("icon",ImageUtils.excelIcon);
+					var xboxExcel:HBox = new HBox();
+					xboxExcel.percentWidth = 100;
+					xboxExcel.setStyle("horizontalAlign","right");
+					xboxExcel.addChild(btnExportExcel);
+					//rightForm.setStyle('verticalGap', 0);
+				
+					if(p==0){
+						grid1 = getGridTab1();
+						
+						var vbox:VBox = new VBox();
+						vbox.percentWidth = 100;
+						vbox.percentHeight = 100;
+						
+						
+						labelTitle1 = new Label();
+						
+						var hb:HBox = new HBox();
+						hb.percentWidth = 100;
+						hb.addChild(labelTitle1);
+						hb.addChild(xboxExcel);
+						vbox.addChild(hb);
+						
+						
+						vbox.addChild(grid1);
+						
+						var hboxLogCount:HBox = new HBox();
+						hboxLogCount.percentWidth = 100;
+						hboxLogCount.setStyle("horizontalAlign","right");
+						
+						lblLog1 = new Label();
+						lblLog1.setStyle("paddingRight",20);
+						hboxLogCount.addChild(lblLog1);
+						vbox.addChild(hboxLogCount);
+						hBox.addChild(vbox);
+						btnExportExcel.addEventListener(MouseEvent.CLICK,exportDashboard1);
+					}else if(p==1){
+						var renderer:ClassFactory = new ClassFactory(LinkButtonRevenueColRenderer);
+						renderer.properties = new Object();
+						renderer.properties["list"]= list;
+						grid2 = getGridTab2(renderer);
+						var vbox2:VBox = new VBox();
+						vbox2.percentWidth = 100;
+						vbox2.percentHeight = 100;
+						txtSearch = new TextInput();
+						txtSearch.width = 200;
+						txtSearch.addEventListener(Event.CHANGE,function (e:Event):void{
+							advanceSearch();
+						});
+						var btnSearch:Button = new Button();
+						btnSearch.toolTip = i18n._('GLOBAL_ADVANCE_SEARCH');
+						btnSearch.setStyle("icon",searchIcon);
+						btnSearch.addEventListener(MouseEvent.CLICK,function (e:MouseEvent):void{
+							advanceSearch();
+						});
+						var hbButtonSerach:HBox = new HBox();
+						hbButtonSerach.percentWidth = 100;
+						hbButtonSerach.setStyle("paddingLeft",10);
+						
+						
+						hbButtonSerach.addChild(txtSearch);
+						hbButtonSerach.addChild(btnSearch);
+						
+						
+						
+						hbButtonSerach.addChild(xboxExcel);
+						var hboxLogCount2:HBox = new HBox();
+						hboxLogCount2.percentWidth = 100;
+						hboxLogCount2.setStyle("horizontalAlign","right");
+						lblLog2 = new Label();
+						lblLog2.setStyle("paddingRight",20);
+						vbox2.addChild(hbButtonSerach);
+						hboxLogCount2.addChild(lblLog2);
+						labelTitle2 = new Label();
+						vbox2.addChild(labelTitle2);
+						vbox2.addChild(grid2);
+						vbox2.addChild(hboxLogCount2);
+						
+						hBox.addChild(vbox2);
+						btnExportExcel.addEventListener(MouseEvent.CLICK,exportDashboard2);
+					}else if(p==2){
+						// grid opportunity sales stage
+						//grid3 = getGridTab3();
+						//grid3.rowCount = 3;
+						//grid3.percentHeight = 100;
+						var vb:VBox = new VBox();
+						vb.percentWidth = 100;
+						vb.setStyle("horizontalAlign","center");
+						
+						vb.addChild(xboxExcel);
+						
+						var hboxHtml:HBox = new HBox();
+						hboxHtml.width = 640;
+						
+						hboxHtml.addChild(html);
+						vb.addChild(hboxHtml);
+						hBox.addChild(vb);
+						btnExportExcel.addEventListener(MouseEvent.CLICK,exportDashboard3);
+						
+					}else if(p==3){
+						// grid opportunity by owner
+						
+						
+						var vb3:VBox = new VBox();
+						vb3.percentWidth = 100;
+						grid4 = getGridTab4();
+						vb3.percentHeight = 100;
+						vb3.addChild(xboxExcel);
+						vb3.addChild(grid4);
+						hBox.addChild(vb3);
+						btnExportExcel.addEventListener(MouseEvent.CLICK,exportDashboard4);
+					}
+					
+					///hBox.addChild(vRule);
+					
+					innerCanvas.addChild(hBox);
+					
+					innerCanvas.label =tabTitle[p];
+					viewstack.addChild(innerCanvas);
+					
+					
+					
+				}
+				
+				refreshHandler();
+				
+				grid1.addEventListener(NativeDragEvent.NATIVE_DRAG_ENTER, onDropIn);
+				grid2.addEventListener(NativeDragEvent.NATIVE_DRAG_ENTER, onDropIn);
+				grid1.addEventListener(NativeDragEvent.NATIVE_DRAG_DROP, onDragDrop);
+				grid2.addEventListener(NativeDragEvent.NATIVE_DRAG_DROP, onDragDrop);
+				reload();
+			}
+			private function exportError(ms:String):void{
+				Alert.show(ms,"", Alert.YES, this);
+			}
+			private function exportDashboard1(e:Event):void{
+			
+				var listData:ArrayCollection =new ArrayCollection(Database.revenueDao.fetch({Data_Type:Dashboard1}));
+
+				ExportExcelUtils.export(listData,colDP1,exportError);
+			}
+			private function exportDashboard2(e:Event):void{
+				var listData:ArrayCollection = Database.revenueDao.query("Data_Type='Dashboard2'");
+				
+				
+				ExportExcelUtils.export(listData,colDP2,exportError,true);
+			}
+			private function exportDashboard3(e:Event):void{
+				ExportExcelUtils.export(listOppAllMonth,colDP3,exportError);
+			}
+			private function exportDashboard4(e:Event):void{
+				var listData:ArrayCollection = getListOpportunity();
+				ExportExcelUtils.export(listData,colDP4,exportError);
+			}
+			
+			private function getListOpportunity():ArrayCollection{
+				var col:ArrayCollection = new ArrayCollection([{element_name:"OwnerFullName"},{element_name:"SalesStage"},{element_name:"CloseDate"},{element_name:"AccountName"},{element_name:"OpportunityName"},{element_name:"Description"},{element_name:"Revenue"},{element_name:"OpportunityId"},{element_name:"AccountId"}]);
+				var objectTransaction:Object = Database.transactionDao.find("Opportunity");
+				var defaultFitler:Object =  Database.filterDao.getObjectFilter("Opportunity",objectTransaction.default_filter);
+				var filterQuery:String = FieldUtils.computeFilter(defaultFitler);
+				if(filterQuery != null && filterQuery != ""){
+					filterQuery = filterQuery +" AND OwnerFullName !=''"
+				}
+				var ls:ArrayCollection = Database.opportunityDao.findAll(col,filterQuery);
+				return ls;
+			}
+			private function getListOpportunitySalesStage():String{
+
+				var formatter:DateFormatter = new DateFormatter(); 
+				formatter.formatString = "YYYY-MM"; 
+
+				var objectTransaction:Object = Database.transactionDao.find("Opportunity");
+				var defaultFitler:Object =  Database.filterDao.getObjectFilter("Opportunity",objectTransaction.default_filter);
+
+				var formatterMMDD:DateFormatter = new DateFormatter(); 
+				formatterMMDD.formatString = "MMM YY"; 
+				var trHeader:String = "";
+				var trContentTable:String = "";
+				listOppAllMonth = new ArrayCollection();
+				var date:Date = new Date();
+				for(var i:int=0;i<12;i++){
+					var dMonth:Date = new Date();
+					dMonth.setMonth(date.getMonth()- i);
+					var obj:Object = getOpportunitySalesStageByMonth(formatter.format(dMonth),defaultFitler);
+					
+					var fmValue:String = formatterMMDD.format(dMonth);
+					obj["month"] = fmValue;
+					trHeader = trHeader + '<tr style="height:25px">'+'<td>'+fmValue+'</td>'+'</tr>';
+					
+					trContentTable = trContentTable + 
+						'<tr style="height:25px">'+
+							'<td width="200px">'+obj["display_open"]+'</td>'+
+							'<td width="200px">'+obj["display_won"]+'</td>'+
+							'<td width="200px">'+obj["display_lost"]+'</td>'+
+						'</tr>';
+					listOppAllMonth.addItem(obj);
+				}
+
+				var html:String = '<html>'+
+				'<head></head>'+
+				'<body>'+
+					'<table width="100%">'+
+					'<tr>'+
+					'<td width="80px"></td>'+
+					'<td>'+
+					'<table cellspacing="0" width="100%">'+
+						'<tr style="text-align: center;font-weight: bold;font-size: 12;">'+
+							'<td width="200px">Open</td>'+
+							'<td width="200px">Closed/Won</td>'+
+							'<td width="200px">Closed/Lost</td>'+
+						'</tr>'+
+					'</table>'+
+					'</td>'+
+					'</tr>'+
+					'<tr>'+
+						'<td>'+
+					'<table cellspacing="0" width="80px" style="font-size: 12;text-align: right;font-weight: bold;">'+
+						trHeader +
+					'</table>'+
+					'</td>'+
+					'<td>'+
+					'<table cellspacing="0" width="100%" style="font-size: 12;text-align: right;" border="1 solid gray" with="600px">'+
+						trContentTable +
+					'</table>'+
+					'</td>'+
+					'</tr>'+
+				'</table>'+
+				'</body>'+
+			'</html>';
+				
+				
+				
+				
+				return html;
+				
+			}
+			private function getOpportunitySalesStageByMonth(month:String,defaultFitler:Object):Object{
+					var col:ArrayCollection = new ArrayCollection([{element_name:"SalesStage"},{element_name:"Revenue"}]);
+					var date:Date = new Date();	
+					//var filter:String = "substr(CloseDate,1,7) = " + date.fullYear+ "-" + month;
+					var filter:String = "substr(CloseDate,1,7) = '" + month +"'";
+					
+					var filterQuery:String = FieldUtils.computeFilter(defaultFitler);
+					if(filterQuery != null && filterQuery !=""){
+						filter = filter + " AND " + filterQuery;
+					}
+					
+					var ls:ArrayCollection = Database.opportunityDao.findAll(col,filter);
+					var opportunity:Object = new Object();
+					var clWon:int = 0;
+					var clLost:int = 0;
+					var open:int = 0;
+					if(ls != null && ls.length>0){
+						for each(var obj:Object in ls){
+							var val:String= obj["Revenue"];
+							if("Closed/Won" == obj["SalesStage"]){
+								clWon = clWon + Number(val);
+							}else if("Closed/Lost" == obj["SalesStage"]){
+								clLost=clLost+ Number(val);
+							}else{
+								open = open + Number(val);
+							}
+						}
+					}
+					
+					opportunity["open"]=open;
+					opportunity["won"]=clWon;
+					opportunity["lost"]=clLost;
+					opportunity["display_open"]=NumberUtils.format(open);
+					opportunity["display_won"]=NumberUtils.format(clWon);
+					opportunity["display_lost"]=NumberUtils.format(clLost);
+					return opportunity;
+			}	
+			private function onDragDrop(event:NativeDragEvent):void
+			{
+				var arr:Array = event.clipboard.getData(ClipboardFormats.FILE_LIST_FORMAT) as Array;
+				uploadFile(arr);
+			}
+			private function onDropIn(event:NativeDragEvent):void 
+			{
+				if(event.clipboard.hasFormat(ClipboardFormats.FILE_LIST_FORMAT))
+				{
+					//get the array of files
+					var files:Array = event.clipboard.getData(ClipboardFormats.FILE_LIST_FORMAT) as Array;
+					
+					//make sure only one file is dragged in (i.e. this app doesn’t support dragging in multiple files)
+					if(files.length == 1)
+					{
+						var f:File = files[0];
+						if(f.extension.toLowerCase() == "xml"){
+							//accept the drag action
+							DragManager.acceptDragDrop(event.currentTarget as AdvancedDataGrid);
+						}
+						
+					}
+				}
+			}
+			private var pageIndex:int = 0;
+			
+			
+			
+			
+			private var currentSelected:int = 0;
+			public function reload():void {
+				/*viewstack.removeAllChildren();
+				initTab();
+				
+				if(viewstack.getChildren().length <= currentSelected){
+					currentSelected = 0;
+				}				
+				viewstack.selectedIndex = currentSelected;
+				*/
+				
+				var records1:ArrayCollection = new ArrayCollection(Database.revenueDao.fetch({Data_Type:Dashboard1}));
+				var myGColl:GroupingCollection2 = new GroupingCollection2();
+				var myGrp:Grouping = new Grouping();
+				myGColl.source = records1;
+				myGrp.fields = [addGroupingFiel("Territory"),addGroupingFiel("BusinessArea"),addGroupingFiel("Group_"),addGroupingFiel("Brand")];
+				myGColl.grouping = myGrp;
+				//myGColl.summaries = [adgSummaries()];
+			//	grid1.displayItemsExpanded = true;
+				grid1.dataProvider=myGColl;
+				myGColl.refresh();
+				//grid1.displayItemsExpanded = true;
+				//grid1.dataProvider = records1;
+				
+				
+				var records2:ArrayCollection = new ArrayCollection(Database.revenueDao.fetch({Data_Type:Dashboard2}));
+				
+//				grid2.dataProvider = records2;
+				loadDataGrid2(records2);
+				var count1:int = 0;
+				var count2:int = 0;
+				if(records1 != null){
+					count1 = records1.length;
+					
+				}
+				if(records2 != null){
+					count2 = records2.length;
+				}
+				lblLog1.text ="Count ("+count1 +")";
+				lblLog2.text ="Count ("+count2 +")";
+				drawTitle(labelTitle1,Dashboard1);
+				drawTitle(labelTitle2,Dashboard2);
+			}
+			
+			private function loadDataGrid2(record:ArrayCollection):void{
+				var myGColl2:GroupingCollection2 = new GroupingCollection2();
+				var myGrp2:Grouping = new Grouping();
+				myGColl2.source = record;
+				myGrp2.fields = [addGroupingFiel("Territory")];
+				myGColl2.grouping = myGrp2;
+				//myGColl.summaries = [adgSummaries()];
+				grid1.displayItemsExpanded = true;
+				
+				grid2.dataProvider=myGColl2;
+				myGColl2.refresh();
+				grid2.displayItemsExpanded = true;
+				/*
+				var root:ArrayCollection = myGColl2.getRoot() as ArrayCollection;
+				if(root != null && root.length>0){
+					var node:Object = root[0];
+					if(node != null){
+						node["GroupLabel"] = "Total";
+					}
+					
+				}
+				*/
+			}
+			public static function addGroupingFiel(fname:String):GroupingField{
+				var group:GroupingField = new GroupingField(fname);
+				group.summaries =[adgSummaries()];
+				return group;
+			}
+			private static function adgSummaries () : SummaryRow
+			{
+				var tmp:SummaryRow = new SummaryRow();
+				tmp.summaryPlacement = "group";
+				var lsSum:Array  = [adgSummaryField("PriorDayRevenue"), adgSummaryField("MonthRevenue"), adgSummaryField("QTDRevenue"), adgSummaryField("YTDRevenue"),
+					adgSummaryField("MATRevenue"), adgSummaryField("LYMonthRevenue"), adgSummaryField("LYQTDRevenue"), adgSummaryField("LYYTDRevenue"), adgSummaryField("LYMATRevenue"), adgSummaryField("YTDGrowth")];
+
+				tmp.fields = lsSum;
+				return tmp;
+			}
+			private static function adgSummaryField (fname:String) :SummaryField2
+			{
+				var tmp:SummaryField2 = new SummaryField2();
+				tmp.dataField = fname;
+				tmp.summaryOperation = "SUM";
+				return tmp;
+			}
+
+			private function upperBarHandler():void {
+				try
+				{
+					var file:File = new File();
+					file.browseForOpenMultiple("Import XML File", [new FileFilter("*.XML", "*.xml")]);
+					
+					file.addEventListener(FileListEvent.SELECT_MULTIPLE,function (event:FileListEvent):void{uploadFile(event.files)});
+					file.addEventListener(Event.CANCEL, cancelledFile);
+				} 
+				catch(error:Error) 
+				{
+					exportError(error.message);
+				}
+				
+			}
+			private function refreshHandler():void {
+				
+				
+				var htmlString:String = getListOpportunitySalesStage();
+				var file:File = Utils.writeStringFile( 'googlemap_' + DateUtils.getCurrentDateAsSerial() + '.html', htmlString );
+				if(file!=null) html.location = file.url;
+				html.validateNow();
+				html.percentWidth = 100;
+				grid4.dataProvider = getListOpportunity();
+			}
+			private function importFromOutlook():void{
+				var path:String = File.documentsDirectory.nativePath
+					
+				var dir:File = new File(path+"/attachments");
+				var ms:String = "";
+				if(dir.exists){
+					var arr:Array = dir.getDirectoryListing();
+					if(arr != null && arr.length>0){
+						uploadFile(arr);
+					}else{
+						ms = "Has no attachment in local foler";
+					}
+				}else{
+					ms = "Has no attachment in outlook";
+				}
+				if(ms != ""){
+					Alert.show(ms,"", Alert.YES, this);
+				}
+			}
+			private function uploadFile(files:Array):void{
+				Utils.showLoadingProgressWindow(function importXml():void{uploadXMLFile(files);}, "Importing Data","Importing Data");
+				
+				
+			}
+			
+			private  function uploadXMLFile(files:Array):void{
+				if(files != null && files.length>0){
+					var asOfDate:String = "";
+					try{
+						
+					for each (var file:File in files){
+						if(file.isDirectory || file.extension == null || file.extension.toLowerCase() != "xml"){
+							continue;
+						}
+						var stream:FileStream = new FileStream();			
+						stream.open(file, FileMode.READ);
+						var fileData:String = stream.readUTFBytes(stream.bytesAvailable);
+						//trace(fileData);
+						
+							var xml:XML = new XML(fileData);
+							var chl:XMLList = xml.children();
+							var data:XML = chl[1];
+							var listColumns:Array = new Array();
+							var metadata:XML = chl[0];
+							
+							
+							var _group:Boolean = false;
+							var _catalog:Boolean = false;
+							var _ShipTo:Boolean = false;
+							
+							for each(var item:XML in metadata.children()) {
+								//var type:String = Utils.checkNullValue(item.@type, "");
+								var colName:String = Utils.checkNullValue(item.@name, "");
+								colName = StringUtil.trim(colName);
+								colName = StringUtils.replaceAll(colName," ","");
+								colName = StringUtils.replaceAll(colName,"#","");
+								colName = colName.replace("(","");
+								colName = colName.replace(")","");
+								colName = colName.replace("/","");
+								if(colName == "Group"){
+									colName = colName + "_";
+									_group = true;
+								}else if(colName == "Order"){
+									colName = colName + "_";
+								}else if(colName == "ShipTo"){
+									_ShipTo = true;
+								}else if(colName == "Catalog"){
+									_catalog = true;
+								}
+								
+								listColumns.push(colName);
+								//var length:String = Utils.checkNullValue(item.@length, "");
+							}
+							//listColumns.push("ProductFamily");
+							//Database.revenueDao.dropAndRecreateTable(listColumns);
+							
+							// acc page 1 shipto + group
+							// acc page 2 catalog
+							
+							
+							var dataType:String = "";
+							if(_catalog == true){
+								// acc page 2
+								dataType = Account2;
+							}else if(_ShipTo == true && _group == true){
+								//acc page 1
+								dataType = Account1;
+							}else  if(_group){
+								// dashboard page 1
+								dataType = Dashboard1;
+							}else{
+								// dashboard page 2
+								dataType = Dashboard2;
+							}
+							
+							Database.revenueDao.delete_by("Data_Type='"+dataType +"'");
+							var df:DateFormatter = new DateFormatter();
+							df.formatString = "DD/MM/YYYY";
+							
+							// row
+							for each(var row:XML in data.children()) {
+								var i:int = 0;
+								var objRevenue:Object = new Object();
+								objRevenue["Data_Type"] = dataType;
+								
+								for each(var val:XML in row.children()) {
+									var value:String = Utils.checkNullValue(val.text(), "");
+									var col:String = listColumns[i];
+									/*
+									var df:String = "";
+									if("month"== col.toLowerCase()){
+									//add day cos value has only year and month
+									
+									if(value.indexOf("-") != -1){
+									df = "-";
+									//value = value + "-01";
+									}else if(value.indexOf("/") != -1){
+									df = "/";
+									//value = value + "/01";
+									}
+									
+									var date:Date = DateUtils.parse(value,"YYYY"+df+"MM" + df +"DD");
+									//value = DateUtils.format(date,"MM");
+									value = date.month + "";
+									}
+									*/
+									objRevenue[col] = value;
+									if("asofdate" == col.toLowerCase() && value != null && value != ""){
+										asOfDate = value;
+									}
+									i++;
+								}
+								
+								//objRevenue["ProductFamily"] = getProductFamily(objRevenue);;
+								// insert to db
+								Database.revenueDao.insert(objRevenue);
+							}
+							
+						stream.close();
+					}
+						
+						if(asOfDate != ""){
+							Database.revenueDao.updateAsOfDate(asOfDate);
+						}
+						
+						
+					}catch(e:Error){
+						//TODO
+					}
+				}
+				
+					
+				
+				reload();
+			}
+			
+			
+			private function cancelledFile(event:Event):void
+			{
+				
+			}
+			
+			private var fMax:Boolean = false;
+			private function viewRestoreMaxWindow():void {
+				if (fMax) {
+					fMax = false;
+					//restore();
+				} else { 
+					fMax = true; 
+					//maximize();
+				}
+			}
+			
+			private function tabChangeAction(e:IndexChangedEvent):void {
+				currentSelected = e.newIndex;
+			}
+			private function onComboxMonthChage(event:Event):void{
+				//var obj:Object = cboMonth.selectedItem;
+				//var month:String = obj["data"];
+				//loadDataByMonth(month);
+				/*
+				if("All" == month){
+					reload();
+				}else{
+					//Utils.showLoadingProgressWindow(function importPref():void{loadDataByMonth(month);}, "Loading Data","Loading Data");
+					loadDataByMonth(month);
+				}
+				*/
+			}
+			
+			private function loadDataByMonth(month:String):void{
+				var data:ArrayCollection = new ArrayCollection(Database.revenueDao.fetch({Month: month}));
+				grid1.dataProvider = data;
+				grid2.dataProvider = data;
+				
+			}
+			
+			protected function clearData_clickHandler():void{
+				Alert.show(i18n._('GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE'),i18n._('GLOBAL_DELETE'), Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+					if (event.detail==Alert.YES){
+						Database.revenueDao.delete_all();
+						reload();
+					}    	 
+				});	
+			}
+			
+			
+			private function advanceSearch():void{
+				var where:String = " Data_Type='" + Dashboard2 + "'";
+				var records:ArrayCollection = null;
+				if(txtSearch.text != ""){
+					where = "ShipToName Like '" + txtSearch.text +"%' AND " + where ;
+					records = Database.revenueDao.query(where);
+				}else{
+					records = Database.revenueDao.query(where);
+				}
+				if(records == null){
+					lblLog2.text ="Count (0)";
+				}else{
+					lblLog2.text ="Count ("+records.length +")";
+				}
+				//grid1.dataProvider = records;
+				loadDataGrid2(records);
+			
+				
+			}
+		]]>
+	</mx:Script>
+	
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0" backgroundColor="0xeeeeee">
+		<mx:VBox width="100%" height="100%" verticalGap="8" top="5" left="8" right="8" bottom="8">			
+			
+			
+			
+				<mx:HBox width="100%" height="32">
+					<!--<mx:HBox width="100%">
+						
+					<mx:Label fontWeight="bold" text="Filter" />
+					<mx:ComboBox dataProvider="{month}" change="onComboxMonthChage(event)" id="cboMonth"/>
+					
+					<mx:Button label="Clear Data" click="clearData_clickHandler()"/>
+						
+					</mx:HBox>
+					-->
+					<mx:HBox width="100%" horizontalAlign="right" id="layoutImportButton">
+						<mx:LinkButton toolTip="Refresh data" icon="{refreshIcon}" click="refreshHandler()"/>
+						<mx:LinkButton label="Import From Outlook" icon="{importIcon}" click="importFromOutlook()"/>
+						<mx:LinkButton paddingRight="20" label="Import" icon="{importIcon}" click="upperBarHandler()"/>
+					</mx:HBox>
+					
+				</mx:HBox>
+			
+			<mx:TabNavigator id="viewstack" width="100%" height="100%" tabHeight="24" creationPolicy="all" change="tabChangeAction(event)"/>
+			
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Canvas>

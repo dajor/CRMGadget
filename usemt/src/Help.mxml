@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="1027" height="600"
+	minWidth="1027" minHeight="600"
+	cornerRadius="3" 
+	showFlexChrome="false" transparent="true" systemChrome="none" title="{i18n._(HELP_TITLE_CRM_GADGET_TO_GO)}"
+	creationComplete="init();" xmlns:control="gadget.control.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			[Bindable] public var urlHelp:String;
+			private var fMax:Boolean = false;
+			
+			private const HELP_TITLE_CRM_GADGET_TO_GO:String = "HELP_TITLE_CRM_GADGET_TO_GO";
+			
+			private function init():void {
+				toggleSpinner(true);
+				htmlLink.addEventListener(Event.COMPLETE, function(e1:Event):void {
+					toggleSpinner(false);			
+				});
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function viewRestoreMaxWindow():void {
+				if (fMax) {
+					fMax = false;
+					restore();
+				} else { 
+					fMax = true; 
+					maximize();
+				}
+			}
+			private function toggleSpinner(play:Boolean):void {
+				iconHelp.visible = !play;
+				spinner.includeInLayout = play;
+				spinner.visible = play;
+				if (play) spinner.play();
+				else spinner.stop();
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main"  width="100%" height="100%" left="0" top="0" right="0" bottom="0">
+		<mx:Canvas styleName="titleBar" doubleClickEnabled="true" doubleClick="viewRestoreMaxWindow()" mouseDown="nativeWindow.startMove()" height="24" top="2" left="2" right="2">
+			<control:Spinner id="spinner" tickColor="#66aaff"/>
+			<mx:Image id="iconHelp" source="@Embed(source='/assets/help.png')" top="3" left="4" />
+			<mx:Label text="{i18n._(HELP_TITLE_CRM_GADGET_TO_GO)}" top="0" left="20"/>
+			<mx:Button styleName="iconMinimize" height="16" width="16" top="2" right="36" click="minimize()"/>
+			<mx:Button styleName="iconMaximize" height="16" width="16" top="2" right="20" click="viewRestoreMaxWindow()"/>
+			<mx:Button styleName="iconClose" height="16" width="16" top="2" right="4" click="close()"/>
+		</mx:Canvas>
+		<mx:VBox width="100%" height="100%" top="28" left="4" right="0" verticalGap="2">
+			<mx:HTML id="htmlLink" width="100%" height="100%" location="{urlHelp}" />
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

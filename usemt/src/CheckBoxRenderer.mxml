@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						  xmlns:s="library://ns.adobe.com/flex/spark" 
+						  xmlns:mx="library://ns.adobe.com/flex/mx" 
+						  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.DataGrid;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.controls.listClasses.ListBaseContentHolder;
+			
+
+			protected function clickHandler(event:MouseEvent):void
+			{
+				if(this.parent is ListBaseContentHolder){ //list
+					data.batchUpdate = !data.batchUpdate;  
+				}else{ //header
+					var dp:ArrayCollection = (listData.owner as DataGrid).dataProvider as ArrayCollection;
+					//for each(var dt:Object in (listData.owner as DataGrid).dataProvider){
+					for each(var dt:Object in dp){
+						dt.batchUpdate = event.target.selected;
+					}
+					// the above line is a trick to force DataGrid refresh
+					(listData.owner as DataGrid).dataProvider = dp;
+					(listData.owner as DataGrid).validateNow();
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<mx:HBox horizontalAlign="center" width="100%">
+		<s:CheckBox click="clickHandler(event)" selected="{data.batchUpdate}" />
+		<!--<s:Label text="{dataGridListData.label}" />-->
+	</mx:HBox>
+</s:MXDataGridItemRenderer>

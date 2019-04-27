@@ -1,0 +1,506 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"		   
+		   resizable="false"
+		   width="430" height="420"
+		   title="{i18n._('BLOCK_LAYOUT_CONFIG@Block Layout Config.')}"
+		   showFlexChrome="false" transparent="true" systemChrome="none" xmlns:control="gadget.control.*"
+		   creationComplete="init(event)"
+		   >
+	
+	<mx:Script>
+		<![CDATA[
+			import flexunit.utils.ArrayList;
+			
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.validators.StringValidator;
+			import mx.validators.Validator;
+
+			[Bindable]
+			private var _selectedItems:ArrayCollection;
+			[Bindable]
+			private var _availableItems:ArrayCollection;
+			private var validators:Array =new Array();
+			public var item:Object;
+			public var posSave:Function;
+			public var isCreate:Boolean = true;
+			
+			private function up_clickHandler(event:MouseEvent):void{
+				var i:int = 0;
+				var o:Object = null;
+				var arr:ArrayCollection = new ArrayCollection(listSplitterSelected.selectedItems);
+					i = listSplitterSelected.selectedIndex;
+					if(arr==null || arr.length < 1 || i<1){
+						return;
+					}
+					
+					_selectedItems.removeItemAt(i);
+					for each(o in arr){
+						_selectedItems.addItemAt(o,i-1);
+						listSplitterSelected.selectedIndex = i;
+					}
+				
+				
+			}
+			private function addAll(arr:ArrayCollection, src:ArrayCollection):void
+			{
+				for each(var o:Object in src)
+				{
+					arr.addItem(o);
+				}
+			}
+			//all hadlers 
+			protected function aList_doubleClickHandler(event:MouseEvent):void
+			{ 
+				
+					addAll(_selectedItems, new ArrayCollection(listSplitterField.selectedItems));
+					removeAvailableItems(listSplitterField.selectedItems);
+				
+				
+			}
+			protected function sList_doubleClickHandler(event:MouseEvent):void
+			{
+				
+					addAll(_availableItems, new ArrayCollection(listSplitterSelected.selectedItems));
+					removeSelectedItems(listSplitterSelected.selectedItems);
+				
+			}
+			
+			private function oneLeftBtn_clickHandler(event:MouseEvent):void
+			{
+				
+					addAll(_availableItems, new ArrayCollection(listSplitterSelected.selectedItems));
+					removeSelectedItems(listSplitterSelected.selectedItems);
+				
+				
+			}
+			
+			private function removeSelectedItems(items:Array):void
+			{
+				for each(var o:Object in items)
+				{
+					
+						_selectedItems.removeItemAt(_selectedItems.getItemIndex(o));
+					
+					
+				}
+			}
+			private function allLeftBtn_clickHandler(event:MouseEvent):void
+			{
+				
+					addAll(_availableItems, _selectedItems);
+					_selectedItems.removeAll();
+				
+				
+			}
+			private function allRightBtn_clickHandler(event:MouseEvent):void
+			{
+				
+					addAll(_selectedItems, _availableItems);
+					_availableItems.removeAll();
+				
+				
+			}
+			private function removeAvailableItems(items:Array):void
+			{
+				for each(var o:Object in items)
+				{
+					var removeIdx:int = getIndex(o,_availableItems);
+					if (removeIdx > -1){
+						_availableItems.removeItemAt(removeIdx);
+					}
+				
+					
+				}
+			}
+			
+			private function getIndex(field:Object, listField:ArrayCollection):int {
+				for(var i:int=0;i<listField.length;i++){
+					var obj:Object = listField.getItemAt(i);
+					if(field.data==obj.data){
+						return i;
+					}else{
+						if(obj.orignal_colname!=null){
+							if(obj.orignal_colname==field.orignal_colname){
+								return i;
+							}
+						}
+					}
+				}
+				
+				return -1;
+			}
+			
+			
+			private function oneRightBtn_clickHandler(event:MouseEvent):void
+			{
+				
+					addAll(_selectedItems, new ArrayCollection(listSplitterField.selectedItems));
+					removeAvailableItems(listSplitterField.selectedItems);
+				
+				
+			}
+			private function down_clickHandler(event:MouseEvent):void{
+				var i:int = 0;
+				var o:Object = null;
+				var arr:ArrayCollection =  new ArrayCollection(listSplitterSelected.selectedItems);
+					i = listSplitterSelected.selectedIndex;
+					if(arr==null || arr.length < 1 || i == _selectedItems.length - 1){
+						return;
+					}
+					
+					_selectedItems.removeItemAt(i);
+					for each(o in arr){
+						_selectedItems.addItemAt(o,i+1);
+						listSplitterSelected.selectedIndex = i;
+					}
+				
+				
+				
+			}
+			
+			
+			private function switchBtn_clickHandler(event:MouseEvent):void
+			{
+				var t:ArrayCollection =  _selectedItems;
+					_selectedItems = _availableItems;
+					_availableItems = t;
+				
+				
+			}
+			
+			
+			protected function refreshAvailableItems():void{
+				if(item!=null){
+					_availableItems =  Utils.getColumns(item.entity, false, true);
+					
+					var s:Sort = new Sort();
+					s.fields=[new SortField("label")];
+					_availableItems.sort= s;
+					_availableItems.filterFunction = function(element:*):Boolean{
+						return element.data != item.parent_field;
+					};
+					_availableItems.refresh();
+				}
+			}
+
+			protected function init(event:FlexEvent):void
+			{	var stringValidator:StringValidator = new StringValidator();
+				stringValidator.property = "text";
+				stringValidator.source = txtName;
+				validators.push(stringValidator);
+				stringValidator = new StringValidator();
+				stringValidator.property = "text";
+				stringValidator.source = cboValue;
+				validators.push(stringValidator);
+				
+				loadPickListValue();
+				refreshAvailableItems();
+				if(!isCreate){
+					item['dynamicGroup'] = getDependFields(item.gadget_id);
+					txtName.text = item.Name;
+				}			
+				
+				refreshSelectedItem(null);
+				txtName.setFocus();
+			}
+			
+			
+			protected function getDependFields(parentId:String):Object{
+				var result:Object = Database.blockDependField.getDependFields(parentId);
+				for each(var rec:Object in result){
+					var fields:String = rec.fields;
+					if(!StringUtils.isEmpty(fields)){
+						rec.fields=string2Fields(fields.split(','));
+					}else{
+						rec.fields=new ArrayCollection();
+					}
+				}
+				
+				return result;
+			}
+			
+			protected function refreshSelectedItem(selectedItems:ArrayCollection):void{
+				if(_availableItems!=null && selectedItems!=null) {
+					_selectedItems = selectedItems;
+					if (_selectedItems.length>0 && _availableItems.length>0  )
+					{
+						removeAvailableItems(_selectedItems.toArray());
+					}
+				}else{
+				   _selectedItems = new ArrayCollection();
+				}
+			}
+			
+			
+
+			protected function loadPickListValue():void
+			{
+				var pick:ArrayCollection = PicklistService.getPicklist(item.entity, item.parent_field,false);				
+					var datasource:ArrayCollection = new ArrayCollection();
+					if(pick!=null && pick.length>0){
+						var firstObj:Object = pick.getItemAt(0);
+						if(firstObj.data!=''&& firstObj.label!=''){
+							datasource.addItem({data:'',label:''});
+						}
+					}
+					
+					datasource.addAll(pick);
+					var visibleCombo:Boolean = datasource.length > 1 ? true : false;
+					cboValue.visible = visibleCombo;
+					cboValue.includeInLayout=visibleCombo;
+					txtValue.visible = !visibleCombo;
+					txtValue.includeInLayout=!visibleCombo;
+					txtValue.text = "";
+					if(visibleCombo){
+						cboValue.dataProvider = datasource;
+					}
+				
+				
+			}
+			
+			private function openMultiPicklistPopup():void{
+//				var entity:String = item.entity;
+//				var obj:Object = cboDriving.selectedItem;
+//				var multiPicklist:Object = PicklistService.getMultiSelectPicklist(entity, obj, obj.column);
+//				multiPicklist.selectedItems = listValues;
+//				var multi:CustomMultiPickListPopup = new CustomMultiPickListPopup();
+//				multi.picklist = multiPicklist;
+//				multi.onOkMultiPicklist = onOkMultiPicklist;
+//				WindowManager.openModal(multi);
+				
+			}
+			
+
+			protected function btnSave_handler(event:MouseEvent):void
+			{
+				var parentObj:Object = null;
+				var dynamicGroup:Object = item['dynamicGroup'];
+				var validatorErrorArray:Array = Validator.validateAll(validators);
+				if(validatorErrorArray==null || validatorErrorArray.length<1){
+					Database.begin();
+					try{
+						if(!isCreate){	
+							parentObj = item;
+							Database.blockLayoutDao.update({'Name':txtName.text},{'gadget_id':item.gadget_id});
+							Database.blockDependField.delete_({'parent_id':item.gadget_id});
+						}else{
+							Database.blockLayoutDao.insert({'entity':item.entity,'Name':txtName.text,'parent_field':item.parent_field});
+							parentObj = Database.blockLayoutDao.selectLastRecord();
+						}
+						if(dynamicGroup!=null){
+							for(var v:String in dynamicGroup){
+								var obj:Object = dynamicGroup[v];
+								if(obj!=null){
+									var objSave:Object = {'parent_field_value':v,'entity':item.entity,'isdefault':obj.isdefault,'parent_id':parentObj.gadget_id};
+									objSave.fields = fields2String(obj.fields);
+									Database.blockDependField.insert(objSave);
+								}
+							}	
+						}
+						Database.commit();
+					}catch(e:SQLError){
+						Database.rollback();
+					}
+					if(posSave!=null){
+						posSave(item);
+					}
+					this.close();
+				}else{
+					var errorMessageArray:Array = [];
+					for each (var err:Object in validatorErrorArray) {
+						var errField:String = ''; 
+						if (err.currentTarget) {
+							var parent:DisplayObject = err.currentTarget.source.parent; 
+							if( err.currentTarget.source is TextInput){
+								errField =i18n._('GLOBAL_NAME@Name')+ " : ";
+							}else if( err.currentTarget.source is ComboBox){
+								errField = i18n._('GLOBAL_TYPE@Type') + " : ";
+							} 
+							//							errField = FormItem(err.currentTarget.source.parent).label + " : ";
+						}
+						errorMessageArray.push(errField +Utils.getTranslatedValidation(err.message));
+					}
+				
+					Alert.show(errorMessageArray.join("\n"), i18n._('GLOBAL_INVALID_FORM'), Alert.OK, this);
+				}
+			}
+			
+			protected function fields2String(fields:ArrayCollection):String{
+				var result:String = '';
+				
+				if(fields!=null){
+					var first:Boolean = true;
+					for each(var f:Object in fields){
+						if(!first){
+							result+=',';	
+						}
+						if(!StringUtils.isEmpty(f.orignal_colname)){
+							result+=f.orignal_colname;
+						}else{
+							result+=f.data;
+						}
+						first = false;
+					}
+				}
+				
+				return result;
+			}
+			
+			protected function string2Fields(strFields:Array):ArrayCollection{
+				var result:ArrayCollection = new ArrayCollection();
+				var fields:Dictionary = new Dictionary();
+				for each(var f:Object in _availableItems){
+					fields[f.data] = f;
+					if(!StringUtils.isEmpty(f.orignal_colname)){
+						fields[f.orignal_colname] = f;
+					}
+					
+				}
+				
+				for each(var strF:String in strFields){
+					var objF:Object = fields[strF];
+					if(objF!=null){
+						result.addItem(objF);
+					}
+				}
+				
+				//@ToDO
+				return result;
+				
+			}
+
+
+			protected function cboValue_changeHandler(event:ListEvent):void
+			{
+			
+				var selectedObj:Object = cboValue.selectedItem;
+				chkDefault.selected = false;
+				if(selectedObj!=null && selectedObj.data!=''){
+					var dynamicGroup:Object = item['dynamicGroup'];
+					if(dynamicGroup==null){
+						dynamicGroup = new Object();
+						item['dynamicGroup'] = dynamicGroup;
+					}
+					if(dynamicGroup[selectedObj.data]==null){
+						dynamicGroup[selectedObj.data] = {'fields':new ArrayCollection(),'isdefault':false};
+					}else{
+						chkDefault.selected = dynamicGroup[selectedObj.data].isdefault;
+					}
+					refreshAvailableItems();
+					refreshSelectedItem(dynamicGroup[selectedObj.data].fields);
+					
+				}else{
+					_availableItems = new ArrayCollection();
+					_selectedItems = new ArrayCollection();
+				}
+				
+			}
+
+
+			protected function chkDefault_clickHandler(event:MouseEvent):void
+			{
+				var selectedObj:Object = cboValue.selectedItem;
+				if(selectedObj!=null && selectedObj.data!='' &&  chkDefault.selected){
+					var dynamicGroup:Object = item['dynamicGroup'];
+					if(dynamicGroup==null){
+						dynamicGroup = new Object();
+						item['dynamicGroup'] = dynamicGroup;
+					}
+					var current:Object = dynamicGroup[selectedObj.data];
+					if(current!=null){
+						for(var f:String in dynamicGroup){
+							var obj:Object = dynamicGroup[f];
+							obj.isdefault = false;
+						}
+						current.isdefault = true;
+					}
+				}
+				
+			}
+
+		]]>
+	</mx:Script>		
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar title="{i18n._('BLOCK_LAYOUT_CONFIG@Block Layout Config.')}" icon="@Embed(source='/assets/customize.png')" id="titlebar" y="2" x="25"/>
+		
+			<mx:VBox top="30" left="0" right="0" bottom="0" label="{i18n._('GLOBAL_CREATE_NEW@Create New')}">
+				<mx:Form>
+					
+					<mx:FormItem required="true" width="100%" paddingBottom="5">
+						<mx:HBox width="100%">
+							<mx:Label width="150" text="{i18n._('GLOBAL_NAME@Name')}"/>
+							<mx:TextInput id="txtName" width="200"/>
+						</mx:HBox>					
+					</mx:FormItem>		
+					<!--<mx:FormItem required="true" width="100%" paddingBottom="5">
+						<mx:HBox width="100%">
+							<mx:Label width="150" text="{i18n._('DRIVING_PICKLIST@Driving Picklist')}"/>
+							<mx:ComboBox width="200" id="cboDriving"  change="changePickList(event)"/>
+						</mx:HBox>					
+					</mx:FormItem>			-->	
+					<mx:FormItem required="true" width="100%" paddingBottom="5">
+						<mx:HBox width="100%">
+							<mx:Label width="150" text="{i18n._('GLOBAL_TYPE@Type')}"/>
+							<mx:ComboBox width="200" id="cboValue" change="cboValue_changeHandler(event)" />
+							<mx:HBox>
+								<mx:TextInput id="txtValue" visible = "false" width="200" includeInLayout="false" />												
+							</mx:HBox>
+						</mx:HBox>
+					</mx:FormItem>		
+					<mx:FormItem required="false" width="100%">
+						<mx:HBox width="100%">
+							<mx:Label width="150" text="{i18n._('GLOBAL_DEFAULT@Default')}"/>
+							<mx:CheckBox id="chkDefault" click="chkDefault_clickHandler(event)"/>														
+						</mx:HBox>
+					</mx:FormItem>		
+					<mx:FormItem width="100%">
+						<mx:HBox width="100%"  verticalAlign="middle">
+							<mx:VBox width="100%">
+								<mx:Label text="{i18n._('GLOBAL_AVAILABLE_FIELD@Available Fields')}"/>
+								<mx:List id="listSplitterField"  doubleClickEnabled="true" height="180" allowMultipleSelection="true" width="{(this.width-155)/2}" dataProvider="{_availableItems}"  doubleClick="aList_doubleClickHandler(event)"  />
+							</mx:VBox>
+							<mx:VBox id="boxSplitterMove" width="15">
+								<mx:LinkButton icon="@Embed('/assets/all-right.gif')" width="16" height="16" toolTip="{i18n._('MULTISELECTLIST_MOVE_ALL_ITEMS_TO_RIGHT')}" click="allRightBtn_clickHandler(event)" />  
+								<mx:LinkButton icon="@Embed('/assets/one-right.gif')" width="16" height="16" toolTip="{i18n._('MULTISELECTLIST_MOVE_SELECTED_ITEMS_TO_RIGHT')}" click="oneRightBtn_clickHandler(event)" /> 	
+								<mx:Spacer height="2" />
+								<mx:LinkButton icon="@Embed('/assets/switch-h.gif')" width="16" height="16" toolTip="{i18n._('MULTISELECTLIST_SWITCH_SELECTION_ITEMS')}" click="switchBtn_clickHandler(event)" /> 
+								<mx:Spacer height="2" /> 
+								<mx:LinkButton icon="@Embed('/assets/one-left.gif')" width="16" height="16" toolTip="{i18n._('MULTISELECTLIST_MOVE_SELECTED_ITEMS_TO_LEFT')}" click="oneLeftBtn_clickHandler(event)" />
+								<mx:LinkButton icon="@Embed('/assets/all-left.gif')" width="16" height="16" toolTip="{i18n._('MULTISELECTLIST_MOVE_ALL_ITEMS_TO_LEFT')}" click="allLeftBtn_clickHandler(event)" />
+							</mx:VBox> 
+							<mx:VBox width="100%">
+								<mx:Label text="{i18n._('GLOBAL_SELECTED_FIELD@Selected Fields')}"/>
+								<mx:List doubleClick="sList_doubleClickHandler(event)"  dataProvider="{_selectedItems}" doubleClickEnabled="true" height="180" allowMultipleSelection="true"  width="{(this.width-155)/2}" id="listSplitterSelected"/>
+							</mx:VBox>
+							<mx:VBox id="boxSplitterUpDown" width="100%">
+								<mx:LinkButton  icon="@Embed('/assets/triangle-up.gif')" width="16" height="16" toolTip="{'Up'}" click="up_clickHandler(event)" />  
+								<mx:Spacer height="2" />
+								<mx:LinkButton icon="@Embed('/assets/triangle-down.gif')" width="16" height="16" toolTip="{'Down'}" click="down_clickHandler(event)" />
+							</mx:VBox>
+						</mx:HBox>
+						<mx:HBox width="100%" horizontalAlign="right" paddingBottom="5" paddingRight="20">
+							<mx:Button name="cancel"  label="{i18n._('GLOBAL_CANCEL@Cancel')}" click="close()" />
+							<mx:Button name="save"  label="{i18n._('GLOBAL_SAVE@Save')}" click="btnSave_handler(event)" />
+						</mx:HBox>
+					</mx:FormItem>
+				</mx:Form>
+				
+			</mx:VBox>
+			
+		
+	</mx:Canvas>
+</mx:Window>

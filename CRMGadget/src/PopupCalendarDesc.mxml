@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false" height="185"
+	width="188" 
+	showFlexChrome="false" systemChrome="none" xmlns:form="gadget.form.*"
+	xmlns:s="library://ns.adobe.com/flex/spark" xmlns:local="*"
+	creationComplete="init();"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.DateUtils;
+			
+			import mx.controls.Alert;
+				[Bindable] public var isVisibleDesc:Boolean;
+				[Bindable] public var activity:Object;
+				[Bindable] public var refresh:Function;
+				[Bindable] public var mainwindow:MainWindow;
+				private function init():void{
+					if(isVisibleDesc){
+						txtDesc.visible = true;
+						txtDesc.percentWidth = 100;
+						txtDesc.height = 120;
+						txtDesc.text = activity.Description;
+						txtDueDate.visible = false;
+						txtDueDate.height = 0;
+						txtDueDate.width = 0;
+						hBoxControl.top = 30;
+						hBoxControl.right = 4;
+						lblDesc.visible = true;
+					}else{
+						var d:Date = activity.DueDate == null ? new Date() : DateUtils.guessAndParse(activity.DueDate);
+						txtDueDate.visible = true;
+						txtDueDate.height = 147;
+						txtDueDate.percentWidth = 100;
+						txtDueDate.selectedDate = d;
+						txtDesc.visible = false;
+						txtDesc.height = 0;
+						txtDesc.width = 0;
+						hBoxControl.top = 4;
+						hBoxControl.left = 4;
+						lblDesc.visible = false;
+					}
+					
+				}
+				private function commit():void{
+					if(isVisibleDesc){
+						activity.Description = txtDesc.text;
+					}else{
+						if(txtDueDate.selectedDate == null){
+							Alert.show(i18n._('Please choose date.') ,"" , Alert.OK,this);
+							return;
+						}else{
+							activity.DueDate = DateUtils.format(txtDueDate.selectedDate,DateUtils.DATABASE_DATE_FORMAT);
+						}
+					}
+					Database.getDao(Database.activityDao.entity).update(activity);
+					refresh();
+					mainwindow.enabled = true
+					close();
+				}
+				private function closePopup():void{
+					mainwindow.enabled = true;
+					close();
+				} 
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas width="100%" height="100%" horizontalScrollPolicy="off" styleName="main" left="0" top="0"  right="0" bottom="0">
+		<mx:Label text="{i18n._('GLOBAL_DESCRIPTION')}" fontWeight="bold" top="5" left="4" id="lblDesc" visible="false"/>
+		<mx:HBox width="100%" height="100%" id="hBoxControl">
+			<mx:DateChooser id="txtDueDate" yearNavigationEnabled="true" color="0x000000" visible="false"/>
+			
+			<mx:TextArea id="txtDesc" visible="false" />
+		</mx:HBox>
+		<mx:HBox width="100%" horizontalAlign="right" top="155" paddingRight="4">
+			<mx:Button label="Cancel" click="closePopup()"/>
+			<mx:Button label="Ok" click="commit()"/>
+			
+		</mx:HBox>
+	</mx:Canvas>
+</mx:Window>

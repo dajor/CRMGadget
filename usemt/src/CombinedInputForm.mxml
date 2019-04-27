@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="960" height="694"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init();"
+	creationComplete="navigator.setFocus();"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.InputFormUtils;
+			import gadget.util.Relation;
+			import gadget.util.SilentOOPS;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Form;
+			import mx.containers.FormItem;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
+			import mx.controls.TextInput;
+			import mx.controls.VRule;
+			import mx.core.IUIComponent;
+			import mx.validators.Validator;
+			
+			
+			
+			private var item:Object;
+			
+			private var inputFields:ArrayCollection = new ArrayCollection();
+			
+			private var validators:Array = [];
+			
+			private function setTitle():void {
+				titlebar.title=i18n._("GLOBAL_COMBINED_INPUT_FORM");
+				this.title = titlebar.title;
+			}
+			
+			public function init():void {
+				
+				setTitle();
+				
+				item = new Object();
+				var nbPage:int = 0;
+				var canvas:Canvas;
+				var hbox:HBox;
+				var leftForm:Form, rightForm:Form;
+				var formField:Object;
+				var pageTitles:Object = new Object();
+				for each (formField in InputFormUtils.getInputFormFields()) {
+					if (formField.title){
+						pageTitles[formField.page] = formField.title;
+					}
+					if (formField.page >= nbPage) {
+						nbPage++;
+					}
+				}
+				for (var i:int = 0; i < nbPage; i++) {
+					canvas = new Canvas();
+					canvas.label = pageTitles[i];
+					canvas.percentHeight = 100;
+					hbox = new HBox();
+					hbox.percentWidth = 100;
+					hbox.percentHeight = 100;
+					leftForm = new Form();
+					leftForm.width = 460;
+					leftForm.id = 'leftForm';
+					leftForm.setStyle("paddingTop", "0");
+					leftForm.setStyle("verticalGap", "4");
+					hbox.addChild(leftForm);
+					var vrule:VRule = new VRule();
+					vrule.percentHeight = 100;
+					hbox.addChild(vrule);
+					rightForm = new Form();
+					rightForm.width = 460;
+					rightForm.id = 'rightForm';
+					rightForm.setStyle("paddingTop", "0");
+					rightForm.setStyle("verticalGap", "4");
+					hbox.addChild(rightForm);
+					canvas.addChild(hbox);
+					navigator.addChild(canvas);
+				}
+				var inputField:DisplayObject;
+				for each (formField in InputFormUtils.getInputFormFields()) {
+					if (!formField.title) {
+						
+						var form:Form;
+						canvas = navigator.getChildAt(formField.page) as Canvas;
+						hbox = canvas.getChildAt(0) as HBox;
+						if (formField.col == 0) {
+							form = hbox.getChildAt(0) as Form;
+						} else {
+							form = hbox.getChildAt(2) as Form;
+						}
+						if (formField.header){
+							inputField = GUIUtils.getHeader(formField.header);
+							form.addChild(inputField);
+						}else if(formField.link){
+							inputField = GUIUtils.getLink(formField.link,formField.linkText,formField.linkURL);
+							form.addChild(inputField);
+						}else {
+							var fieldInfo:Object = FieldUtils.getField(formField.entity, formField.element_name);
+							var formItem:FormItem = new FormItem();
+							formItem.label = fieldInfo.display_name;
+							formItem.required = fieldInfo.required;
+							formItem.setStyle("labelWidth", 170);
+							inputField = GUIUtils.getInputField(true, {"_finderClick":finderClick, "_referenceClick":referenceClick}, formField.entity, item, fieldInfo, false);
+							validators = validators.concat(FieldUtils.getValidators(fieldInfo, inputField));
+							(inputField as IUIComponent).percentWidth = 100;
+							inputFields.addItem({'formField':formField, 'component':inputField});
+							formItem.addChild(inputField);
+							formItem.percentWidth = 100;
+							formItem.height = 22;
+							form.addChild(formItem);
+						}
+					}					
+				}
+				
+				// setup cascading picklists
+				for each (var inputFieldObj:Object in inputFields){
+					GUIUtils.setupCascadingCombo(inputFieldObj.component, inputFieldObj.formField, inputFields);
+				}
+				
+			}
+			
+			private function finderClick(event:MouseEvent):void {
+				var finder:GenericFinder = new GenericFinder();
+				finder.textInput = (event.currentTarget as TextInput);
+				finder.item = item;
+				//finder.detail = this;
+				finder.dataQuery = event.target.document.data;
+				WindowManager.openModal(finder);
+			}
+			
+			private function referenceClick(event:MouseEvent):void {
+				var itemFinder:ItemFinder = new ItemFinder();
+				itemFinder.relation = (event.currentTarget as TextInput).data;
+//unused now	itemFinder.textInput = (event.currentTarget as TextInput);
+				//CRO 12.01.2011
+				SilentOOPS(i18n._("GLOBAL_WE_NEED_A_RELOAD_IN_COMBINEDINPUTFORM"));
+//WE NEED THIS:	itemFinder.reload = reload;
+				itemFinder.item = item;
+				WindowManager.openModal(itemFinder);
+			}
+
+			private function commit():void {
+				var validatorErrorArray:Array = Validator.validateAll(validators);
+				var entities:Object = new Object();
+				var formField:Object;
+				for each (formField in InputFormUtils.getInputFormFields()) {
+					if(formField.entity) {
+						entities[formField.entity] = formField.entity;	
+					}
+				}
+				var validatorMap:Dictionary = Database.validationDao.selectByEntityAsMap(formField.entity);
+				for each(var entityKey:String in entities){
+					var fieldsByEntityKey:ArrayCollection = new ArrayCollection();
+					for each(var displayObject:Object in inputFields){
+						formField = displayObject.formField;
+						var entity_name:String = formField.entity; 
+						var column_name:String = formField.element_name;
+						var component:DisplayObject = displayObject.component;
+						var fieldInfo:Object = FieldUtils.getField(entityKey,column_name);
+						if(entity_name == entityKey){
+							var value:String = GUIUtils.getInputFieldValue(component,fieldInfo);
+							FieldUtils.readValidationRule(validatorErrorArray, {'component': component, 'column_name':column_name}, entity_name,validatorMap);
+							fieldsByEntityKey.addItem( {'fieldName':column_name,'fieldValue':value} );
+						}
+					}
+					entities[entityKey] = {'entityName':entityKey, 'fields':fieldsByEntityKey};
+				}
+				
+				if (validatorErrorArray.length != 0) {
+					var errorMessageArray:Array = [];
+					for each (var err:Object in validatorErrorArray) {
+						var errField:String = ''; 
+						if (err.currentTarget) {
+							errField = FormItem(err.currentTarget.source.parent).label + " : ";
+						}
+						errorMessageArray.push(errField +Utils.getTranslatedValidation(err.message));
+					}
+					Alert.show(errorMessageArray.join("\n"), i18n._("GLOBAL_INVALID_FORM"), Alert.OK, this);
+					return;
+				}
+				// First step : create the entities
+				var items:Object = new Object();
+				for each(var entity:Object in entities){
+					var item:Object = new Object();
+					for each(var field:Object in entity.fields){
+						item[field.fieldName] = field.fieldValue;
+					}
+					item["OwnerId"] = Database.userDao.read().id;
+					Database.getDao(entity.entityName).insert(item);
+					item = Database.getDao(entity.entityName).selectLastRecord()[0];
+					item[DAOUtils.getOracleId(entity.entityName)] = "#" + item.gadget_id;
+					Database.getDao(entity.entityName).update(item);
+					items[entity.entityName] = item;
+				}
+				// Second step : update the items to setup the relations
+				for each(var srcEntity:Object in entities){
+					var srcItem:Object = items[srcEntity.entityName];
+					for each(var destEntity:Object in entities){
+						if (srcEntity.entityName != destEntity.entityName) {
+							var destItem:Object = items[destEntity.entityName];
+							var relation:Object = Relation.getRelation(srcEntity.entityName, destEntity.entityName);
+							if (relation != null) {
+								srcItem[relation.keySrc] = destItem[relation.keyDest];
+								for(var i:int=0; i<relation.labelDest.length; i++){
+									srcItem[relation.labelSrc[i]] = destItem[relation.labelDest[i]];
+								}
+							}
+						}
+					}
+					Database.getDao(srcEntity.entityName).update(srcItem);
+				}
+				close();
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="960" height="694" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/edit.png')" id="titlebar" y="2" x="25"/>
+		<mx:VBox top="36" left="8" right="8" bottom="8">
+			<mx:TabNavigator id="navigator" width="100%" height="100%" horizontalScrollPolicy="off" tabHeight="24"/>
+			<mx:Canvas width="100%">
+				<mx:HBox width="100%" horizontalAlign="right">
+					<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="this.close()" right="0" icon="{ImageUtils.cancelIcon}"/>
+					<mx:Button id="createBtn" label="{i18n._('GLOBAL_CREATE')}" click="commit()" right="0" icon="{ImageUtils.acceptIcon}"/>
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:ilog="http://www.ilog.com/2007/ilog/flex" xmlns:local="*"
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="100%" height="100%" creationComplete="init();" xmlns:control="gadget.control.*" 
+		 >
+	<fx:Script>
+		<![CDATA[
+			import flash.globalization.DateTimeStyle;
+			
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.lists.ListDetail;
+			import gadget.util.ActivityDataUtils;
+			import gadget.util.CalendarUtils;
+			import gadget.util.DateUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.MenuUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import ilog.calendar.CalendarEvent;
+			import ilog.calendar.CalendarItem;
+			import ilog.calendar.CalendarItemEditKind;
+			import ilog.utils.CLDRDateFormatter;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.UITextField;
+			import mx.effects.Fade;
+			import mx.events.ItemClickEvent;
+			import mx.formatters.DateFormatter;
+			import mx.resources.IResourceBundle;
+			import mx.resources.Locale;
+			import mx.utils.StringUtil;
+			
+			public var refreshFunction:Function;
+			
+			private var selectBy:int = CalendarUtils.SELECTED_WEEK;
+			
+			public var selectedItem:Object;
+			
+			[Embed(source='/assets/calendar/calendar_view_day.png')] [Bindable] private static var iconDay:Class;
+			[Embed(source='/assets/calendar/calendar_view_week.png')] [Bindable] private static var iconWeek:Class;
+			[Embed(source='/assets/calendar/calendar_view_work_week.png')] [Bindable] private static var iconWorkWeek:Class;
+			[Embed(source='/assets/calendar/calendar_view_month.png')] [Bindable] private static var iconMonth:Class;
+			//			[Bindable]
+			//			[Embed(source="assets/call.png")]
+			//			public var activityCallIcon:Class;
+			
+			/* these variables must be declared as public */
+			[Bindable] public var activityIcon:Class = Database.customLayoutDao.getIcon('Activity');
+			[Bindable] public var activityAppointmentIcon:Class = Database.customLayoutDao.getIcon('Activity',1);
+			[Bindable] public var activityCallIcon:Class = Database.customLayoutDao.getIcon('Activity',2);
+			
+			//			@Embed('assets/edit.png');
+			//			[Bindable] public var editIcon:Class 
+			//				@Embed('assets/delete.png');
+			[Bindable] public var editIcon:Class = ImageUtils.editIcon;
+			[Bindable] public var deleteIcon:Class = ImageUtils.deleteIcon; 
+			[Bindable] public var copyIcon:Class = ImageUtils.copyIcon;
+			[Bindable] public var languageCode:String;
+			public function init(isLoadData:Boolean=false):void {
+				var currentUser:Object = Database.allUsersDao.ownerUser()
+				languageCode = currentUser.LanguageCode==null?"":currentUser.LanguageCode;			
+				resourceManager.localeChain =['en_US'];
+				if(languageCode=='JPN'){
+					resourceManager.localeChain =['ja_JP'];
+				}else if(languageCode=='FRA'){
+					resourceManager.localeChain =['fr_FR'];
+				}else if(languageCode=='DEU'){
+					resourceManager.localeChain =['de_DE'];
+					
+				}else if(languageCode=='PTG'){
+					resourceManager.localeChain =['pt_BR'];
+				}else if(languageCode=='ESN'){
+					resourceManager.localeChain =['es_ES'];
+				}else if(languageCode=='NLD'){
+					resourceManager.localeChain =['nl_NL'];
+				}else if(languageCode=='SVE'){
+					resourceManager.localeChain =['sv_SE'];
+				}else if("CHS" == languageCode){
+					resourceManager.localeChain = ['zh_CN'];
+					var resourceBundle:IResourceBundle = resourceManager.getResourceBundle("zh_CN","ilogcalendar");
+					//bug#7528
+					resourceBundle.content["header.month.mode.short.format"]= "EEE"
+					resourceBundle.content["header.month.mode.long.format"]="EEE";
+					resourceBundle.content["header.week.mode.long.format"]="EEE, MMMM DD";
+					resourceBundle.content["header.week.mode.regular.format"]="EEE, MM DD";
+					resourceBundle.content["range.format.sameday.date1"]="EEE, MMMM D";
+					resourceBundle.content["range.format.sameday.time.date1"]="EEE, MMMM D, L:NN A";
+				}
+						
+				cal.rowHeaderLabelFunction = rowHeaderLabelFunction;
+				
+				/*
+				// add key to locale in flex complier berfore use key codes
+				resourceManager.localeChain =['ja_JP'];
+				resourceManager.localeChain =['fr_FR'];
+				resourceManager.localeChain =['de_DE'];
+				resourceManager.localeChain =['pt_BR'];
+				resourceManager.localeChain =['es_ES'];
+				resourceManager.localeChain =['ar_EG'];
+				resourceManager.localeChain =['nl_NL'];
+				resourceManager.localeChain =['ko_KR'];
+				resourceManager.localeChain =['zh_CN'];
+				resourceManager.localeChain =['pl_PL'];
+				resourceManager.localeChain =['ru_RU'];
+				resourceManager.localeChain =['tr_TR'];
+				resourceManager.localeChain =['cs_CZ'];
+				*/	
+				cal.addEventListener(CalendarEvent.ITEM_CLICK, showDetail);
+				cal.addEventListener(CalendarEvent.ITEM_DOUBLE_CLICK, openDetailCalendar);
+				cal.addEventListener(CalendarEvent.ITEM_EDIT_END, updateActivity);
+				cal.addEventListener(CalendarEvent.ITEM_ROLL_OVER, isResizable);
+				cal.addEventListener(KeyboardEvent.KEY_DOWN, keyboardDeleteHandler);
+				MenuUtils.getContextMenuIBMCalendar(cal, addActivity, openDetail, deleteItem);
+				if(isLoadData){
+					loadData();
+				}
+			}
+			
+			public function keyboardDeleteHandler(event:KeyboardEvent):void {
+				switch (event.keyCode) {
+					case Keyboard.DELETE:
+						deleteItem(selectedItem);
+						break;		
+					case Keyboard.D:
+						deleteItem(selectedItem);
+						break;
+				}
+			}
+			
+			private function isResizable(e:CalendarEvent):void {
+				var data:Object = e.item.data;
+				
+				var canResize:Boolean = data.Activity == 'Appointment' ? true : false;
+				if (cal.resizeEnabled != canResize) {
+					cal.resizeEnabled = canResize;
+				}
+			} 
+			
+			private function updateActivity(e:CalendarEvent):void {
+				var data:Object = e.item.data;
+				data = Database.activityDao.findByGadgetId(data.gadget_id);
+				if(data.Activity == 'Task'){
+					data.DueDate = DateUtils.format(e.startDate, DateUtils.DATABASE_DATE_FORMAT);
+				}else{
+					//					data.StartTime = DateUtils.format(e.startDate, DateUtils.DATABASE_DATETIME_FORMAT);
+					//					data.EndTime = DateUtils.format(e.endDate, DateUtils.DATABASE_DATETIME_FORMAT);
+					var startDate:Date = new Date( e.startDate.getTime()-DateUtils.getCurrentTimeZone(e.startDate)*GUIUtils.millisecondsPerHour );
+					var endDate:Date = new Date( e.endDate.getTime()-DateUtils.getCurrentTimeZone(e.endDate)*GUIUtils.millisecondsPerHour );
+					data.StartTime = DateUtils.format(startDate, DateUtils.DATABASE_DATETIME_FORMAT);
+					data.EndTime = DateUtils.format(endDate, DateUtils.DATABASE_DATETIME_FORMAT);
+					
+					;
+					
+				}
+				data.local_update = new Date().getTime();
+				data.modified = i18n._("UPD");
+				Database.activityDao.update(data);	
+				refreshFunction(data);
+				
+			}
+			
+			private function addActivity(dateSelection:Date, timeRangeSelection:Array, subtype:int = 0):void {
+				var item:Object = ActivityDataUtils.getActivityData(subtype);
+				var screenCreate:Detail = new Detail();
+				screenCreate.calendarIlog = this;
+				setTime(item, dateSelection, timeRangeSelection, subtype);
+				screenCreate.item = item;
+				screenCreate.entity = "Activity";
+				screenCreate.subtype = subtype;
+				screenCreate.mainWindow = parentApplication as MainWindow;
+				screenCreate.refreshFunction = refreshFunction;
+				screenCreate.create = true;
+				WindowManager.openModal(screenCreate);
+			}
+			
+			private function setTime(item:Object, dateSelection:Date, timeRangeSelection:Array, subtype:int):void{
+				if(subtype == 0){
+					item["DueDate"] = dateSelection;
+				}else{
+					if(timeRangeSelection != null){
+//						item["StartTime"] = timeRangeSelection[0];
+//						item["EndTime"] = timeRangeSelection[1];
+						// VM convert to timezone 0, whend init field it convert to current timezone back
+						item["StartTime"] = new Date(timeRangeSelection[0].getTime()-DateUtils.getCurrentTimeZone(timeRangeSelection[0])*GUIUtils.millisecondsPerHour);
+						item["EndTime"]=new Date(timeRangeSelection[1].getTime()-DateUtils.getCurrentTimeZone(timeRangeSelection[1])*GUIUtils.millisecondsPerHour);
+					}else{
+						item["StartTime"] = dateSelection;
+						item["EndTime"] = dateSelection;
+					}
+				}
+			}			
+			
+			private function showDetail(event:CalendarEvent):void{
+				var item:Object = event.item.data;	
+				var listDetail:ListDetail = (parentDocument as List).detail;
+				selectedItem = Database.activityDao.findByGadgetId(item.gadget_id) ;
+				listDetail.item = selectedItem;
+				listDetail.loadData();
+				listDetail.validateNow();
+			}
+			
+			private function openDetailCalendar(event:CalendarEvent):void {
+				var data:Object = event.item.data;
+				showDetail(event);
+				openDetail(data);
+			}
+			
+			private function openDetail(data:Object,isCopy:Boolean = false):void {
+				(parentApplication as MainWindow).getSelectedList().editScreenDetail(data,null,null,true,isCopy);
+				if(data == null) return;
+				Utils.addRecentlyViewed(data);
+			} 
+			
+			private function deleteItem(data:Object):void {
+				//				if(data == null) return;
+				(parentApplication as MainWindow).getSelectedList().deleteItem(data);
+				
+			} 
+			
+			private function dayClick():void{
+				cal.mode = "day"; bar.visible = true; selectBy = CalendarUtils.SELECTED_DAY; loadData();
+			}
+			private function workWeekClick():void{
+				cal.mode = "workweek"; bar.visible = true; selectBy = CalendarUtils.SELECTED_5DAYS; loadData();
+			}
+			private function weekClick():void{
+				cal.mode = "week"; bar.visible = true; selectBy = CalendarUtils.SELECTED_WEEK; loadData();
+				
+			}
+			private function monthClick():void{
+				cal.mode = "month"; bar.visible = false; selectBy = CalendarUtils.SELECTED_MONTH; loadData();
+			}
+			private function rowHeaderLabelFunction(date:Date, mode:String):String {
+				if (mode == Calendar.MONTH_MODE) {
+					return cal.calendar.getWeek(date).toString();
+				} else {
+					
+					var df:CLDRDateFormatter = new CLDRDateFormatter();
+					if(languageCode=='DEU'){
+						// k 1 -> 24
+						// h 1 -> 12
+						// a AM/PM
+						// H 0 -> 23
+						df.formatString = "k"
+						
+					}else {
+						if (Database.preferencesDao.isLongTimeFormate()) {
+							df.formatString = "k"
+						} else {
+							df.formatString = "h:a"
+						}
+					}
+					
+					
+					return df.format(date);
+				} 
+			}
+			
+			
+			public function loadData():void {
+				if (cal == null) return;
+				var data:Array = new Array();
+				var current:Date = CalendarUtils.getSelectedDate(dateChooser);
+				cal.date = current;
+				
+				//	columnHeaderLabelFunction(current,cal.mode);
+				var obj:Object;
+				for each(var activity:Object in CalendarUtils.getActivities(dateChooser,selectBy)){	
+					//Change Request #7700
+					var primaryContact:String = StringUtils.isEmpty(activity.PrimaryContact) ?  "\n" : "\n" +activity.PrimaryContact; 
+					var accountData:Array = ["","","",""];
+					//if(cal.mode=="day"){
+						if(!StringUtils.isEmpty(activity.AccountId)){
+							var columns:ArrayCollection = new ArrayCollection([
+								{element_name:"AccountName"},
+								{element_name:"IndexedShortText1"}, {element_name:"PrimaryBillToStreetAddress"},
+								{element_name:"PrimaryBillToCity"}
+							]);
+							var resultAcc:ArrayCollection =	Database.accountDao.findAll(columns,"AccountId='"+activity.AccountId+"'");
+							var account:Object = null;
+							if(resultAcc!=null && resultAcc.length>0){
+								account = resultAcc[0];
+							}
+							if(account!=null){
+								accountData[0]  = StringUtils.isEmpty(account.AccountName)?"":"\n"+account.AccountName;
+								accountData[1]  = StringUtils.isEmpty(account.IndexedShortText1)?"":"\n"+account.IndexedShortText1;
+								accountData[2]  = StringUtils.isEmpty(account.PrimaryBillToStreetAddress)?"":"\n"+account.PrimaryBillToStreetAddress;
+								accountData[3]  = StringUtils.isEmpty(account.PrimaryBillToCity)?"":"\n"+account.PrimaryBillToCity;
+							}
+						}
+						
+					//}
+					var startDate:Date = null;
+					var endDate:Date = null;
+					var startTime:Date = null;
+					var endTime:Date = null;
+					if( activity.Activity == 'Appointment'){
+						startTime = getActualDate(DateUtils.guessAndParse(activity.StartTime));
+						endTime = getActualDate(DateUtils.guessAndParse(activity.EndTime));
+						obj ={
+							summary:activity.Subject,
+								tooltip:activity.Subject  + accountData[0]  + accountData[1] + accountData[2]+ accountData[3] + primaryContact,
+								entity: activity.CallType == 'Account Call' ? 'Call' : 'Appointment',
+								color: activity.CallType == 'Account Call' ? CalendarUtils.ACTIVITY_CALL_COLOR : CalendarUtils.ACTIVITY_APPOINTMENT_COLOR,
+								data: activity,
+								startTime: startTime,
+								endTime: endTime
+						};
+						if(activity.GUID){
+							obj.color = CalendarUtils.ACTIVITY_GOOGLE_COLOR;
+							obj.entity = "GActivity";
+						} 
+						data.push(obj);
+					}else{
+						startDate = DateUtils.guessAndParse(activity.DueDate);
+						//						startTime = getActualDate(new Date(startDate.fullYear, startDate.month, startDate.date, 8));
+						//						endTime =getActualDate( new Date(startDate.fullYear, startDate.month, startDate.date, 17));
+						startTime = new Date(startDate.fullYear, startDate.month, startDate.date, 0);
+						endTime = new Date(startDate.fullYear, startDate.month, startDate.date, 24,0,0,0);
+						//endTime.setHours(24);
+						obj ={
+							summary:activity.Subject ,
+								tooltip:activity.Subject + accountData[0] + accountData[1]  + accountData[2] +accountData[3]+ primaryContact,
+								entity: 'Task',
+								color: CalendarUtils.ACTIVITY_TASK_COLOR,
+								data: activity,
+								startTime: startTime,
+								endTime: endTime
+						};
+						if(activity.GUID){
+							obj.color = CalendarUtils.ACTIVITY_GOOGLE_COLOR;
+							obj.entity = "GActivity";
+						} 
+						data.push(obj);
+					}
+				}
+				
+				changeStartDayOfWeek();
+				cal.dataProvider = data;
+				CalendarUtils.setSpecialDays(dateChooser);
+			}
+			public function changeStartDayOfWeek():void{
+				var start:int = Database.preferencesDao.getBeginOfWeek();
+				cal.firstDayOfWeek = start;
+				dateChooser.firstDayOfWeek = start;
+			}
+			private function getActualDate(date:Date):Date{
+				if(date==null) return null;
+				
+				return new Date(date.getTime()+DateUtils.getCurrentTimeZone(date)*GUIUtils.millisecondsPerHour);
+				
+			}
+			
+			/**
+			 * This function is called by the calendar to give a color to the 
+			 * item renderers.       
+			 */  
+			private function itemColorFunction(calItem:CalendarItem):Object {
+				switch(calItem.data.entity) {
+					case 'Appointment': return CalendarUtils.ACTIVITY_APPOINTMENT_COLOR;
+					case 'Call': return CalendarUtils.ACTIVITY_CALL_COLOR;
+					case 'Task': return CalendarUtils.ACTIVITY_TASK_COLOR;
+					case 'GActivity': return CalendarUtils.ACTIVITY_GOOGLE_COLOR;
+					default: return null;
+				}
+			}
+			
+			private function timeRangeFunction(startDate:Date,endDate:Date):String{
+				var footerTitle:String = cal.getTimeRangeLabel(null,startDate,endDate);
+				if(Database.preferencesDao.isLongTimeFormate()){
+					var dateFormatter:DateFormatter = new DateFormatter();
+					dateFormatter.formatString = "JJ:NN";
+					var display:String = StringUtil.substitute(" {0} to {1}",                         
+						dateFormatter.format(startDate),
+						dateFormatter.format(endDate));
+					if(footerTitle.lastIndexOf(",") != -1){
+						var time:String = footerTitle.substring(footerTitle.lastIndexOf(",")+1);
+						if(footerTitle.indexOf('to') != -1){
+							footerTitle = footerTitle.replace(time,display);
+						}
+					}
+				}
+				
+				
+				return footerTitle;
+			}
+			private function toolTipShownHandler(item:CalendarItem):String{
+				var tooltip:String ="";
+				if(item != null){
+					if(item.data != null){
+						tooltip = item.data.tooltip;
+					}else{
+						tooltip = item.summary;
+					}
+					var listMonth:Array = dateChooser.monthNames;
+					var footerTitle:String = "";
+					var object:Object = item.data;
+					if(object != null){
+						if(object.entity != 'Task'){
+							var startDate:Date = object.startTime as Date;
+							var endDate:Date =object.endTime as Date;
+							footerTitle = timeRangeFunction(startDate,endDate);
+						}else{
+							footerTitle = cal.getTimeRangeLabel(object);
+						}
+					}
+					tooltip = tooltip + " \n " + footerTitle;
+				}
+				return tooltip
+			}
+		    private function createCall(e:MouseEvent):void{
+				var selectedDate:Date =  (e.currentTarget as Calendar).getTime(e.stageX,e.stageY,true);
+				var rang:Array = (e.currentTarget as Calendar).timeRangeSelection;
+				var isEnable:Boolean = Database.preferencesDao.isEnableDoubleClickNewCall()&& Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_BUTTON_ACTIVITY_CREATE_CALL);
+				if(StringUtils.endsWith(e.target.toString(),("sheetEventManager")) && isEnable && !(e.target is UITextField) && selectedDate != null && rang != null && rang.length > 0){
+					addActivity(selectedDate,rang,2);
+				}
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Style source="calendar.css"/>
+	<s:Group>		
+		<s:Rect width="100%" height="100%">
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:entries>
+						<s:GradientEntry color="0x000000"/>
+						<s:GradientEntry color="0x323232"/>
+					</s:entries>
+				</s:LinearGradient>
+			</s:fill>
+		</s:Rect>  
+	</s:Group>
+	<s:HGroup width="100%" height="100%" gap="2">
+		<s:VGroup width="200" height="80" gap="2">
+			<s:VGroup height="100%" width="100%" verticalAlign="bottom" horizontalAlign="center">
+				<mx:DateChooser id="dateChooser"
+								scroll="CalendarUtils.setSpecialDays(dateChooser)" 
+								change="loadData()"
+								selectionIndicatorSkin="mx.skins.halo.DateChooserIndicator"
+								selectionColor = "0xFF8040"
+								allowDisjointSelection="true" 
+								allowMultipleSelection="true" 
+								firstDayOfWeek="{Database.preferencesDao.getBeginOfWeek()}"/>
+				<mx:HBox width="100%" horizontalAlign="center">		
+					<!-- VM bug: #72-->
+					<mx:Button width="36" toolTip="{i18n._('CALENDARILOG_TOGGLEBUTTONBAR_DAY')}" icon="{iconDay}" click="dayClick()" />
+					<mx:Button width="36" toolTip="{i18n._('CALENDARILOG_TOGGLEBUTTONBAR_WORK_WEEK')}" icon="{iconWorkWeek}"  click="workWeekClick()" />
+					<mx:Button width="36" toolTip="{i18n._('CALENDARILOG_TOGGLEBUTTONBAR_WEEK')}" icon="{iconWeek}" click="weekClick()" />
+					<mx:Button width="36" toolTip="{i18n._('CALENDARILOG_TOGGLEBUTTONBAR_MONTH')}" icon="{iconMonth}" click="monthClick()" />
+				</mx:HBox>
+			</s:VGroup>
+		</s:VGroup>
+		<s:Group width="100%" height="100%">
+			<s:VGroup width="100%" height="100%">
+				<s:Group width="100%" height="100%">
+					<ilog:Calendar doubleClickEnabled="true" doubleClick="createCall(event)" timeRangeTipFunction="{timeRangeFunction}" startDisplayedTime="[8,0]" endDisplayedTime="[16,0]" dataTipFunction="{toolTipShownHandler}" itemColorFunction="{itemColorFunction}" width="100%" showItemIndicators="true" height="100%" id="cal" mode="workweek" firstDayOfWeek="{Database.preferencesDao.getBeginOfWeek()}">
+						<ilog:itemVerticalRenderer>
+							<fx:Component>
+								<!--<ilog:CalendarItemVerticalRenderer borderSkin="GradientVerticalBorderRenderer"/>-->
+								<control:CustomVerticalRenderer borderSkin="GradientVerticalBorderRenderer"/>
+							</fx:Component>
+						</ilog:itemVerticalRenderer>
+					</ilog:Calendar>
+					<mx:ButtonBar iconField="icon" top="2" left="2" color="0xEEEEEE"
+								  id="bar" direction="vertical"
+								  showEffect="{new Fade(bar)}"
+								  buttonWidth="38"
+								  itemClick="{bar.selectedIndex==0?cal.zoom(2):cal.zoom(.5)}">
+						<fx:Object icon="@Embed(source='/assets/calendar/zoomin.png')"/>
+						<fx:Object icon="@Embed(source='/assets/calendar/zoomout.png')"/>
+					</mx:ButtonBar>
+				</s:Group>
+			</s:VGroup>
+		</s:Group>
+	</s:HGroup>
+</mx:HBox>

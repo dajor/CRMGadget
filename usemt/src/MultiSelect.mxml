@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+			
+			[Bindable]  
+			public var _availableItems:ArrayCollection;
+			[Bindable]  
+			public var labelField:String = "";
+			[Bindable] 
+			public var _selectedItems:ArrayCollection;
+			
+			
+			private function allRightBtn_clickHandler(event:MouseEvent):void
+			{
+				addAll(_selectedItems, _availableItems);
+				//	sortSelectedItems();
+				_availableItems.removeAll();
+				
+			}
+			
+			private function oneRightBtn_clickHandler(event:MouseEvent):void
+			{
+				addAll(_selectedItems, new ArrayCollection(listAvailable.selectedItems)); 
+				//	sortSelectedItems();
+				removeAvailableItems(listAvailable.selectedItems);
+				
+			}
+			
+			
+			
+			private function oneLeftBtn_clickHandler(event:MouseEvent):void
+			{
+				addAll(_availableItems, new ArrayCollection(listSelected.selectedItems)); 
+				//	sortAvailableItems();
+				removeSelectedItems(listSelected.selectedItems);
+				
+			}
+			private function allLeftBtn_clickHandler(event:MouseEvent):void
+			{
+				addAll(_availableItems, _selectedItems); 
+				//	sortAvailableItems();
+				_selectedItems.removeAll();
+				
+			}
+			
+			
+			private function switchBtn_clickHandler(event:MouseEvent):void
+			{
+				var t:ArrayCollection = new ArrayCollection();
+				t = _selectedItems;
+				_selectedItems = _availableItems;
+				_availableItems = t; 
+				
+			}
+			//all hadlers 
+			protected function aList_doubleClickHandler(event:MouseEvent):void
+			{ 
+				addAll(_selectedItems, new ArrayCollection(listAvailable.selectedItems)); 
+				//sortSelectedItems();
+				removeAvailableItems(listAvailable.selectedItems);
+				
+			}
+			protected function sList_doubleClickHandler(event:MouseEvent):void
+			{
+				addAll(_availableItems, new ArrayCollection(listSelected.selectedItems)); 
+				//sortAvailableItems();
+				removeSelectedItems(listSelected.selectedItems);
+				
+				
+			}
+			private function addAll(arr:ArrayCollection, src:ArrayCollection):void
+			{
+				for each(var o:Object in src)
+				{
+					arr.addItem(o);
+				}
+			}
+			
+			//sort selected items list
+			private function sortSelectedItems():void
+			{
+				var s:Sort = new Sort();
+				s.fields=[new SortField("label")];
+				_selectedItems.sort = s;
+				_selectedItems.refresh();
+			}
+			//sort available items list
+			private function sortAvailableItems():void
+			{
+				var s:Sort = new Sort();
+				s.fields=[new SortField("label")];
+				_availableItems.sort = s;
+				_availableItems.refresh();
+			}
+			//remove given items from selected list
+			private function removeSelectedItems(items:Array):void
+			{
+				for each(var o:Object in items)
+				{
+					_selectedItems.removeItemAt(_selectedItems.getItemIndex(o));
+					
+				}
+			}
+			private function removeAvailableItems(items:Array):void
+			{
+				for each(var o:Object in items)
+				{
+					if ( _availableItems.getItemIndex(o) > -1 )
+						_availableItems.removeItemAt(_availableItems.getItemIndex(o));
+					
+				}
+			}
+			public function set selectedItems(v:ArrayCollection):void
+			{ 
+				_selectedItems = v;			
+				updateLists();
+			} 
+			public function get selectedItems():ArrayCollection
+			{ 
+				return _selectedItems;			
+			
+			}
+			
+			//set all available items, those will be display on the left list from teh component		
+			public function set availableItems(v:ArrayCollection):void
+			{ 
+				_availableItems = v;
+				updateLists();
+			}
+			//update available and selected list
+			private function updateLists():void
+			{
+//				var listSelected:ArrayCollection = null;
+//				var listAvailable:ArrayCollection = null;
+//				listSelected = _selectedItems;
+//				listAvailable = _availableItems;
+				if(_selectedItems) {
+					if (_selectedItems.length>0 && _availableItems.length>0  )
+					{
+						var arr:ArrayCollection = new ArrayCollection();
+						
+						for each(var s:Object in _selectedItems)
+						{
+							for each(var v:Object in _availableItems)
+							{
+								if ( v.data == s.data )
+									arr.addItem(v);
+							} 
+						}
+						
+						removeAvailableItems(arr.toArray());
+					}
+				}
+			}
+		]]>
+	</fx:Script>
+	<mx:HBox width="100%"  verticalAlign="middle">
+		<mx:VBox width="100%">
+			<mx:Label text="{i18n._('GLOBAL_Available@Available')}"/>
+			<mx:List dataProvider="{_availableItems}" id="listAvailable" labelField="{labelField}" doubleClickEnabled="true" height="180" allowMultipleSelection="true" width="200"  doubleClick="aList_doubleClickHandler(event)"  />
+		</mx:VBox>
+		<mx:VBox id="boxModelMove" width="15">
+			
+			<mx:LinkButton id="allRightBtn" icon="@Embed('/assets/all-right.gif')" width="16" height="16" toolTip="{i18n._('MULTISELECTLIST_MOVE_ALL_ITEMS_TO_RIGHT')}" click="allRightBtn_clickHandler(event)" />  
+			<mx:LinkButton id="oneRightBtn" icon="@Embed('/assets/one-right.gif')" width="16" height="16" toolTip="{i18n._('MULTISELECTLIST_MOVE_SELECTED_ITEMS_TO_RIGHT')}" click="oneRightBtn_clickHandler(event)" /> 	
+			<mx:Spacer height="2" />
+			<mx:LinkButton id="switchBtn" icon="@Embed('/assets/switch-h.gif')" width="16" height="16" toolTip="{i18n._('MULTISELECTLIST_SWITCH_SELECTION_ITEMS')}" click="switchBtn_clickHandler(event)" /> 
+			<mx:Spacer height="2" /> 
+			<mx:LinkButton id="oneLeftBtn" icon="@Embed('/assets/one-left.gif')" width="16" height="16" toolTip="{i18n._('MULTISELECTLIST_MOVE_SELECTED_ITEMS_TO_LEFT')}" click="oneLeftBtn_clickHandler(event)" />
+			<mx:LinkButton id="allLeftBtn" icon="@Embed('/assets/all-left.gif')" width="16" height="16" toolTip="{i18n._('MULTISELECTLIST_MOVE_ALL_ITEMS_TO_LEFT')}" click="allLeftBtn_clickHandler(event)" />
+			
+		</mx:VBox> 
+		<mx:VBox width="100%">
+			<mx:Label text="{i18n._('GLOBAL_SELECTED@Selected')}"/>
+			<mx:List doubleClick="sList_doubleClickHandler(event)" labelField="{labelField}" dataProvider="{_selectedItems}" doubleClickEnabled="true" height="180" allowMultipleSelection="true"  width="200" id="listSelected"/>
+		</mx:VBox>
+
+	</mx:HBox>
+</mx:VBox>

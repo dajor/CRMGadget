@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectRoot>
+<url value="file:///D:/Workspaces/Flex/CRMGadget/src/Contact.wsdl.xml">
+<service name="Contact">
+<port name="Default">
+<operations>
+<operation name="ContactDeleteChild(ContactWS_ContactDeleteChild_Input: ContactWS_ContactDeleteChild_Input): ContactWS_ContactDeleteChild_Output"/>
+<operation name="ContactQueryPage(ContactWS_ContactQueryPage_Input: ContactWS_ContactQueryPage_Input): ContactWS_ContactQueryPage_Output"/>
+<operation name="ContactInsertOrUpdate(ContactWS_ContactInsertOrUpdate_Input: ContactWS_ContactInsertOrUpdate_Input): ContactWS_ContactInsertOrUpdate_Output"/>
+<operation name="ContactInsert(ContactWS_ContactInsert_Input: ContactWS_ContactInsert_Input): ContactWS_ContactInsert_Output"/>
+<operation name="ContactInsertChild(ContactWS_ContactInsertChild_Input: ContactWS_ContactInsertChild_Input): ContactWS_ContactInsertChild_Output"/>
+<operation name="ContactUpdate(ContactWS_ContactUpdate_Input: ContactWS_ContactUpdate_Input): ContactWS_ContactUpdate_Output"/>
+<operation name="ContactUpdateChild(ContactWS_ContactUpdateChild_Input: ContactWS_ContactUpdateChild_Input): ContactWS_ContactUpdateChild_Output"/>
+<operation name="ContactDelete(ContactWS_ContactDelete_Input: ContactWS_ContactDelete_Input): ContactWS_ContactDelete_Output"/>
+</operations>
+</port>
+</service>
+<asPackage absPath="D:\Workspaces\Flex\CRMGadget\src\generated\webservices" name="generated.webservices">
+<mainAsClass name="ContactClient.as"/>
+<otherAsClass name="String2000.as"/>
+<otherAsClass name="ContactInsertResultEvent.as"/>
+<otherAsClass name="String1500.as"/>
+<otherAsClass name="ListOfAttachment.as"/>
+<otherAsClass name="Team.as"/>
+<otherAsClass name="ListOfNote.as"/>
+<otherAsClass name="ListOfCampaign.as"/>
+<otherAsClass name="String400.as"/>
+<otherAsClass name="ServiceRequest.as"/>
+<otherAsClass name="String1.as"/>
+<otherAsClass name="String64.as"/>
+<otherAsClass name="String15.as"/>
+<otherAsClass name="ContactDeleteChild_request.as"/>
+<otherAsClass name="ContactUpdateChild_request.as"/>
+<otherAsClass name="ContactDeleteResultEvent.as"/>
+<otherAsClass name="ListOfAsset.as"/>
+<otherAsClass name="ContactInsertChildResultEvent.as"/>
+<otherAsClass name="Campaign.as"/>
+<otherAsClass name="String1999.as"/>
+<otherAsClass name="ListOfServiceRequest.as"/>
+<otherAsClass name="AlternateAddress.as"/>
+<otherAsClass name="CustomObject3.as"/>
+<otherAsClass name="ContactInsertOrUpdateResultEvent.as"/>
+<otherAsClass name="BaseContactClient.as"/>
+<otherAsClass name="String315.as"/>
+<otherAsClass name="Lead.as"/>
+<otherAsClass name="Opportunity.as"/>
+<otherAsClass name="ListOfContactTeam.as"/>
+<otherAsClass name="Book.as"/>
+<otherAsClass name="Note.as"/>
+<otherAsClass name="Interests.as"/>
+<otherAsClass name="IContactClient.as"/>
+<otherAsClass name="String10.as"/>
+<otherAsClass name="ContactUpdateChildResultEvent.as"/>
+<otherAsClass name="ContactInsert_request.as"/>
+<otherAsClass name="String30.as"/>
+<otherAsClass name="String50.as"/>
+<otherAsClass name="ListOfAccount.as"/>
+<otherAsClass name="String255.as"/>
+<otherAsClass name="RelatedContact.as"/>
+<otherAsClass name="ListOfCustomObject3.as"/>
+<otherAsClass name="ListOfAddress.as"/>
+<otherAsClass name="ContactDelete_request.as"/>
+<otherAsClass name="String330.as"/>
+<otherAsClass name="ListOfContact.as"/>
+<otherAsClass name="ContactQueryPageResultEvent.as"/>
+<otherAsClass name="ListOfActivity.as"/>
+<otherAsClass name="String40.as"/>
+<otherAsClass name="ListOfInterests.as"/>
+<otherAsClass name="ContactInsertOrUpdate_request.as"/>
+<otherAsClass name="Contact.as"/>
+<otherAsClass name="ContactDeleteChildResultEvent.as"/>
+<otherAsClass name="ContactUpdateResultEvent.as"/>
+<otherAsClass name="ListOfLead.as"/>
+<otherAsClass name="SiebelXmlAttachmentType.as"/>
+<otherAsClass name="Revenue.as"/>
+<otherAsClass name="Account.as"/>
+<otherAsClass name="Activity.as"/>
+<otherAsClass name="String250.as"/>
+<otherAsClass name="String75.as"/>
+<otherAsClass name="String100.as"/>
+<otherAsClass name="ContactQueryPage_request.as"/>
+<otherAsClass name="String200.as"/>
+<otherAsClass name="Attachment.as"/>
+<otherAsClass name="ListOfAlternateAddress.as"/>
+<otherAsClass name="ContactUpdate_request.as"/>
+<otherAsClass name="ListOfContactTopElmt.as"/>
+<otherAsClass name="ListOfBook.as"/>
+<otherAsClass name="ListOfRelatedContact.as"/>
+<otherAsClass name="Asset.as"/>
+<otherAsClass name="ContactInsertChild_request.as"/>
+<otherAsClass name="ListOfRevenue.as"/>
+<otherAsClass name="String20.as"/>
+<otherAsClass name="ListOfContact0.as"/>
+<otherAsClass name="String25.as"/>
+<otherAsClass name="Address.as"/>
+<otherAsClass name="ListOfOpportunity.as"/>
+<otherAsClass name="BaseContactClientSchema.as"/>
+<otherAsClass name="String82.as"/>
+</asPackage>
+</url>
+<url value="http://www.webservicex.net/stockquote.asmx?WSDL">
+<service name="StockQuote">
+<port name="StockQuoteSoap">
+<operations>
+<operation name="GetQuote(parameters: GetQuote): GetQuoteResponse"/>
+</operations>
+</port>
+</service>
+<asPackage absPath="D:\Workspaces\Flex\CRMGadget\src\net\webservicex" name="net.webservicex">
+<mainAsClass name="StockQuote.as"/>
+<otherAsClass name="GetQuoteResultEvent.as"/>
+<otherAsClass name="String0.as"/>
+<otherAsClass name="GetQuote_request.as"/>
+<otherAsClass name="BaseStockQuoteSchema.as"/>
+<otherAsClass name="BaseStockQuote.as"/>
+<otherAsClass name="IStockQuote.as"/>
+</asPackage>
+</url>
+<url value="file:///D:/Contact.wsdl.xml">
+<service name="Contact">
+<port name="Contact">
+<operations>
+<operation name="ContactQueryPage(ContactQueryPage_Input: ContactQueryPage_Input): ContactQueryPage_Output"/>
+<operation name="ContactInsert(ContactInsert_Input: ContactInsert_Input): ContactInsert_Output"/>
+<operation name="ContactExecute(ContactExecute_Input: ContactExecute_Input): ContactExecute_Output"/>
+<operation name="ContactUpdate(ContactUpdate_Input: ContactUpdate_Input): ContactUpdate_Output"/>
+<operation name="ContactDelete(ContactDelete_Input: ContactDelete_Input): ContactDelete_Output"/>
+</operations>
+</port>
+</service>
+<asPackage absPath="D:\Workspaces\Flex\CRMGadget\src\generated\webservices\contact" name="generated.webservices.contact">
+<mainAsClass name="ContactClient.as"/>
+<otherAsClass name="QueryType.as"/>
+<otherAsClass name="ContactExecuteResultEvent.as"/>
+<otherAsClass name="ListOfContact.as"/>
+<otherAsClass name="ContactInsertResultEvent.as"/>
+<otherAsClass name="ListOfContactTopElmtData.as"/>
+<otherAsClass name="ListOfContactQuery.as"/>
+<otherAsClass name="ContactQueryPage_request.as"/>
+<otherAsClass name="ContactQueryPageResultEvent.as"/>
+<otherAsClass name="ContactExecute_request.as"/>
+<otherAsClass name="BaseContactClient.as"/>
+<otherAsClass name="ContactUpdate_request.as"/>
+<otherAsClass name="ContactData.as"/>
+<otherAsClass name="IContactClient.as"/>
+<otherAsClass name="ListOfContactData.as"/>
+<otherAsClass name="ContactUpdateResultEvent.as"/>
+<otherAsClass name="ContactDeleteResultEvent.as"/>
+<otherAsClass name="ListOfContactTopElmtQuery.as"/>
+<otherAsClass name="ContactInsert_request.as"/>
+<otherAsClass name="ContactQuery.as"/>
+<otherAsClass name="ListOfContact0.as"/>
+<otherAsClass name="BaseContactClientSchema.as"/>
+<otherAsClass name="ContactDelete_request.as"/>
+</asPackage>
+</url>
+<url value="file:///D:/Workspaces/Flex/CRMGadget/src/wsdl/Contact.wsdl.xml">
+<service name="Contact">
+<port name="Contact">
+<operations>
+<operation name="ContactQueryPage(ContactQueryPage_Input: ContactQueryPage_Input): ContactQueryPage_Output"/>
+<operation name="ContactInsert(ContactInsert_Input: ContactInsert_Input): ContactInsert_Output"/>
+<operation name="ContactExecute(ContactExecute_Input: ContactExecute_Input): ContactExecute_Output"/>
+<operation name="ContactUpdate(ContactUpdate_Input: ContactUpdate_Input): ContactUpdate_Output"/>
+<operation name="ContactDelete(ContactDelete_Input: ContactDelete_Input): ContactDelete_Output"/>
+</operations>
+</port>
+</service>
+<asPackage absPath="D:\Workspaces\Flex\CRMGadget\src\generated\webservices\contact" name="generated.webservices.contact">
+<mainAsClass name="ContactClient.as"/>
+<otherAsClass name="QueryType.as"/>
+<otherAsClass name="ContactExecuteResultEvent.as"/>
+<otherAsClass name="ListOfContact.as"/>
+<otherAsClass name="ListOfContactTopElmtData.as"/>
+<otherAsClass name="ContactInsertResultEvent.as"/>
+<otherAsClass name="ListOfContactQuery.as"/>
+<otherAsClass name="ContactQueryPage_request.as"/>
+<otherAsClass name="ContactQueryPageResultEvent.as"/>
+<otherAsClass name="ContactExecute_request.as"/>
+<otherAsClass name="BaseContactClient.as"/>
+<otherAsClass name="ContactUpdate_request.as"/>
+<otherAsClass name="ContactData.as"/>
+<otherAsClass name="IContactClient.as"/>
+<otherAsClass name="ListOfContactData.as"/>
+<otherAsClass name="ContactDeleteResultEvent.as"/>
+<otherAsClass name="ContactUpdateResultEvent.as"/>
+<otherAsClass name="ListOfContactTopElmtQuery.as"/>
+<otherAsClass name="ContactQuery.as"/>
+<otherAsClass name="ListOfContact0.as"/>
+<otherAsClass name="ContactInsert_request.as"/>
+<otherAsClass name="BaseContactClientSchema.as"/>
+<otherAsClass name="ContactDelete_request.as"/>
+</asPackage>
+</url>
+</projectRoot>

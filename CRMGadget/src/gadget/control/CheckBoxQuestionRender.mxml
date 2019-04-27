@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true" height="100%" width="100%"								  
+								  >
+	<fx:Script>
+		<![CDATA[
+			import com.assessment.DtoColumn;
+			
+			import gadget.assessment.AssessmentSectionTotal;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			
+			import spark.components.CheckBox;
+			import spark.components.Label;
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid;
+			private var list:ArrayCollection ;
+			protected var _dtoCol:DtoColumn;
+			protected var _displayName:Function;
+			protected var _refreshPageTotal:Function;
+
+			
+			private var chkBox:CheckBox;
+			private var txtVal:Label;
+			
+			public function set refreshPageTotal(refreshPageTotal:Function):void{
+				this._refreshPageTotal = refreshPageTotal;
+			}
+			public function get refreshPageTotal():Function{
+				return this._refreshPageTotal;
+			}
+			
+			public function set dtoCol(col:DtoColumn):void{
+				this._dtoCol=col;
+			} 
+			public function get dtoCol():DtoColumn{
+				return this._dtoCol;
+			}
+			public function set displayName(funcDisplayname:Function):void{
+				this._displayName = funcDisplayname;
+			}
+			public function get displayName():Function{
+				return this._displayName;
+			}
+			
+			
+			private function clickFunction(e:Event):void{
+
+				 if(column!=null){			
+					 data[column.dataField] = chkBox.selected ? '1' :'0';	
+					 if(refreshPageTotal!=null){
+						 refreshPageTotal();
+					 }
+					 list = grid.dataProvider as ArrayCollection;
+					 grid.dataProvider = list;
+					 grid.validateNow();
+					
+				 }
+//				 if(chkBox.selected){
+//					 hbcell.setStyle("backgroundColor", 0x008000);
+//				 }else{
+//					 hbcell.setStyle("backgroundColor", 0xFF0000);
+//				 }
+				 
+								
+			 }	
+//			private function calculatePercent():void{
+//				list = grid.dataProvider as ArrayCollection;
+//				var lstSeleted:int = 0;
+//				for(var i:int = 0;i<list.length;i++){ // First row is header
+//					if(list[i][column.dataField] == 1){
+//						lstSeleted += 1;
+//					}
+//				}
+//				var totalObject:Object = list[list.length-1];
+//				
+//				if(totalObject is AssessmentSectionTotal){
+//					
+//				}else{
+//					//maybe never 
+//					list[list.length-1][column.dataField] = Math.round((lstSeleted/(list.length-1)) * 100 );
+//				}
+//				
+//				
+//				
+//				grid.dataProvider = list;
+//				grid.validateNow();
+//			}
+				
+			 override public function set data(value:Object):void{		
+				super.data = value;
+				
+				if(column!=null && value){
+					
+					if(data!=null && (!data.isHeader || data.isHeader=='0') && !data.isFooter){
+						if(chkBox==null){
+							chkBox = new CheckBox();
+							chkBox.addEventListener(MouseEvent.CLICK,clickFunction);
+							chkBox.percentHeight=100;
+							chkBox.enabled = column.editable;
+							//chkBox.percentWidth=100;
+							hbcell.addChild(chkBox);
+						}
+					}else{
+						if(txtVal==null){
+							txtVal = new Label();
+							txtVal.percentHeight=100;
+							txtVal.setStyle("verticalAlign","middle");
+							//txtVal.percentWidth=100;
+							hbcell.addChild(txtVal);
+						}
+					}
+					var val:Object = null;
+					if(displayName!=null){
+						val = displayName(dtoCol,value);
+					}else{
+						val = value[column.dataField];
+					}
+					
+					if(chkBox!=null){
+						chkBox.selected=(val==true || val=="true" || val==1 || val=="1");
+						if(chkBox.selected){
+							hbcell.setStyle("backgroundColor",0xFF0000);
+							
+						}else{
+							hbcell.setStyle("backgroundColor",0x008000);
+						}
+					}else if(txtVal!=null){
+						txtVal.text = String(val);
+						txtVal.setStyle("backgroundColor",0x92B8FF);
+						hbcell.setStyle("backgroundColor", 0x92B8FF);
+						txtVal.setStyle("fontWeight","bold");
+						if(data.isFooter) {
+							txtVal.text = String(val) ;
+						} 
+//						if(data.isFooter){
+//							hbcell.setStyle("backgroundColor", 0xA33908);
+//							txtVal.setStyle("backgroundColor",0xA33908);
+//						}
+					}
+					
+				}
+				 
+			 }
+						
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];						
+					}
+					
+				}
+			}
+			
+		]]>
+		
+	</fx:Script>
+	<mx:HBox id="hbcell" backgroundColor="0xFFFF00"  verticalAlign="middle" width="100%" height="30"   paddingBottom="3" horizontalAlign="center" >
+		<!--<s:CheckBox id="chkBox"   click="{clickFunction()}" visible="false"  />
+		<s:Label id="txtVal" verticalAlign="middle"   visible="false"  />-->
+	</mx:HBox>
+</s:MXAdvancedDataGridItemRenderer>

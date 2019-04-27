@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--CRO 05.01.2011-->
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="390" height="220"
+	title="{entity +'  Team'}" 
+	showFlexChrome="false" transparent="true" systemChrome="none" creationComplete="init()">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.control.ImageTextInput;
+			import gadget.dao.BaseDAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.SupportRegistry;
+			import gadget.i18n.i18n;
+			import gadget.service.LocaleService;
+			import gadget.service.PicklistService;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.validators.Validator;
+
+			[Bindable] public var selectedItem:Object;
+			[Bindable] public var entity:String; 
+			[Bindable] public var related:String;
+//			[Bindable] private var allItems:ArrayCollection;
+			[Binable] public var listRole:ArrayCollection;
+			[Binable] public var elementname:String;
+//			[Binable] public var listField:ArrayCollection;
+			public var action:Function;
+			public var item:Object;
+			public var filter:String;
+			private var selectedUser:Object;
+			
+			private function init():void {
+				userInput.item = {'element_name':elementname, 'data':item};
+				userInput.data ={'entity':related, 'element_name':elementname}
+				userInput.clickFunc=finderClick;
+				userInput.text=item[elementname];
+				userInput.enabled=true;
+				loadPickList(teamRole,'TeamRole',false);
+				loadPickList(accessProfiles,entity+'Access');
+				
+				var isVisible:Boolean = entity==Database.accountDao.entity;
+				icAccess.visible = isVisible;	
+				icAccess.includeInLayout =isVisible;
+				ioppAccess.visible = isVisible;
+				ioppAccess.includeInLayout = isVisible;
+				if(isVisible){
+					loadPickList(contactAccess,'ContactAccess');
+					loadPickList(opportunityAccess,'OpportunityAccess');
+					height = 270;
+					
+				}	
+			
+				
+			}
+			
+			private function finderClick(event:MouseEvent):void {
+				
+				var entityFinder:EntityFinder = new EntityFinder();
+				entityFinder.entity = item.related;
+				
+				entityFinder.action = function(other:Object):void {				
+					selectedUser=other;
+					userInput.text=other[elementname];
+					
+					
+				};
+				WindowManager.openModal(entityFinder);
+				
+				
+			}
+			
+			private function okAction():void{
+				var validatorErrorArray:Array =Validator.validateAll([userV,accessPfVal]);
+				var errorMessageArray:Array = [];
+				if (validatorErrorArray.length != 0) {				
+					for each (var err:Object in validatorErrorArray) {
+						var errField:String = ''; 
+						if (err.currentTarget) {
+							var parent:Object=err.currentTarget.source.parent;
+							
+							errField = FormItem(parent).label + " : ";
+						}
+						errorMessageArray.push(errField + err.message);
+					}
+					
+					
+				}
+				
+				if(errorMessageArray.length>0){
+					Alert.show(errorMessageArray.join("\n"), "Invalid form...", Alert.OK, this);
+					return;
+				}
+				selectedUser.accessProfile=accessProfiles.selectedLabel;
+				selectedUser.ContactAccess = contactAccess.selectedItem;
+				selectedUser.OpportunityAccess = opportunityAccess.selectedItem;
+				selectedUser.OpportunityAccessId = accessProfiles.selectedItem.data
+				selectedUser.TeamRole = teamRole.selectedItem.data;
+				action(selectedUser);
+				close();
+				
+			}
+			
+			
+//			private function updateInfo():void {
+//				if (allItems != null && allItems.length == 1000) {
+//					//CRO 05.01.2011
+//					info.text = i18n._('GLOBAL_ONLY_THE_FIRST_1000_MATCHING_ITEMS_ARE_SHOWN');
+//				}  else if (allItems != null) {
+//					//CRO 05.01.2011
+//					info.text = allItems.length + " " +i18n._('GLOBAL_ITEMS_FOUND');
+//				} else if (filter == null) {
+//					//CRO 05.01.2011
+//					info.text = i18n._('GLOBAL_PLEASE_ENTER_AT_LEAST_TWO_CHARACTERS_FOR_SEARCH');
+//				}
+//			}
+			
+			private function selectItem(selected:Object):void {
+				if (selected==null) return;
+				selectedItem = Database.getDao(related).findByGadgetId(selected.gadget_id);
+				action(selectedItem);
+				close();
+			}
+			
+			
+			private function loadPickList(pick:ComboBox,field:String,isTeamRole:Boolean=true):void{
+				if(isTeamRole){
+					pick.dataProvider = this.listRole;
+					pick.selectedIndex = 0;
+					return;
+				}
+				var subDao:BaseDAO = SupportRegistry.getSupportDao(entity,"Team");				
+				var list:ArrayCollection =  PicklistService.getPicklist_crmod(subDao.entity,field,LocaleService.getLanguageCode());
+				list.addItemAt({ data:'', label:'' },0);
+				pick.dataProvider = list;
+				pick.selectedIndex = 0;
+			}
+			
+			private function getLabel(element_name:String):String{
+				
+				var subDao:BaseDAO = SupportRegistry.getSupportDao(entity,"Team");				
+				var obj:Object = Database.fieldDao.findFieldByPrimaryKey(DAOUtils.getRecordType(subDao.entity),element_name);
+				
+				if(obj==null){
+					return element_name;
+				}
+				
+				
+				return obj.display_name;
+				
+				
+				
+			}
+
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/search.png')" title="{related + ' Team'}"/>
+		<mx:VBox top="32" left="16" right="16" verticalGap="3">
+			<!--<mx:Label id="info" left="0"/>-->
+			<mx:Form width="100%">
+				<mx:FormItem label="User" required="true">
+					<control:ImageTextInput  width="200" id="userInput"  />
+				</mx:FormItem>
+				<mx:FormItem label="{getLabel('TeamRole')}"  >					
+					<mx:ComboBox  id="teamRole" width="160" selectedIndex="0" rowCount="3" />
+				</mx:FormItem>				
+				<mx:FormItem label="{getLabel(entity+'Access')}" required="true" >					
+					<mx:ComboBox id="accessProfiles" width="160" selectedIndex="0" rowCount="3" />
+				</mx:FormItem>
+				<mx:FormItem label="{getLabel('ContactAccess')}"  id="icAccess">					
+					<mx:ComboBox  id="contactAccess" width="160" selectedIndex="0" rowCount="3" />
+				</mx:FormItem>
+				<mx:FormItem label="{getLabel('OpportunityAccess')}"  id="ioppAccess">					
+					<mx:ComboBox id="opportunityAccess" width="160" selectedIndex="0" rowCount="3" />
+				</mx:FormItem>
+			</mx:Form>
+			<mx:HBox width="100%" horizontalAlign="right" right="8">
+				<mx:Button id="okBtn" label="Ok" click="okAction()" />
+				<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="this.close()"/>				
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+	<mx:StringValidator id="userV" source="{userInput}"
+						property="text"							
+						/>
+	
+	<mx:NumberValidator id="accessPfVal" source="{accessProfiles}" minValue="1" 
+						property="selectedIndex" lowerThanMinError="This Field is required."/>
+</mx:Window>

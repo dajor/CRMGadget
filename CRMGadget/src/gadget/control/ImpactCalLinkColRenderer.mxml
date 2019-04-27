@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.lists.List;
+			import gadget.lists.ListDetail;
+			import gadget.util.GUIUtils;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			
+			import org.purepdf.colors.RGBColor;
+			
+			
+			
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid;
+			private var _clickAction:Function;
+
+			public function get clickAction():Function
+			{
+				return _clickAction;
+			}
+
+			public function set clickAction(value:Function):void
+			{
+				_clickAction = value;
+			}
+		
+			
+			
+			
+			
+			private function clickFunction(e:Event):void{
+				if(clickAction!=null){
+					clickAction(super.data);
+				}
+			}	
+			override public function getStyle(styleProp:String):*
+			{
+				if("alternatingItemColors"==styleProp && super.data!=null){
+					var colors:Array = super.getStyle(styleProp);
+					if(!isNaN(super.data.group)&& colors!=null && colors.length>0){
+						var realCol:Array = new Array();
+						realCol.push(colors[super.data.group%colors.length]);
+						return realCol;
+					}
+				}
+				
+				return super.getStyle(styleProp);
+			}
+			override public function set data(value:Object):void{		
+				super.data = value;
+				if(column!=null && value){					
+					//TODO
+					btnLink.label = value[column.dataField];					
+					
+				}
+			}
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var listGrid:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(listGrid!=null){					
+						column = grid.columns[listGrid.columnIndex];						
+					}
+					
+				}
+			}
+			
+		]]>
+		
+	</fx:Script>
+	<mx:Canvas width="100%" horizontalScrollPolicy="off">
+		<mx:LinkButton id="btnLink" click="clickFunction(event)" color="#2c79b8" width="100%"/>
+	</mx:Canvas>
+</s:MXAdvancedDataGridItemRenderer>

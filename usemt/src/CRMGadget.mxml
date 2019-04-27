@@ -1,0 +1,479 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   creationComplete="init();"
+					   showStatusBar="false" width="508" height="334" backgroundAlpha="0">
+	<fx:Script> 
+		<![CDATA[ 
+			import adobe.utils.ProductManager;
+			
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.service.UserService;
+			import gadget.util.HackOpenAnotherDatabase;
+			import gadget.util.Startup;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import licenses.TurboLicense;
+			
+			import mx.controls.Alert;
+			import mx.core.Application;
+			import mx.core.FlexGlobals;
+			import mx.core.Window;
+			import mx.events.CloseEvent;
+			import mx.resources.IResourceManager;
+			import mx.utils.StringUtil;
+			private var loadTimer:Timer; 
+			private var isReady:Boolean = false;
+			private var isDisplayEncryptPassword:Boolean = false;
+			private var numberOfLogin:int = 0;
+			private var mainWindow:MainWindow; 
+			private var appInfo:Object;
+			private var pathFile:String;
+			
+			private var NOT_ENCRYPT_DB_FILE:File;
+			private var ENCRYPT_DB_FILE:File;
+			private var DISABLE_EULA_FILE:File;
+			private var CUSTOM_DATABASE_LOCATION:File;
+			private var connection:SQLConnection;
+			private var license:TurboLicense;
+			private var isNewVersion:Boolean=false;
+			private function initLicence():void{
+				license = new TurboLicense();
+				license.initUI = init;
+				license.exit = this.close;
+				license.open(true);
+				
+			}
+			public function init():void { 
+				// google analytic
+				tracker.trackPageview("/Starting application");
+				
+				// center the window on the screen
+				var screenBounds:Rectangle = Screen.mainScreen.bounds; 
+				nativeWindow.x = (screenBounds.width - nativeWindow.width) / 2; 
+				nativeWindow.y = (screenBounds.height - nativeWindow.height) / 2; 
+				
+				appInfo = Utils.getAppInfo();
+				applicationName.text = appInfo.name;
+				version.text = "Version " +appInfo.version;
+				
+//				NOT_ENCRYPT_DB_FILE = File.userDirectory.resolvePath(Database.DB_NAME);
+//				ENCRYPT_DB_FILE = File.userDirectory.resolvePath(Database.ENCRYPTED_DB_NAME);
+//				DISABLE_EULA_FILE = File.userDirectory.resolvePath(Database.DISABLE_EULA);
+				
+				// initialize database location
+				initDB();
+				
+				// start the timer, which simulates a loading delay 
+				loadTimer = new Timer(1, 1); 
+				loadTimer.addEventListener(TimerEvent.TIMER, incrementTime); 
+				loadTimer.start(); 
+				
+				Startup.init();
+				
+			}
+			
+			
+			private function logInfo(s:String):void {
+				trace(s);
+				infoText.text = s;
+			}
+			
+			public function initializeNewDB(dbfile:File,mainWindow:Window=null):void { 
+				connection.close();
+				dbfile.deleteFile();		
+				reStartApp();				
+			}
+			
+			public static function reStartApp():void{
+				var app:WindowedApplication = WindowedApplication(FlexGlobals.topLevelApplication);
+				// var app:WindowedApplication = WindowedApplication(Application.application);			
+				var mgr:ProductManager = new ProductManager("airappinstaller");				
+				mgr.launch("-launch " + app.nativeApplication.applicationID + " " +  app.nativeApplication.publisherID);				
+				// app.close();
+				NativeApplication.nativeApplication.exit();
+			}
+			
+			private function initDB():void {
+				if(Database.exist(Database.CUSTOM_DATABASE)) { // if custom database file exist we get path from this file, otherwise get from current user directory
+					NOT_ENCRYPT_DB_FILE = File.applicationDirectory.resolvePath(Database.getCustomDatabasePathFromFile() + "/" + Database.DB_NAME);
+					ENCRYPT_DB_FILE = File.applicationDirectory.resolvePath(Database.getCustomDatabasePathFromFile() + "/" + Database.ENCRYPTED_DB_NAME);
+				}else {
+					NOT_ENCRYPT_DB_FILE = File.userDirectory.resolvePath(Database.DB_NAME);
+					ENCRYPT_DB_FILE = File.userDirectory.resolvePath(Database.ENCRYPTED_DB_NAME);
+				}
+				DISABLE_EULA_FILE = File.userDirectory.resolvePath(Database.DISABLE_EULA);
+			}
+			
+			private function incrementTime(event:TimerEvent):void {
+				
+				// Change Request #217
+				if(!NOT_ENCRYPT_DB_FILE.exists && !ENCRYPT_DB_FILE.exists && !Database.exist(Database.CUSTOM_DATABASE)){ //no DB
+					if(!DISABLE_EULA_FILE.exists){
+						displayLicenseWindow();
+					}else{
+						//displayInputEncryptPasswordWindow();
+					
+						accessDatabase();
+						start();
+					}
+				// --- VM -- #491
+				}else if(checkEULA_Veriosn()){
+					isNewVersion = true;
+					displayLicenseWindow();
+				}else if(!StringUtils.isEmpty(Database.getCustomDatabasePathFromFile())){ //ENCRYPT_DB_FILE exists
+						//displayVerifyEncryptPasswordWindow();
+					   
+					    accessDatabase();
+				}else{ //NOT_ENCRYPT_DB_FILE exists
+						displayMainWindowAndInitDB(Database.DB_NAME);
+				}
+				
+				
+			} 
+			private function checkEULA_Veriosn():Boolean{
+				var file:File = File.userDirectory.resolvePath(Database.CUSTOM_DATABASE);
+				var stream:FileStream = new FileStream();
+				stream.open(file, FileMode.READ);
+				var fileData:String = stream.readUTFBytes(stream.bytesAvailable);
+				//trace(fileData);
+				try{
+					var xml:XML = new XML(fileData);	
+					var oldVersion:String = xml.appversion;
+					var accepted_eula:String = xml.accepted_eula;
+					stream.close();
+					if(accepted_eula.toLocaleLowerCase()!='true'){
+						if(!StringUtils.isEmpty(oldVersion)){
+							var curVersion:String = appInfo.version;
+								if(Number(curVersion) > Number(oldVersion)){							
+									return true;
+								}else{
+									return false;
+								}
+						}
+					}else{
+						return false;
+					}
+				}catch(e:Error){
+					var messageStr:String = e.message;
+					var errorStr:String = messageStr.substr(messageStr.indexOf(':') + 1, messageStr.length);
+					trace('read version ------- ' + errorStr);
+					return true
+				}
+				return true;
+				
+			}
+			// Change Request #217
+			private function displayInitDbLocation():void {
+				var initDbLocation:InitDbLocation = new InitDbLocation();
+				initDbLocation.crmGadget = this;
+				//initDbLocation.displayInputEncryptPasswordWindow = displayInputEncryptPasswordWindow;
+				initDbLocation.displayMainWindowAndInitDB = displayMainWindowAndInitDB;
+				//initDbLocation.displayVerifyEncryptPasswordWindow = displayVerifyEncryptPasswordWindow;
+				initDbLocation.accessDatabase = accessDatabase;
+				initDbLocation.open(true);		
+				var screenBounds:Rectangle = Screen.mainScreen.bounds; 
+				initDbLocation.nativeWindow.x = (screenBounds.width - initDbLocation.nativeWindow.width) / 2; 
+				initDbLocation.nativeWindow.y = (screenBounds.height - initDbLocation.nativeWindow.height) / 2;
+			}
+			public static const DATABASE_PASSWORD:String = "Fellow Consulting"; // default database password 
+			private function closedForm(obj:Object):void{
+				this.close();
+			}
+			public function accessDatabase():void{
+				var xml:XML = Database.getConfigXML();
+				var pwd:String = DATABASE_PASSWORD ;
+				
+				if(xml != null){
+					var xmlPWD:String = xml.elements("database_password");
+					if(!StringUtils.isEmpty(xmlPWD)){
+						
+						try{
+							pwd = Utils.decryptPassword(xmlPWD);
+						}catch(e:Error){
+							
+							Alert.show('Password is invalid format.', "", Alert.OK, this, closedForm
+							
+							);
+							return;
+						}
+						
+						
+					}
+				   	
+				}
+				if(xmlPWD != pwd){
+					
+					displayMainWindowAndInitDB(Database.ENCRYPTED_DB_NAME,pwd);
+				}else{
+					Alert.show(i18n._('GLOBAL_INVALID_PASSWORD'));
+				}
+				
+				
+				
+			}
+//			private function incrementTime(event:TimerEvent):void { 
+//				
+//				var NOT_ENCRYPT_DB_FILE:File = File.userDirectory.resolvePath(Database.DB_NAME);
+//				var ENCRYPT_DB_FILE:File = File.userDirectory.resolvePath(Database.ENCRYPTED_DB_NAME);
+//				var DISABLE_EULA_FILE:File = File.userDirectory.resolvePath(Database.DISABLE_EULA);
+//				/*
+//					if no db file
+//						display license screen
+//						if they accept
+//							display input encrypt password screen
+//							displayMainWindowAndInitDB
+//					else if ENCRYPT_DB_FILE exists
+//							display verify encrypt password to open
+//							if verify is ok
+//								displayMainWindowAndInitDB
+//					else (olddb exist)
+//						displayMainWindowAndInitDB
+//				*/
+//				
+//				if(!NOT_ENCRYPT_DB_FILE.exists && !ENCRYPT_DB_FILE.exists){ //no DB
+//					if(!DISABLE_EULA_FILE.exists){
+//						displayLicenseWindow();
+//					}else{
+//						displayInputEncryptPasswordWindow();
+//						start();
+//					}
+//				}else if(ENCRYPT_DB_FILE.exists){ //ENCRYPT_DB_FILE exists
+//					displayVerifyEncryptPasswordWindow();
+//				}else{ //NOT_ENCRYPT_DB_FILE exists
+//					displayMainWindowAndInitDB(Database.DB_NAME);
+//				}
+//			} 
+			
+			private function displayInputEncryptPasswordWindow():void {
+				var inEncPW:InputEncryptPasswordWindow = new InputEncryptPasswordWindow();
+				inEncPW.displayMainWindowAndInitDB = displayMainWindowAndInitDB;
+				inEncPW.appInfo = appInfo;
+				inEncPW.open(true);
+				var screenBounds:Rectangle = Screen.mainScreen.bounds; 
+				inEncPW.nativeWindow.x = (screenBounds.width - inEncPW.nativeWindow.width) / 2; 
+				inEncPW.nativeWindow.y = (screenBounds.height - inEncPW.nativeWindow.height) / 2;
+				isDisplayEncryptPassword = true;
+			}
+			
+			private function displayVerifyEncryptPasswordWindow(messageInfo:String=""):void {
+				var verEncPW:VerifyEncryptPasswordWindow = new VerifyEncryptPasswordWindow();
+				verEncPW.displayMainWindowAndInitDB = displayMainWindowAndInitDB;
+				verEncPW.messageInfo = messageInfo;
+				verEncPW.appInfo = appInfo;
+				verEncPW.crmGadget = this;
+				verEncPW.open(true);
+				isDisplayEncryptPassword = true;
+				var screenBounds:Rectangle = Screen.mainScreen.bounds; 
+				verEncPW.nativeWindow.x = (screenBounds.width - verEncPW.nativeWindow.width) / 2; 
+				verEncPW.nativeWindow.y = (screenBounds.height - verEncPW.nativeWindow.height) / 2; 
+				
+			}
+			
+			private var worklist:Array;
+			private static var workHalted:Function;
+			private static var stopwork:Boolean;
+			
+			private function addWork(display:String, fn:Function, params:Object = null):Object {
+				var wob:Object = { fn:fn, text:display, params:params }; 
+				worklist.push(wob);
+				return wob;
+			}
+
+			private function fatalAlertClick(click:CloseEvent, final:Function):void {
+				if (click.detail==Alert.CANCEL)
+					NativeApplication.nativeApplication.exit();
+				else
+					doWork(final);	//continue
+			}
+
+			public static function StopWork():void {
+				stopwork = true;
+			}
+
+			public static function ContinueWork():void {
+				stopwork = false;
+				var tmp:Function = workHalted;
+				workHalted = null;
+				if (tmp!=null)
+					tmp();
+			}
+
+			private function doWork(final:Function):void {
+				var ob:Object = worklist.shift();
+				if (ob!=null) {
+					logInfo(ob.text);
+					setTimeout(function():void {
+						if (ob.fn!=null) {
+							//DEBUG ob.fn(ob.params);
+							try {
+								ob.fn(ob.params);
+								if (stopwork) {
+									workHalted = function():void {doWork(final)};
+									return;
+								}
+							} catch (e:Error) {
+								trace(e.getStackTrace());
+								trace(e);
+								var errorMessage:String = e.message;
+								if(isDisplayEncryptPassword && errorMessage.indexOf("3138")>0){
+									++numberOfLogin;
+									if(numberOfLogin==2) NativeApplication.nativeApplication.exit();
+									//displayVerifyEncryptPasswordWindow("Invalid password.");
+									var file:File = File.userDirectory.resolvePath("ErrorEncryptionLog" +".txt");
+									Utils.writeToFile(file ,e.getStackTrace() + "\n" + e.toString());
+								}else if(isDisplayEncryptPassword){
+									++numberOfLogin;
+									// error sometime when missing encryptionkey in subfolder ..\Adobe\AIR\ELS
+									// "Missing Encryption Key in subfolder ..\Adobe\AIR\ELS \nPlease Contact your administrator"
+									if(numberOfLogin==2) NativeApplication.nativeApplication.exit();
+									//displayVerifyEncryptPasswordWindow(e.message + "\nPlease Contact your administrator");
+								}else{
+									Alert.show(e.message + "\nPlease Contact your administrator",ob.text,Alert.OK|Alert.CANCEL,null,function (click:CloseEvent):void {fatalAlertClick(click,final)});
+								}				
+								return;
+							}
+						}
+						doWork(final);
+						}, 20);	//VAHI give GUI time to display the info
+				} else if (final!=null) {
+					//set framerate--mony
+					var fRate:int = Database.preferencesDao.getIntValue(PreferencesDAO.FRAME_RATE,0);
+					if(fRate>0){
+						frameRate=fRate;
+					}
+					final();
+				}
+			}
+
+			private function displayMainWindowAndInitDB(dbName:String, encPW:String=""):void {
+				
+				this.visible = true;
+				this.activate();
+				
+				Startup.pre_db();
+
+				stopwork = false;
+				workHalted = null;
+				worklist = [];
+				addWork("Open database...", function(params:Object):void {
+					connection = Database.dbinit(addWork, dbName, encPW);
+					HackOpenAnotherDatabase(connection);
+				});
+				doWork(displayMainWindow);
+			}
+			private function displayMainWindow():void {
+				
+				Startup.post_db();
+				
+				var that:CRMGadget = this;
+				addWork("Checking...", function(params:Object):void {
+					//JD user for only version 1.194
+					if(isNewVersion){
+						if(UserService.DIVERSEY == UserService.getCustomerId() && Utils.getAppInfo().version=='1.194'){
+							Database.lastsyncDao.unsync("gadget.sync.incoming::IncomingAttachmentService RequestAttachment");
+						}
+					}
+					
+					Database.checkBeforeStart();
+				});
+				doWork(function display():void{	
+					addWork("Initializing GUI...", function(params:Object):void {
+						//initKitchenReportPath();
+						mainWindow = new MainWindow();
+						mainWindow.crmGadget = that;
+						mainWindow.open();
+					});
+					doWork(Startup.running);});
+			}
+			
+			
+			private function initKitchenReportPath():void {
+				if(UserService.getCustomerId() == UserService.DIVERSEY) {
+					var report:Object = Database.reportAdminDao.first();
+					if(report == null || (report != null && StringUtils.isEmpty(report.report_path))) {
+						var root:File = File.getRootDirectories()[0];
+						if(root != null && root.isDirectory) {
+							pathFile = searchFileInDirectory(root, 'MAPCApplication.exe');
+							if(pathFile != null) {
+								var re:Object = new Object();
+								re.report_path = pathFile;
+								re.type = report != null ? report.type : "";
+								Database.reportAdminDao.insert(re);
+							}
+						}
+					}
+				}
+			}
+			
+			
+			private function searchFileInDirectory(directories:File, fileName:String):String {
+				if(pathFile != null) return pathFile;
+				var directory:Array = directories.getDirectoryListing();
+				for each (var f:File in directory) {
+					if (f.isDirectory && !f.isHidden) {
+						searchFileInDirectory(f, fileName);
+					}else {
+						if(f.name == fileName) {
+							pathFile = f.nativePath;
+						}
+					}
+				}
+				return pathFile;
+			}
+			
+			private function displayLicenseWindow():void {
+				this.visible = false;
+				var eulaWindow:EULA = new EULA();
+				eulaWindow.crmGadget = this;
+				// eulaWindow.displayInputEncryptPasswordWindow = displayInputEncryptPasswordWindow;
+				eulaWindow.displayInitDbLocation = displayInitDbLocation;
+				//eulaWindow.displayVerifyEncryptPasswordWindow = displayVerifyEncryptPasswordWindow;
+				eulaWindow.accessDatabase = accessDatabase;
+				eulaWindow.displayMainWindowAndInitDB = displayMainWindowAndInitDB;
+				eulaWindow.appInfo = appInfo;
+				eulaWindow.open(true);		
+				var screenBounds:Rectangle = Screen.mainScreen.bounds; 
+				eulaWindow.nativeWindow.x = (screenBounds.width - eulaWindow.nativeWindow.width) / 2; 
+				eulaWindow.nativeWindow.y = (screenBounds.height - eulaWindow.nativeWindow.height) / 2;
+			}
+			
+			public function ready():void {
+				if (!isReady) {
+					isReady = true;
+					nativeWindow.close();
+					start();
+				}
+			}
+			
+			public function start():void {
+				if(mainWindow!=null){
+					mainWindow.visible = true;
+					mainWindow.activate();
+				}
+			}
+		]]> 
+	</fx:Script>
+	
+	<fx:Declarations>
+		<analytics:FlexTracker
+			xmlns:analytics="com.google.analytics.components.*"
+			id="tracker"
+			account="UA-9914116-1"
+			mode="AS3"
+			visualDebug="false"/>
+	</fx:Declarations>
+	
+	<mx:Image x="0" y="0"  source="@Embed('/assets/Splash-Background.png')" scaleContent="false" width="508" height="334" alpha="1"/>
+	<mx:VBox verticalGap="0" x="237" y="38">
+		<mx:Label id="applicationName" color="#FFFFFF" fontSize="24" fontWeight="bold"/>
+		<mx:Label id="version" fontWeight="bold"/>
+		<mx:Label fontWeight="bold" text="©2010 Fellow Consulting"/>	
+	</mx:VBox>
+	<mx:Text id="infoText" x="237" y="138" width="220" height="80"/>
+	
+</s:WindowedApplication>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="335" height="135" resizable="false"
+	title="{filter.displayName}" 
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*">
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.util.ImageUtils;
+			import gadget.window.WindowManager;
+			
+			[Bindable] public var filter:Object;
+			public var list:List;
+			
+			private function openListLayout(event:Event):void{
+				var listLayout:ListLayout = new ListLayout();
+				listLayout.list = list;
+				listLayout.filter = filter;
+				WindowManager.openModal(listLayout);
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="335" height="135" right="0" bottom="0">
+		<control:TitleBar title="{i18n._('FILTER_PREDEFINED_DETAIL_PREDEFINED_FILTER_TILTE_BAR')+' ' + filter.displayName}"/>
+		<mx:VBox top="32" left="16" right="16">
+			<mx:Form width="100%"><!--CRO 05.01.2011-->
+				<mx:FormItem required="true" label="{i18n._('GLOBAL_NAME')}">
+					<mx:TextInput text="{filter.displayName}" enabled="false" width="215"/>
+				</mx:FormItem>
+			</mx:Form>
+			<mx:HBox width="100%"><!--CRO 05.01.2011-->
+				<mx:Button label="{i18n._('GLOBAL_COLUMN_LAYOUT')}" icon="@Embed('/assets/customize.png')" click="openListLayout(event);" />
+				<mx:HBox width="100%" horizontalAlign="right">
+					<mx:Button label="{i18n._('GLOBAL_CLOSE')}" icon="{ImageUtils.cancelIcon}" click="{this.close()}" />
+				</mx:HBox>
+			</mx:HBox>
+		</mx:VBox>	
+	</mx:Canvas>
+	
+	
+</mx:Window>

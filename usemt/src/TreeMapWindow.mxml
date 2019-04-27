@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:list="gadget.lists.*"
+	xmlns:control="gadget.control.*" 
+	xmlns:containers="flexlib.containers.*"
+	layout="absolute" 
+	title="Tree Map"
+	showFlexChrome="false" transparent="true" systemChrome="none" 
+	showStatusBar="false" 
+	width="1060" height="640" 
+	cornerRadius="3" 
+	visible="true"
+	creationComplete="Utils.showLoadingProgressWindow(load, i18n._(StringUtils.LOADING_STR), i18n._(StringUtils.LOADING_STR));"
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:layout="flexlib.scheduling.scheduleClasses.layout.*" 
+	xmlns:code="http://code.google.com/p/flexlib/" xmlns:ilog="http://www.ilog.com/2007/ilog/flex" xmlns:local="*" 
+	keyDown="keyDown(event)"
+	>
+	<mx:Script>
+    
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import ilog.treemap.TreeMapEvent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.CursorBookmark;
+			import mx.collections.Grouping;
+			import mx.collections.GroupingCollection2;
+			import mx.collections.GroupingField;
+			import mx.collections.HierarchicalCollectionView;
+			import mx.collections.HierarchicalData;
+			import mx.collections.ICollectionView;
+			import mx.collections.IViewCursor;
+			import mx.controls.ProgressBar;
+			import mx.controls.ToolTip;
+			import mx.effects.WipeUp;
+			import mx.managers.ToolTipManager;
+			import mx.utils.ColorUtil;
+			
+			private const OPACITIES:Array = [100, 100];
+			private const RATIOS:Array = [0x00, 0xFF];
+			
+			private var previousRoot:Array = [];                              
+			private var tooltip:ToolTip;
+			private var source:ArrayCollection;
+			private var stateFirst:GroupingCollection2;
+			private var modeFirst:GroupingCollection2;
+			
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			public function load():void {
+				buildStateFirst();
+			}
+			
+			public function buildStateFirst():void {
+				stateFirst = new GroupingCollection2();
+				source = Database.accountDao.selectAll();
+				stateFirst.source = source;
+				var grouping:Grouping = new Grouping();
+				grouping.label = "AccountName";
+				grouping.fields = [ new GroupingField("PrimaryBillToCountry"),
+					new GroupingField("PrimaryBillToCity")];
+				stateFirst.grouping = grouping;
+				stateFirst.refresh();
+				initDataProvider();
+				buildModeFirst();
+				table.dataProvider = source;
+			}
+			
+			public function buildModeFirst():void {
+				modeFirst = new GroupingCollection2();
+				modeFirst.source = source;
+				var grouping:Grouping = new Grouping();
+				grouping.label = "AccountName";
+				grouping.fields = [ new GroupingField("PrimaryBillToCity"), 
+					new GroupingField("PrimaryBillToCountry") ];
+				modeFirst.grouping = grouping;
+				modeFirst.refresh();
+			}
+				
+			private var collection:HierarchicalCollectionView;
+			private var _stateCollection:HierarchicalCollectionView;
+			private var _modeCollection:HierarchicalCollectionView;
+			
+			public function initDataProvider():void {
+				treemap.dataProvider = stateFirst;
+				collection = treemap.dataProvider as HierarchicalCollectionView;
+				_stateCollection = collection;
+				expandAll();
+			}
+			
+			private function expandAll():void {
+				var iterator:IViewCursor = collection.createCursor();
+				var toOpen:Array = [];
+				iterator.seek(CursorBookmark.FIRST);
+				while(!iterator.afterLast) {
+					toOpen =  toOpen.concat(getChildrenOf(iterator.current));
+					iterator.moveNext();
+				}
+				collection.openNodes = toOpen;
+			}
+			
+			private function getChildrenOf(item:Object):Array {
+				var res:Array = [item];
+				var model:HierarchicalData = collection.source as HierarchicalData;
+				if (item != null && model.canHaveChildren(item)) {
+					var childItems:ICollectionView;
+					if (item != null &&	model.canHaveChildren(item) && model.hasChildren(item)) {
+						childItems = collection.getChildren(item);
+					}
+					if (childItems) {
+						var childItem:Object;
+						for (var i:IViewCursor = childItems.createCursor(); !i.afterLast; ) {
+							childItem = i.current;
+							if (model.canHaveChildren(childItem)) {
+								res = res.concat(getChildrenOf(childItem));
+							}
+							i.moveNext();
+						}
+					}
+				}
+				return res;
+			}                     
+			
+			public function isIntermediate(item:Object):Boolean{
+				// has children and has parent
+				return item.children && HierarchicalCollectionView(treemap.dataProvider).getParentItem(item) != null;
+			}
+			
+			public function isRoot(item:Object):Boolean{
+				return item.children == treemap.dataProvider;
+			}
+			
+			public function isTop(item:Object):Boolean{
+				var p:* = HierarchicalCollectionView(treemap.dataProvider).getParentItem(item);
+				// is part of the collection but has no parent
+				return p == null;
+			}
+			
+			public function ontableselect():void{
+				treemap.selectedItems = table.selectedItems;
+				ontmselect(false);
+			}
+			
+			public function ontmselect(updateTable:Boolean):void{
+				if (treemap.selectedItems.length == 0) {
+					nameLabel.text = "";
+					if (updateTable)
+						table.selectedItems = [];
+					dd.enabled = false;
+					return;
+				}
+				dd.enabled = true;
+				var selectedItem:Object = treemap.selectedItems[0];
+				var dp:ICollectionView = table.dataProvider as ICollectionView;
+				if (!selectedItem.children) {
+					nameLabel.text = selectedItem.PrimaryBillToCountry+"  /  "+selectedItem.PrimaryBillToCity+"  /  "+selectedItem.AccountName;
+					// do not allow drilldown on leaf
+					if (updateTable)
+						table.selectedItems = treemap.selectedItems;
+					if (HierarchicalCollectionView(treemap.dataProvider).getParentItem(selectedItem) == treemap.virtualRoot) {
+						dd.enabled = false;
+					}
+				} else {
+					var selection:Array = [];
+					var i:int, j:int;
+					if (isTop(selectedItem)) {
+						// top level
+						nameLabel.text = selectedItem.AccountName;
+						for (i = 0; i < selectedItem.children.length; i++) {
+							for (j = 0; j < selectedItem.children[i].children.length; j++) {
+								selection.push(selectedItem.children[i].children[j]);
+							}
+						}
+					} else {
+						// we already dealt with top and leaf level => intermediate
+						nameLabel.text = HierarchicalCollectionView(treemap.dataProvider).getParentItem(selectedItem).AccountName+" / "+selectedItem.AccountName;
+						for (i = 0; i < selectedItem.children.length; i++) {
+							selection.push(selectedItem.children[i]);
+						}
+					}
+					if (updateTable)
+						table.selectedItems = selection;
+				}
+				if (updateTable && table.selectedIndex != -1)
+					table.scrollToIndex(table.selectedIndex);
+			}
+			
+			public function onkeydown(event:KeyboardEvent):void{
+				if (event.keyCode == Keyboard.PAGE_UP)
+					drilldown();
+				else if (event.keyCode == Keyboard.PAGE_DOWN)
+					drillup();
+			}
+			
+			public function onmousewheel(event:MouseEvent):void{                           
+				event.stopPropagation();
+				if (event.delta > 0 && dd.enabled) {
+					drilldown();
+				} else if (event.delta < 0 && du.enabled) {
+					drillup();
+				}
+			}
+			
+			public function drilldown():void{
+				var selectedItem:Object = treemap.selectedItems.length > 0 ? treemap.selectedItems[0] : null;
+				// do not drill down on leaf items instead drill down on their parent
+				if (selectedItem != null && !selectedItem.children) {        
+					selectedItem = HierarchicalCollectionView(treemap.dataProvider).getParentItem(selectedItem);
+				}
+				if (selectedItem != null && selectedItem != treemap.virtualRoot &&
+					treemap.virtualRoot != previousRoot[previousRoot.length-1]) {
+					assignRoot(selectedItem);
+					previousRoot.push(treemap.virtualRoot);        
+					du.enabled = true;
+				}
+			}
+			
+			public function drillup():void{
+				// we do two tests before proceeding because during animation the first test is ok
+				// even though it is not a good idea
+				if (previousRoot.length > 0 && 
+					previousRoot[previousRoot.length - 1] !=  treemap.virtualRoot) {
+					assignRoot(previousRoot.pop());
+					if (previousRoot.length == 0)
+						du.enabled = false;          
+				}
+			}
+			
+			public function assignRoot(root:Object):void{
+				treemap.virtualRoot = root;
+				dd.enabled = true;
+				if (isIntermediate(root)) {
+					// intermediate level
+					treemap.labelThreshold = 2;
+					dd.enabled = false;
+				} else  {
+					treemap.labelThreshold = 1;
+				}
+				var dp:ICollectionView = table.dataProvider as ICollectionView;
+				dp.filterFunction = function(item:Object):Boolean {
+					if (isRoot(root)) {
+						return true;
+					} else if (isIntermediate(root)) { 
+						// intermediate
+						return (HierarchicalCollectionView(treemap.dataProvider).getParentItem(item) == root);
+					} else if (isTop(root)) {
+						// top
+						var hcv:HierarchicalCollectionView = treemap.dataProvider as HierarchicalCollectionView;
+						return (hcv.getParentItem(hcv.getParentItem(item)) == root);
+					} 
+					return true;
+				};  
+				dp.refresh();             
+			}
+			
+			public function onover(event:TreeMapEvent):void{     
+				if (event.item) {
+					// Position the upper-left of the tooltip
+					// at the lower-right of the arrow cursor.
+					var x:Number = MouseEvent(event.triggerEvent).stageX + 11;
+					var y:Number = MouseEvent(event.triggerEvent).stageY + 22;
+					// If the tooltip is too wide to fit onstage, move it left.
+					tooltip = 
+						ToolTipManager.createToolTip(event.item.AccountName, x, y, null, this) as ToolTip;         
+					var toolTipWidth:Number = tooltip.width;
+					var screenWidth:Number = tooltip.screen.width;
+					var screenHeight:Number = tooltip.screen.height;
+					if (x + toolTipWidth > screenWidth)
+						x = screenWidth - toolTipWidth;
+					// If the tooltip is too tall to fit onstage, move it up.
+					var toolTipHeight:Number = tooltip.height;
+					if (y + toolTipHeight > screenHeight)
+						y = screenHeight - toolTipHeight;
+					tooltip.move(x, y);                
+				}
+			}
+			
+			public function onout(event:TreeMapEvent):void{
+				if (tooltip) {
+					ToolTipManager.destroyToolTip(tooltip);
+					tooltip = null;
+				}
+			}
+			
+			private function rFunction(item:Object, graphics:Graphics, rect:Rectangle, fillColor:uint, depth:int, isLeaf:Boolean):void{
+				var colors:Array = [fillColor, ColorUtil.adjustBrightness(fillColor, -50)];
+				var matr:Matrix = new Matrix();
+				matr.createGradientBox(rect.width, rect.height, 90, rect.x, rect.y);
+				graphics.beginGradientFill(GradientType.LINEAR, colors, OPACITIES, RATIOS, matr);
+				graphics.drawRect(rect.x, rect.y, rect.width, rect.height);
+				graphics.endFill();
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="1060" height="640" right="0" bottom="0"><!--CRO 05.01.2011 TREEMAPWINDOW_TITLE_BAR_TREE_MAP =GLOBAL_TREE_MAP-->
+		<control:TitleBar icon="@Embed(source='/assets/tree_map.png')" title="{i18n._('GLOBAL_TREE_MAP')}"/>
+		<mx:VBox top="32" left="8" right="8" bottom="8">
+			<mx:HDividedBox width="100%" height="100%">
+				<mx:ApplicationControlBar width="350" height="100%"
+										  fillColors="[#FFFFFF, #EEEEEE]">
+					<!--<mx:VBox width="100%" height="100%">-->
+					<mx:DataGrid id="table" width="100%" height="100%"
+								 change="ontableselect()" doubleClickEnabled="true" doubleClick="drilldown()" >
+						<mx:columns><!--CRO 05.01.2011-->
+							<mx:DataGridColumn dataField="AccountName"
+											   headerText="{i18n._('GLOBAL_ACCOUNT_NAME')}"/>
+							<mx:DataGridColumn dataField="PrimaryBillToCountry"
+											   headerText="{i18n._('TREEMAPWINDOW_DATAGRID_COLUMN_COUNTRY')}"
+											   width="55"/>
+							<mx:DataGridColumn dataField="PrimaryBillToCity"
+											   headerText="{i18n._('GLOBAL_CITY')}"
+											   width="55"/><!--CRO 05.01.2011-->
+							<mx:DataGridColumn dataField="AnnualRevenues"
+											   headerText="{i18n._('GLOBAL_ANNUAL_REVENUES')}"
+											   width="55"/>
+						</mx:columns>
+					</mx:DataGrid>
+					<!--</mx:VBox>-->
+				</mx:ApplicationControlBar>
+				
+				<mx:VBox width="100%" height="100%">
+					<mx:ApplicationControlBar width="100%" height="35" minWidth="0"
+											  fillColors="[#FFFFFF, #BCC2CD]" fillAlphas="[0.8, 0.8]">
+						<!--CRO 05.01.2011-->
+						<mx:Button icon="@Embed(source='/assets/drilldown.png')"
+								   toolTip="{i18n._('GLOBAL_DRILL_DOWN')}"
+								   click="drilldown()" enabled="false" id="dd"
+								   label="{i18n._('GLOBAL_DRILL_DOWN')}"
+								   minWidth="110"/>
+						<mx:Button
+							label="{i18n._('TREEMAPWINDOW_BUTTON_DRILL_UP')}"
+							icon="@Embed(source='/assets/drillup.png')"
+							toolTip="{i18n._('TREEMAPWINDOW_BUTTON_TOOL_TIP_GO_BACK_TO_PREVIOUS_LEVEL')}"
+							click="drillup()" enabled="false" id="du" minWidth="110"/>
+						<mx:Label width="100%" id="nameLabel" text="" fontWeight="bold"/>
+					</mx:ApplicationControlBar>
+					<mx:ApplicationControlBar width="100%" height="100%"
+											  fillColors="[#FFFFFF, #EEEEEE]">
+						<mx:VBox width="100%" height="100%">            
+							<ilog:TreeMap id="treemap" height="100%" width="100%"
+										  doubleClickEnabled="true" renderFunction="rFunction"
+										  itemRollOver="onover(event)"
+										  itemRollOut="onout(event)" areaField="AnnualRevenues"
+										  colorField="AnnualRevenues" labelField="AccountName" animationDuration="500"
+										  labelThreshold="1" change="ontmselect(true)"
+										  colorScheme="div-red-green" topMarginProportion="0.5"
+										  maxTopMargin="20" backgroundColor="0xFFFFFF"              
+										  textBackgroundColor="0xFFFFFF" keyDown="onkeydown(event)"
+										  mouseWheel="onmousewheel(event)" borderThreshold="1"
+										  borderThickness="1" itemDoubleClick="drilldown()" />             
+						</mx:VBox>
+					</mx:ApplicationControlBar>
+				</mx:VBox>
+			</mx:HDividedBox>
+		</mx:VBox>		
+	</mx:Canvas>
+</mx:Window>

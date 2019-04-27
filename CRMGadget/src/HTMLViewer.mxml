@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	width="1060" height="640"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init()"
+	resizable="false"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			import gadget.window.WindowManager;
+			[Bindable] public var facebook:Boolean = true;
+			[Bindable] public var location:String;
+			[Bindable] public var titleBarIcon:Class;
+			[Bindable] public var titleBarLabel:String;
+			[Bindable] public var item:Object;
+			[Bindable] private var showSpinner:Boolean;
+			public var reload:Function;
+			private function init():void {
+				if(location != null) {
+					htmlLink.location = location;
+					toggleSpinner(true);
+					htmlLink.addEventListener(Event.COMPLETE, function(e:Event):void {
+						toggleSpinner(false);
+					});
+				}
+				systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN, keyDown);
+			}
+			
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			
+			private function toggleSpinner(play:Boolean):void {
+				if (play) {
+					showSpinner = play;
+					spinner.play();
+				}
+				else { 
+					showSpinner = play;
+					spinner.stop();
+				}
+			}
+			
+			private var fMax:Boolean = false;
+			private function viewRestoreMaxWindow():void {
+				if (fMax) {
+					fMax = false;
+					restore();
+				} else { 
+					fMax = true; 
+					maximize();
+				}
+			}
+
+			protected function update_clickHandler(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				if(facebook) {
+					Detail.openFacebookWindow(item, true, this,reload);
+				}else {
+					Detail.openFacebookWindow(item, false, this,reload);
+				}				
+			}
+
+		]]>
+	</mx:Script>
+
+	<mx:Canvas horizontalScrollPolicy="off" verticalScrollPolicy="off" width="100%" height="100%" styleName="main" left="0" top="0" right="0" bottom="0">
+		<mx:Canvas width="100%" id="windowTitleBar" backgroundColor = "#EEEEEE" styleName="titleBar" doubleClickEnabled="true" doubleClick="viewRestoreMaxWindow()" mouseDown="nativeWindow.startMove()" height="24" top="2" left="2" right="2">
+			<mx:HBox width="100%" left="4" horizontalGap="2" verticalAlign="middle">
+				<control:Spinner id="spinner" includeInLayout="{showSpinner}" visible="{showSpinner}" tickColor="#66aaff"/>
+				<mx:Image source="{titleBarIcon}" height="16" width="16"/>
+				<mx:Label id="titleLabel" text="{titleBarLabel}"/>
+			</mx:HBox>
+			<mx:Button styleName="iconMinimize" height="16" width="16" top="2" right="36" click="minimize()"/>
+			<mx:Button styleName="iconMaximize" height="16" width="16" top="2" right="20" click="viewRestoreMaxWindow()"/>
+			<mx:Button styleName="iconClose" height="16" width="16" top="2" right="4" click="close()"/>
+		</mx:Canvas>
+		<mx:Canvas width="100%" height="100%" left="5" top="24" right="5" bottom="5">
+			<mx:VBox width="100%" height="100%">
+				<mx:HTML id="htmlLink" width="100%" height="100%"/>
+				<mx:HBox width="100%" horizontalAlign="right" horizontalGap="4" paddingLeft="4" paddingRight="4" paddingTop="4" paddingBottom="4" backgroundColor="#EEEEEE" cornerRadius="5">
+					<mx:Button icon="{ImageUtils.cancelIcon}" label="{i18n._('GLOBAL_CANCEL')}" click="close()"/>
+					<mx:Button icon="{ImageUtils.editIcon}" label="{i18n._('GLOBAL_UPDATE')}" click="update_clickHandler(event)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:Canvas>
+	</mx:Canvas>
+	
+</mx:Window>

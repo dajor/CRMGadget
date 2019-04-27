@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="450" height="540"
+	title="{i18n._('GLOBAL_LOGGING_DETAIL')}"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init()"
+	>
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.sync.LogEvent;
+			import gadget.util.ImageUtils;
+			import gadget.util.ObjectUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			[Bindable] public var item:Object; 
+			[Bindable] public var list:List;
+			private function init():void {
+				var type:String;
+				var typeIcon:Class;
+				lblTime.text = item.time;
+				switch(item.type){
+					case LogEvent.ERROR : type = "Error"; typeIcon = ImageUtils.errorIcon; break;
+					case LogEvent.WARNING: type = "Warning"; typeIcon = ImageUtils.warningIcon; break;
+					case LogEvent.SUCCESS: type = "Success"; typeIcon = ImageUtils.tickIcon; break;
+					default: type = "Info"; typeIcon = ImageUtils.infoIcon;
+				}
+				lblType.text = type;
+				txtMessage.text = item.message;
+				if(item.record!=null){
+					var colsName:Array = DAOUtils.getNameColumns(item.record.gadget_type);
+					var name:String = ObjectUtils.joinFields(item.record,colsName);
+					recordename.text=name;
+					viewBtn.enabled=(true && list!=null);
+				}else{
+					viewBtn.enabled=false;
+				}				
+				trace(item.event);
+				if(item.event != null){
+					txtEvent.text = Utils.formatEvent(item.event);	
+				}
+				titlebar.icon = typeIcon;
+			}
+			private function viewRecord():void{
+							
+				list.editScreenDetail(Database.getDao(item.record.gadget_type).findByGadgetId(item.record.gadget_id));							
+				//close();	
+				
+			}
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="450" height="540" right="0" bottom="0">
+		<control:TitleBar id="titlebar" title="{i18n._('GLOBAL_LOGGING_DETAIL')}" y="2" x="25"/>
+		
+		<mx:VBox top="36" left="8" right="8" bottom="8" width="100%" paddingLeft="10">
+				<mx:HBox>
+						<mx:Label text="{i18n._('LOGGING_DETAIL_LABEL_TIME')}" fontSize="10" fontWeight="bold"/>
+						<mx:Label id="lblTime"/>
+				</mx:HBox>
+				<mx:HBox>
+						<mx:Label text="{i18n._('LOGGING_DETAIL_LABEL_TYPE')}" fontSize="10" fontWeight="bold"/>
+						<mx:Label id="lblType"/>
+				</mx:HBox>
+				<mx:HBox>
+					<mx:Label text="{i18n._('Record Name')}" fontSize="10" fontWeight="bold"/>
+					<mx:Label id="recordename"/>
+				</mx:HBox>
+				<mx:VBox >
+						<mx:Label text="{i18n._('LOGGING_DETAIL_LABEL_MESSAGE')}" fontSize="10" fontWeight="bold"/>
+						<mx:TextArea id="txtMessage" width="410" height="165" editable="false"/>
+				</mx:VBox>
+				<mx:VBox>
+						<mx:Label text="{i18n._('LOGGING_DETAIL_LABEL_EVENT')}  " fontSize="10" fontWeight="bold"/>
+						<mx:TextArea id="txtEvent" width="410" height="165" editable="false"/>
+				</mx:VBox>
+			<mx:Canvas width="100%">
+				<mx:HBox width="100%" horizontalAlign="right">
+					<mx:Button id="viewBtn" label="{i18n._('GLOBAL_VIEW_RECORD')}" click="viewRecord()" right="0" icon="{ImageUtils.editIcon}"/>
+					<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" right="0" icon="{ImageUtils.cancelIcon}"/>
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+		
+	</mx:Canvas>
+	
+</mx:Window>

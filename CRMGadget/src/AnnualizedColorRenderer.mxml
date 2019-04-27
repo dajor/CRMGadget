@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	
+<fx:Script>
+	<![CDATA[
+		import gadget.control.MandatoryColRenderer;
+		override public function getStyle(styleProp:String):*
+		{
+			if(super.data!=null){//always red if an error
+				var realCol:Array = new Array();
+//				if((super.data.type==ImpactCalendar.FORECAST_TYPE||super.data.type==ImpactCalendar.VARIANCE_TYPE) && MandatoryColRenderer.REPLACE_STYLE.indexOf(styleProp)!=-1 ){										
+//						realCol.push(0xFF0000);
+//						return realCol;				
+//				}
+				
+				if("alternatingItemColors"==styleProp){
+					//return normal color
+					var colors:Array = super.getStyle(styleProp);
+					if(!isNaN(super.data.group)&& colors!=null && colors.length>0){					
+						realCol.push(colors[super.data.group%colors.length]);
+						return realCol;
+					}	
+				}
+				
+			}
+			
+			return super.getStyle(styleProp);
+		}
+		override public function set data(value:Object):void{
+			super.data = value;
+			if(super.data!=null){
+				if(super.data.type==ImpactCalendar.FORECAST_TYPE||super.data.type==ImpactCalendar.VARIANCE_TYPE||super.data.type==ImpactCalendar.ACTUAL_TYPE){
+					lblData.setStyle("fontWeight","bold");
+				}
+			}
+		}
+	]]>
+</fx:Script>
+	<s:Label id="lblData" top="5" left="5" right="5" bottom="5" textAlign="left" text="{listData.label}" />
+</s:MXAdvancedDataGridItemRenderer>

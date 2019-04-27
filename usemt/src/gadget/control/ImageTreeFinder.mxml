@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas width="100%" xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.CustomFieldDAO;
+			import gadget.dao.Database;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			[Bindable] public var text:String;
+			[Bindable] public var item:Object;
+			[Bindable] public var fieldInfo:Object;
+			[Bindable] public var clickFunc:Function;
+			[Bindable] public var refreshData:Function;
+			
+			private function clearText():void {
+				text = "";
+				embedText.text = ""; 
+				item.data.objTree = null;
+				var customField:Object = Database.customFieldDao.selectCustomField(fieldInfo.entity, fieldInfo.element_name);
+				var mapFields:ArrayCollection = Utils.bindValueToGridPicklist(customField.bindValue, ["crmData","oodData","oodLabel"]);
+				for each(var map:Object in mapFields) {
+					item.data[map.oodData] = ""; // clear data in object tree
+				}
+				if(refreshData != null) refreshData();
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:HBox width="100%">
+		<mx:Canvas width="95%">			
+			<mx:TextInput id="embedText" text="{text}" data="{data}" editable="false" click="clickFunc(event)" width="100%"/>
+			<mx:Image source="@Embed('/assets/tree.png')" verticalCenter="0" right="5"/>
+		</mx:Canvas>
+		<mx:LinkButton icon="@Embed('/assets/delete.png')" click="{clearText()}"/>
+	</mx:HBox>
+	
+</mx:Canvas>

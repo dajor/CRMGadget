@@ -1,0 +1,33 @@
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+@namespace ilog "http://www.ilog.com/2007/ilog/flex";
+
+ilog|Calendar {
+  grid-background-color: #3e3e3e;
+  headers-background-colors: #222222, #222222;
+  color: #FFFFFF;
+  fontWeight: normal;
+  fontSize:10;
+  color:#ffffff;
+  selection-background-color: #222222;
+  line-color: #000000;
+  alternating-cell-colors: #3e3e3e, #3e3e3e;
+  cell-header-color: #222222;
+  cell-font-color: #999999;
+  today-cell-font-color: #EEEEEE;
+  today-grid-background-color:#6B4747;
+  today-cell-header-color:#533737;   
+  today-headers-background-colors:#533737, #533737;
+  today-font-color: #FFFFFF;  
+  non-working-background-color: #272727;
+}
+
+ilog|CalendarItemLabelRenderer {
+  color : #FFFFFF;
+  selection-text-color : #FF0000;
+}
+
+mx|ButtonBarButton
+{
+  corner-radius: 0;
+}

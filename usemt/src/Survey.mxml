@@ -1,0 +1,670 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	xmlns:containers="flexlib.containers.*"
+	resizable="false"
+	width="1180" 
+	height="630"
+	keyDown="keyDown(event);"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	xmlns:s="library://ns.adobe.com/flex/spark" xmlns:layout="flexlib.scheduling.scheduleClasses.layout.*" xmlns:code="http://code.google.com/p/flexlib/"
+	initialize="init()"
+	
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.assessment.DtoAssessmentSplitter;
+			import com.assessment.DtoColumn;
+			import com.assessment.DtoConfiguration;
+			import com.assessment.DtoPage;
+			import com.hurlant.math.bi_internal;
+			
+			import gadget.assessment.AssessmentModelTotal;
+			import gadget.assessment.AssessmentPageTotal;
+			import gadget.assessment.AssessmentSectionTotal;
+			import gadget.assessment.IAssessmentTotal;
+			import gadget.control.CheckBoxQuestionRender;
+			import gadget.control.DateColumnRenderer;
+			import gadget.control.MyAdvancedDataGrid;
+			import gadget.control.QuestSectionComponent;
+			import gadget.control.RadioQuestionRenderer;
+			import gadget.control.SectionNameItemRenderer;
+			import gadget.control.TextInputColRenderer;
+			import gadget.dao.ActivityDAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.DateUtils;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.ComboBox;
+			import mx.controls.Label;
+			import mx.controls.TextInput;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.events.ListEvent;
+			import mx.utils.StringUtil;
+			[Bindable] public var closeAssModelFunction:Function;
+			//[Bindable] public var modelName:String;
+			
+			[Bindable] public var assModel:DtoConfiguration;
+			//[Bindable] public var assType:String; //type of assessment created by objects(Account,Contact,Lead,Appointment,...)
+			[Bindable] public var parentItem:Object; //Parent survey item
+			[Bindable] public var lstSurveyedTask:ArrayCollection; //list of task has all ready do survey
+			public var assessmentType:String;
+			//private var listSections:ArrayCollection = new ArrayCollection();
+			private var lstIndex:int = 0 ;
+			private var mapTask:Dictionary=null;
+			//private var objGrandTotal:Object = new Object;
+			public static const ACTIVITY_TYPE:String = "Survey result";
+			public static const ACTIVITY_GRAND_TOTAL_TYPE:String = "Survey Result Summary";
+			//public static const GRAND_TOTAL_SUBJECT:String = "Assessment Survey Summary";
+			public static const ACTIVITY_AREA_SUMMARY:String="Survey Area Summary";
+			
+			protected var modelTotal:AssessmentModelTotal;
+			protected var tableTotal:MyAdvancedDataGrid = null;			
+			protected var pageTotalTable:MyAdvancedDataGrid;
+			protected var listColumns:Array = null;
+			
+			
+			private var storeCustomFieldsAccount:Object = new Object();
+			private var mappingControlObject:Object;
+			
+			
+			private function init():void{
+				
+				btnPrevious.enabled = false;				
+				if(assModel!=null){
+					listColumns = Database.mappingTableSettingDao.getColumnByModelId(assModel.recordId);
+					titlebar.title = assModel.assessmentModel;
+					modelTotal = new AssessmentModelTotal(assModel,listColumns);
+					for each(var pageName:String in assModel.pageSelectedIds){						
+						var page:DtoPage = Database.assessmentPageDao.selectByPageName(pageName);						
+						var pageTotal:AssessmentPageTotal = new AssessmentPageTotal(page);
+						modelTotal.addPageTotal(pageTotal);	
+						if(page!=null){
+							for each(var assId:String in page.assessmentSelectedIds){
+								bindListQuestion(assId,pageTotal);
+							}
+							
+						}
+					}
+					
+				}
+				createNewSection();
+				setFooter();
+				
+				if(modelTotal == null || modelTotal.listPageTotal.length==1){
+					btnNext.enabled = false;
+					tableTotal = createListGrandTotal(modelTotal,i18n._('Model_Total@Model Total'));
+				} 
+				detailCanvas.setFocus();
+			//	detailCanvas.addEventListener(KeyboardEvent.KEY_UP,tabChange);
+				
+			}
+			
+			private function keyDown(evt:KeyboardEvent):void {
+				//bug #452
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			
+			
+			private function createColGrandTotal(mappingObject:Object=null):AdvancedDataGridColumn{
+				var child:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+				if(mappingObject != null){
+					child.dataField = mappingObject.colProperty;
+					child.headerText = mappingObject.title ;
+				}
+				//child.showDataTips = true;
+				child.setStyle("fontWeight","bold");
+				child.sortable = false;
+				child.editable = false;
+				child.setStyle("foreColor","white");
+				return child;
+			}
+			public function createListGrandTotal(section:IAssessmentTotal,labelTotal:String):MyAdvancedDataGrid{
+				var vBox:VBox = new VBox();
+				var grid:MyAdvancedDataGrid = new MyAdvancedDataGrid();				
+				var listFields:Array = listColumns;
+				var columns:ArrayCollection = new ArrayCollection();
+				var listData:ArrayCollection = new ArrayCollection();
+				var row:Object = new Object();
+				listData.addItem(row);
+				grid.percentWidth = 100;
+				grid.percentHeight = 10;
+				vBox.setStyle("paddingLeft",20);
+				vBox.setStyle("paddingRight",20);
+				vBox.percentHeight = 100;
+				vBox.percentWidth = 100;
+				vBox.addChild(grid);
+				var totalCol:AdvancedDataGridColumn = createColGrandTotal();
+				
+				totalCol.headerText = labelTotal ;
+				//bug#5795 ---hide Page / Model Total
+//				totalCol.labelFunction = function(item:Object,col:AdvancedDataGridColumn):String{
+//					return section.getAverageTotal().toFixed(2)+" %";
+//				};
+				columns.addItem(totalCol);
+				
+				for each(var dcol:DtoColumn in listFields ){
+					
+					if(dcol.visible && dcol.isHasSumField){
+						var col:AdvancedDataGridColumn = createColGrandTotal(dcol);
+						col.labelFunction = displayTotalValueAsPercent;
+						columns.addItem(col);
+						row[dcol.colProperty] = section.getPercentTotal(dcol); 
+					}
+				}
+				if(columns.length > 0){ 
+					grid.visible = true;
+					grid.columns = columns.source;					
+					assessmentSection.addChild(vBox);
+				}else{
+					grid.visible = false;
+				}
+				grid.dataProvider = listData;
+				
+				return grid;
+				
+			}
+			
+			// CH : ticket 6399
+			// IHFM Status = IndexedPick5
+			// Internrevision resultat = CustomPickList6
+			private function generateCustomFields():HBox{
+				mappingControlObject = new Object();
+				var hboxCustomFieldAccount:HBox = new HBox();
+				hboxCustomFieldAccount.percentWidth = 100;
+				hboxCustomFieldAccount.setStyle("paddingLeft", 20);
+				
+				var account:Object = Utils.getAccount(parentItem);				
+				if(account){
+					storeCustomFieldsAccount = Database.accountDao.findByOracleId(account[DAOUtils.getOracleId("Account")]);
+					if(storeCustomFieldsAccount){
+						for each(var field:String in ["IndexedPick5", "CustomPickList6"]){
+							var hbox:HBox = new HBox();
+							hbox.setStyle("verticalAlign", "middle");
+							var fieldInfo:Object = FieldUtils.getField("Account", field);
+							var lbl:Label = new Label();
+							lbl.text = fieldInfo.display_name;
+							lbl.setStyle("fontWeight", "bold");
+							hbox.addChild(lbl);
+							var displayObject:DisplayObject =  GUIUtils.getInputField(false, null, "Account", storeCustomFieldsAccount, fieldInfo,false);
+							mappingControlObject[field] = displayObject;
+							hbox.addChild(displayObject);
+							hboxCustomFieldAccount.addElement(hbox);
+						}
+					}
+				}else{
+					var label:Label = new Label();
+					label.text = "There are no link account.";
+					hboxCustomFieldAccount.addChild(label);
+				}
+				return hboxCustomFieldAccount;
+			}
+			
+			
+			private function displayTotalValueAsPercent(item:Object,col:AdvancedDataGridColumn):String{
+				if(StringUtils.isEmpty(assModel.sumType)){
+					return item[col.dataField];
+				}else{
+					return item[col.dataField]?Number(item[col.dataField]).toFixed(2)+" %":"0 %";
+				}
+			}
+			
+			private function getTask(assementName:String,pagename:String):Object{
+				if(mapTask==null){
+					mapTask = new Dictionary();
+					for each(var task:Object in lstSurveyedTask){		
+						var key:String = task.Subject;
+						if(task[ActivityDAO.ASS_PAGE_NAME]){
+							key =key+task[ActivityDAO.ASS_PAGE_NAME];
+						}
+						mapTask[key] = task;
+					}
+				}
+				
+				var task:Object =  mapTask[assementName+pagename];
+				
+				if(task==null){
+					//maybe get from ood so pagname is empty
+					//try get task with assname
+					task = mapTask[assementName];
+				}
+				
+				return task;
+			}
+			private function bindListQuestion(assId:String,pageTotal:AssessmentPageTotal):void{
+				
+				var ass:Object = Database.assessmentDao.getById(assId);			
+				if(ass==null){
+					return;//cannot find ass in the database
+				}
+				var lstQues:Array = Database.questionDao.getByAssessmentName(ass.Name);
+				var task:Object = getTask(ass.Name,pageTotal.page.pageName);				
+				var sectionTotal:AssessmentSectionTotal = new AssessmentSectionTotal(ass);
+				pageTotal.addSectionTotal(sectionTotal);					
+				var odd:Boolean = false;
+				if(lstQues!=null && lstQues.length>0){
+					
+					
+					for each(var quest:Object in lstQues){
+						//clear question default value
+						for each(var dtoCol:DtoColumn in listColumns){
+							if (dtoCol.colProperty != "Question" ){
+								delete quest[dtoCol.colProperty];
+							}
+						}
+						/*if(quest.isHeader=="1"){
+							continue;
+						}*/
+						quest.RemoveCommentBox = quest.RemoveComment;
+						//quest.isHeader = false;
+						quest.odd =  odd ? false : true;
+						quest.gadget_id = task == null ? null : task.gadget_id;
+						
+						odd = !odd;
+						var mapCols:ArrayCollection = Database.assessmentMappingDao.selectByQuestionId(quest.QuestionId,assModel.recordId);
+						if(task!=null){
+							for each(var map:Object in mapCols){
+								if (map.ColumnProperty != "Question" ){
+									quest[map.ColumnProperty] = task[map.Oraclefield];
+								}
+							}
+						}
+						
+					}		
+					sectionTotal.listQuestion =new ArrayCollection(lstQues);
+					//companyData.addItem(sectionTotal);
+				}
+				
+				
+				
+			}
+			
+			private function setFooter():void{
+				if(modelTotal.listPageTotal.length>1)
+					progressAmount.text = (lstIndex+1) + " / " + modelTotal.listPageTotal.length + " " + i18n._("GLOBAL_SECTIONS");
+			}
+			
+			private function refreshPage():void{
+				var listFields:Array = listColumns;
+				if(tableTotal!=null && !btnNext.enabled ){
+					
+					var listData:ArrayCollection = new ArrayCollection();
+					var row:Object = new Object();
+					listData.addItem(row);				
+					
+					for each(var obj:DtoColumn in listFields ){	
+						
+						if(obj.visible && obj.isHasSumField){						
+							row[obj.colProperty] = modelTotal.getPercentTotal(obj); 
+						}
+					}
+					tableTotal.dataProvider = listData;
+				}
+				
+				if(pageTotalTable!=null){
+					var pageTotal:AssessmentPageTotal =  modelTotal.listPageTotal[lstIndex] as AssessmentPageTotal;
+					var data:ArrayCollection = new ArrayCollection();
+					var dataRow:Object = new Object();
+					data.addItem(dataRow);				
+					for each(var col:DtoColumn in listFields ){							
+						if(col.visible && col.isHasSumField){						
+							dataRow[col.colProperty] = pageTotal.getPercentTotal(col); 
+						}
+					}
+					pageTotalTable.dataProvider = data;
+				}
+				
+			}
+			
+			private function createNewSection():void{
+				if(modelTotal != null && modelTotal.listPageTotal.length>lstIndex){
+					var assPage:AssessmentPageTotal = modelTotal.listPageTotal[lstIndex];
+					var listAsst:ArrayCollection = assPage.listSectionTotal;
+					var temphieght:int = 0;
+					assessmentSection.removeAllChildren();
+					assessmentSection.verticalScrollPosition = 0;
+					var isButik:Boolean = assModel.assessmentModel=="Foersaeljningsledare Butiks";
+					var isFirstShow:Boolean = true;
+					
+					for each(var  obj:AssessmentSectionTotal in listAsst){
+						var section:QuestSectionComponent = new QuestSectionComponent();
+						if(isFirstShow == true && !isButik){
+							section.showHeadersSection = true;
+							isFirstShow = false;
+						}else{
+							section.showHeadersSection = isButik;
+						}
+						//section.addEventListener(KeyboardEvent.KEY_UP,keyHandler);
+						//section.functionNextPage = changeFunction;
+						section.refreshPage = refreshPage;
+						section.listColumns = listColumns;
+						var lstQuestion:ArrayCollection = new ArrayCollection();
+						lstQuestion.addAll(obj.listQuestion);
+						if(lstQuestion.length>1){//show total section if question >1
+							lstQuestion.addItem(obj);
+						}
+						section.assModel = assModel;
+						section.assname = obj.assessment.Name;
+						section.lstQuesData = lstQuestion;
+						assessmentSection.addChild(section);
+						temphieght = temphieght + section.height;
+						
+					}
+					pageTotalTable= createListGrandTotal(assPage,i18n._('Page_Total@Page Total'));
+					if(temphieght > 0){
+						temphieght =  temphieght + 40;//add page height
+						if(temphieght > 470){
+							assessmentSection.height =  470;
+						}
+					}
+					
+				}
+			}
+			/*
+			private function generateGrid(provider:ArrayCollection):MyAdvancedDataGrid{
+				var grid:MyAdvancedDataGrid = new MyAdvancedDataGrid();
+				grid.sortableColumns = false;
+				grid.variableRowHeight = true;
+				grid.showHeaders = true;
+				grid.dataProvider = provider;
+				var columns:ArrayCollection = new ArrayCollection();
+				for each (var field:DtoColumn in listColumns ){	
+					if(field.visible){
+						columns.addItem(createColumn(field, false));
+					}
+				}
+				grid.percentWidth = 100;
+				grid.columns = columns.toArray();
+				return grid;
+			}
+			
+			private function createColumn(obj:DtoColumn,editable:Boolean = false, assname:String=""):AdvancedDataGridColumn{
+				var child:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+				var property:String = obj.colProperty;
+				child.dataField = property;
+				child.headerText = obj.title;
+				child.dataTipFunction  = onBuildToolTip;
+				child.showDataTips = true;
+				child.setStyle("fontWeight","bold");
+				child.sortable = false;
+				child.editable = editable;
+				child.setStyle("foreColor","white");
+				if (obj.colProperty == "Question" ){
+					child.headerText = assname;
+					child.itemRenderer=new ClassFactory(SectionNameItemRenderer);
+					child.width = 450;
+					return child;
+				}
+				if (obj.dataType==DtoColumn.CHECK_BOX_TYPE){
+					var chkRender:ClassFactory = new ClassFactory(CheckBoxQuestionRender);
+					chkRender.properties={
+						'dtoCol':obj,
+						'displayName':displayName,						
+						'refreshPageTotal':refreshPage};
+					child.itemRenderer=chkRender;
+					child.editable = true;
+					child.width = getWidth(obj.title.length);
+					
+				}else if (obj.dataType==DtoColumn.RADIO_TYPE){
+					var radoiRender:ClassFactory = new ClassFactory(RadioQuestionRenderer);
+					radoiRender.properties={
+						'dtoCol':obj,
+						'displayName':displayName,
+						'groupProperties': listColumns, 
+						'refreshPageTotal':refreshPage};
+					child.itemRenderer=radoiRender;
+					child.editable = true;
+					child.width = getWidth(obj.title.length);
+					
+				}else if(obj.dataType==DtoColumn.DATE_TYPE){
+					child.itemRenderer = new ClassFactory(DateColumnRenderer);
+					child.width = 230;					
+				}else{
+					
+					child.itemRenderer = new ClassFactory(TextInputColRenderer);
+					child.width =230;
+				}
+				
+				return child;
+			}
+			
+			private function displayName(col:DtoColumn,data:Object):Object{
+				
+				if(data is AssessmentSectionTotal){
+					if(StringUtils.isEmpty(assModel.sumType)){
+						return AssessmentSectionTotal(data).getPercentTotal(col);
+					}
+					return AssessmentSectionTotal(data).getPercentTotal(col).toFixed(2) + "%";
+				}else{
+					return data[col.colProperty];
+				}
+			}
+			
+			private function getWidth(length:int):int{
+				var charWidth:int = 20*length;
+				
+				if(charWidth<80){
+					return 80;
+				}else{
+					return charWidth;
+				}
+				
+			}
+			*/
+			private function createStopTimePanel():HBox{
+				var hBox:HBox = new HBox();
+				var lbl:Label = new Label();
+				var txt:TextInput = new TextInput();
+				var btn:Button = new Button();
+				hBox.addChild(lbl);
+				hBox.addChild(txt);
+				hBox.addChild(btn);
+				
+				return hBox;
+			}
+			private function changeFunction(status:String):void{
+				btnNext.enabled = true;
+				btnPrevious.enabled = true;
+				if(status == "pre"){
+					lstIndex --;
+					if(lstIndex<=0) {
+						btnPrevious.enabled = false;	
+					}
+				}else{					
+					lstIndex ++;
+					if(modelTotal.listPageTotal.length<=lstIndex+1){
+						btnNext.enabled = false;
+						
+					}
+				}
+				createNewSection();
+				setFooter();
+				if(btnNext.enabled == false){
+					//calculateGrandTotal(assModel.recordId);
+					tableTotal = createListGrandTotal(modelTotal,i18n._('Model_Total@Model Total'));
+					// CH : ticket 6399
+					assessmentSection.addChild(generateCustomFields());
+				}
+				if(assessmentSection.height > 470){
+					assessmentSection.height = 470;
+				}
+			}
+//			private function tabChange(event:KeyboardEvent):void{
+//				if(btnNext.enabled){
+//					changeFunction("next");
+//				}
+//			}
+			private function closeFunction():void{
+				this.close();
+			}
+			
+			private function setAssNameToSpliter(item:Object,assname:String):void{
+				var dto:DtoAssessmentSplitter =	Database.assessmentSplitterDao.getByAssModel(assModel.recordId);
+				if(dto!=null){
+					var values:Array = assname.split(dto.delimiter);
+					for(var i:int=0;i<values.length;i++){
+						if(i<dto.selectedFields.length){
+							item[dto.selectedFields.getItemAt(i)]=StringUtil.trim(values[i]);						 
+						}
+					}
+				}
+				
+			}
+			private function saveFunction(isClose:Boolean=false):void{
+				
+				try{
+					Database.begin();
+					var acc:Object = Utils.getAccount(parentItem);
+					if(acc != null){
+						for (var i:int=0; i<modelTotal.listPageTotal.length;i++){
+							var page:AssessmentPageTotal = modelTotal.listPageTotal.getItemAt(i) as AssessmentPageTotal;
+							var blocks:ArrayCollection = page.listSectionTotal;	
+							for each(var obj:AssessmentSectionTotal in blocks){
+								var lst:ArrayCollection = obj.listQuestion;
+								var item:Object = new Object();
+								upsertQuestion(item,parentItem,acc,lst,obj,ACTIVITY_TYPE);
+								
+							}
+							upsertQuestion(new Object(),parentItem,acc,Database.activityDao.findSurveyByParentSurveyIdAndPage(parentItem.ActivityId,page.getName(),Survey.ACTIVITY_AREA_SUMMARY),page,ACTIVITY_AREA_SUMMARY);
+						}
+						if(modelTotal.listPageTotal.length>0){ // upsert model total percent
+							upsertQuestion(new Object(),parentItem,acc,Database.activityDao.findSurveyByParentSurveyId(parentItem.ActivityId,Survey.ACTIVITY_GRAND_TOTAL_TYPE),modelTotal,ACTIVITY_GRAND_TOTAL_TYPE);
+						}
+						
+						if(mappingControlObject){
+							for(var field:String in mappingControlObject){
+								var combobox:ComboBox = mappingControlObject[field] as ComboBox; 
+								storeCustomFieldsAccount[field] = combobox.selectedItem.data;
+							}
+							//mark account as update
+							storeCustomFieldsAccount.local_update=new Date().getTime();
+							Database.accountDao.update(storeCustomFieldsAccount);
+						}
+						
+						if(isClose){
+							if(closeAssModelFunction != null) closeAssModelFunction();
+							this.close();
+						}
+					}
+					Database.commit();
+				}catch(e:Error){
+					Database.rollback();
+				}
+			}
+			private function upsertQuestion(item:Object,parentItem:Object,acc:Object,lstQues:ArrayCollection,section:IAssessmentTotal,type:String):void{
+				if( lstQues.length > 0 && lstQues[0].gadget_id!=null){
+					item = Database.activityDao.findByGadgetId(lstQues[0].gadget_id);
+				}
+				if(section is AssessmentSectionTotal){
+					var dtoSection:AssessmentSectionTotal = section as AssessmentSectionTotal;
+					item[ActivityDAO.ASS_PAGE_NAME]=dtoSection.assPageTotal.page.pageName;//page cannot null
+				}
+				item.Type = type;
+				item.ActivitySubType = assModel.assessmentModel;
+				item.Subject = section.getName();
+				item.DueDate = DateUtils.format(new Date(), DateUtils.DATABASE_DATE_FORMAT);
+				item.Activity = "Task";
+				item.Status = "Completed";
+				item.Priority = '3-Low';
+				item[ActivityDAO.PARENTSURVEYID]= parentItem.ActivityId;
+				
+				item.PrimaryContactId = parentItem.PrimaryContactId;
+				item.PrimaryContact = parentItem.PrimaryContact;
+				item.PrimaryContactFirstName = parentItem.ContactFirstName;
+				item.PrimaryContactLastName = parentItem.ContactLastName;
+				item.AccountId = acc.AccountId;
+				item.AccountName = acc.AccountName;
+				item.AccountLocation = acc.Location;
+				
+				if(section!=null){
+					section.saveTotalToObject(item);
+					if(section is AssessmentSectionTotal){
+						setAssNameToSpliter(item,AssessmentSectionTotal(section).assessment.Name);
+					}
+					
+				}
+				
+				
+				
+				for(var j:int=0; j<lstQues.length;j++){
+					if(!lstQues[j].isHeader || lstQues[j].isHeader=='0' ){
+						var mapCols:ArrayCollection = Database.assessmentMappingDao.selectByQuestionId(lstQues[j].QuestionId,assModel.recordId);
+						for each(var dtoCol:Object in mapCols){
+							var questProp:String = dtoCol.ColumnProperty;
+							if(dtoCol.ColumnProperty=='QuestionMapToField'){
+								questProp = "Question";
+							}
+							//if (dtoCol.ColumnProperty != "Question" ){										
+							item[dtoCol.Oraclefield] = lstQues[j][questProp];									
+							//}
+						}
+					}
+				}
+				if(item.gadget_id ==null){
+					
+					for each(var obj:Object in Database.activityDao.getOwnerFields()){						
+						item[obj.entityField] =  Database.allUsersDao.ownerUser()[obj.userField] ;
+					}
+					item["deleted"] = false;
+					item["error"] = false;
+					Database.activityDao.insert(item);
+					var oidName:String = DAOUtils.getOracleId(Database.activityDao.entity);
+					item = Database.getDao(Database.activityDao.entity).selectLastRecord()[0];
+					// by default, sets the OracleId as gadget_id
+					item[oidName] = "#" + item.gadget_id;
+					Database.getDao(Database.activityDao.entity).update(item);
+					
+				}else{
+					item.local_update = new Date().getTime();
+					item.ms_local_change = new Date().getTime();
+					Database.activityDao.update(item);
+				}
+				
+			}
+			
+//			private function keyHandler(event:KeyboardEvent):void {
+//				changeFunction('next');
+//			}
+		]]>		
+		
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" verticalScrollPolicy="off" horizontalScrollPolicy="off" styleName="main" left="10" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar maximizeable="true" window="{this}" id="titlebar" y="2" x="25" />		
+		<mx:VBox width="100%" height="100%" paddingTop="35" paddingLeft="10" paddingRight="10" borderStyle="solid">
+			<mx:HBox width="100%" horizontalAlign="right" paddingRight="21" paddingBottom="5">
+				<mx:Button id="btnClose" label="{i18n._('GLOBAL_SAVE')}"  click="{saveFunction()}"/>
+				<mx:Button id="btnSave" label="{i18n._('GLOBAL_SAVE_AND_CLOSE')}"  click="{saveFunction(true)}"/>
+			</mx:HBox>
+			<mx:VBox id="assessmentSection" width="100%" height="100%" tabEnabled="true" tabEnabledChange="changeFunction('next')"/>
+			
+		</mx:VBox>
+		<mx:Canvas id="buttonCanvas" width="100%" left="8" right="8" bottom="8" height="35"> 
+			<mx:HBox width="100%" paddingLeft="20" paddingRight="21">
+				<mx:HBox width="33%">
+					<mx:Button id="btnPrevious" label="{i18n._('BATCHUPDATE_PREVIOUS_STR')}" enabled="false" click="{changeFunction('pre')}"/>
+				</mx:HBox >
+				<mx:HBox width="33%" horizontalAlign="center" verticalAlign="middle" top="5">
+					<mx:Label id="progressAmount" fontWeight="bold" fontSize="11"/>
+				</mx:HBox>
+				<mx:HBox  width="34%" horizontalAlign="right">
+					<mx:Button id="btnNext" label="{i18n._('BATCHUPDATE_NEXT_STR')}" click="{changeFunction('next')}" />
+				</mx:HBox>
+			</mx:HBox>
+		</mx:Canvas>
+	</mx:Canvas>
+</mx:Window>

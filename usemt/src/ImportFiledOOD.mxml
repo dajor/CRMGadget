@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:control="gadget.control.*"
+		   xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute" width="400" height="150"
+		   showFlexChrome="false" resizable="false"  systemChrome="none" xmlns:util="gadget.util.*"
+		   transparent="true"
+		   showStatusBar="false"
+		   creationComplete="this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown)">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			import gadget.sync.task.LoginCRM;
+			import gadget.util.ImageUtils;
+			import gadget.util.ImportFileOODUtils;
+			
+			import mx.controls.Alert;
+			import mx.validators.Validator;
+			public var importFromFile:Function;
+			public var importFromOOD:Function;
+			
+			private var uri:String;
+			private var httpStatus:int;
+			private var sessionId:String; 
+			private static const FILE_NAME:String = 'gadget.xml';
+			public var tmpPreferences:Object = new Object();
+			private function closeClick():void{
+				this.close();
+			}
+		
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function successHandler(sessionId:String):void{
+				var strForwardSlash:String = tmpPreferences.sodhost.charAt(tmpPreferences.sodhost.length-1) == "/" ? "" : "/";
+				var request:URLRequest = new URLRequest();
+				request.url = tmpPreferences.sodhost + strForwardSlash +  "OnDemand/user/content/" + FILE_NAME;
+				request.method = URLRequestMethod.GET;
+				request.contentType = "text/xml; charset=utf-8";
+				request.requestHeaders.push(new URLRequestHeader("Cookie", "JSESSIONID=" + sessionId));
+				
+				var loader:URLLoader = new URLLoader();
+				loader.dataFormat = URLLoaderDataFormat.BINARY;
+				loader.addEventListener(Event.COMPLETE, function(e:Event):void {
+					
+					var data:String = (e.target as URLLoader).data ;
+					var xml:XML = new XML(data);
+					var name:String = xml.name();
+
+					if("configuration" == name){
+						// import preferrence 
+						importFromOOD(xml);
+						testConnectionWait.visible = false;
+						labMessage.text = i18n._('PREFERENCES_TEXT_CONFIGURATION_SUCCESSFULLY_UPDATED');
+					}else{
+						testConnectionError('Max size expected',null);
+					}
+									
+					buttonOk.enabled = true;
+					buttonClose.enabled = true;	
+				});
+				
+				loader.addEventListener(IOErrorEvent.IO_ERROR, function(e:IOErrorEvent):void {
+					testConnectionError(e.text,null);
+				});
+
+				loader.load(request);
+			}
+			
+			private function testConnectionSuccess(sessionId:String):void{
+				// sending to get xml configuration file from server
+				ImportFileOODUtils.execute(tmpPreferences,successHandler,testConnectionError);
+			}
+			
+			private function testConnectionError(error:String, event:Event):void{
+				testConnectionWait.visible = false;
+				buttonOk.enabled = true;
+				buttonClose.enabled = true;
+				Alert.show(error, i18n._('Error'), Alert.OK, this); 
+			}
+			
+			private function testConnection():void{
+				testConnectionWait.visible = true;
+				var login:LoginCRM = new LoginCRM(testConnectionSuccess, testConnectionError);
+				login.loginCRM(tmpPreferences);
+			}
+			private function okClick():void{
+				
+				if(fromFile.selected){
+					if(importFromFile != null){
+						
+						importFromFile(this);
+//						closeClick();
+
+					}
+				}else{
+					buttonOk.enabled = false;
+					buttonClose.enabled = false;
+					labMessage.text = "";
+					testConnection()
+					
+				}	
+			}
+
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="150" right="0" bottom="0"> 
+		<control:TitleBar id="prefTitleBar" icon="@Embed(source='/assets/upload_config.png')" title="{i18n._('Import Configuration')}"/>
+		<mx:VBox top="40" left="16" right="16" bottom="50">
+			<mx:RadioButton id="fromFile" selected="true"  label="{i18n._('Import from file')}" groupName="import" />
+			<mx:HBox>
+				<mx:RadioButton id="fromOOD" label="{i18n._('Import from OOD')}" groupName="import" />
+				<control:CustomLinkButton id="testConnectionWait" icon="{ImageUtils.synOkIcon}" label="" visible="false" includeInLayout="false"/>
+				 <mx:Label text="" color="green" id="labMessage" /> 
+			</mx:HBox>
+			
+			<!--
+			<mx:Form>
+				<mx:FormItem label="{i18n._('PREFERENCES_FORMITEM_LABEL_CRM_ONDEMAND_URL')}">
+					<mx:TextInput id="url" width="320" enabled="{fromOOD.selected}" text="https://secure-ausomxdsa.crmondemand.com"/>
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._('GLOBAL_LOGIN')}"   includeInLayout="true"  >
+					<mx:TextInput id="username"  enabled="{fromOOD.selected}" text="Edewolf4-17/jbrown" />
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._('GLOBAL_PASSWORD')}"  includeInLayout="true">
+					<mx:TextInput id="password" displayAsPassword="true" enabled="{fromOOD.selected}" text="OnDemand"/>
+				</mx:FormItem>
+			</mx:Form>
+			-->
+			<mx:HBox width="100%" horizontalAlign="right" paddingRight="40" bottom="8"> 
+				<mx:Button id="buttonOk" label="Ok" click="okClick()"/>
+				<mx:Button id="buttonClose" label="Close" click="closeClick()" />
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas width="100%" xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Script>
+		<![CDATA[
+			import gadget.util.ImageUtils;
+			import gadget.i18n.i18n;
+			import mx.events.ItemClickEvent;
+		
+			[Bindable] public var action:Function;
+			[Bindable] public var buttonLabel:String;
+			[Bindable] public var closeLabel:String = 'GLOBAL_CANCEL';
+			
+			[Bindable] public var buttonIcon:Class;
+			// Change to use ImageUtils
+//			[Bindable] [Embed("assets/accept.png")] private var acceptIcon:Class;
+//			[Bindable] [Embed("assets/cancel.png")] private var cancelIcon:Class;
+
+			
+			private function handleButtonBar(event:ItemClickEvent):void {
+				var close:Boolean = true;
+				if (event.label != i18n._(closeLabel)) {
+					close = action();
+				}
+				if (close) {
+					this.parentApplication.close();
+				}
+			}			
+		]]>
+	</mx:Script>
+	<mx:ButtonBar right="0" top="8" itemClick="handleButtonBar(event)">
+		<mx:dataProvider>
+			<mx:Object label="{i18n._(closeLabel)}" icon="{ImageUtils.cancelIcon}"/>
+			<mx:Object label="{i18n._(buttonLabel)}" icon="{buttonIcon ? buttonIcon : ImageUtils.acceptIcon}"/>
+		</mx:dataProvider>
+	</mx:ButtonBar>
+</mx:Canvas>

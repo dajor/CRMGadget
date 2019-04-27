@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="730" height="415"
+	showFlexChrome="false" 
+	transparent="true" 
+	systemChrome="none" 
+	xmlns:form="gadget.form.*"
+	creationComplete="this.title = getTitle()"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.lists.FilterList;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			
+			[Bindable] public var filter:Object;
+			[Bindable] public var criteria1:Object;
+			[Bindable] public var criteria2:Object;
+			[Bindable] public var criteria3:Object;
+			[Bindable] public var criteria4:Object;
+			[Bindable] public var criteria5:Object;
+			[Bindable] public var filterList:FilterList;
+			
+			
+			private function doEvaluate(criteria:Object,entity:String):Boolean{
+			var val:String= Utils.doEvaluateForFilter(criteria,entity);
+				if(val == "<ERROR>") return false;
+				
+				return true	
+			}
+			private function create():Boolean {
+				
+				var validatorErrorArray:Array = filterForm.validate(true);			
+				
+				if (validatorErrorArray.length == 0) {
+					
+					filter.name = filterForm.nameInput.text;
+					filter.predefined = 0;
+					filter.type = Database.filterDao.increaseType(filter.entity);
+					var rowid:Number = Database.filterDao.insert(filter);
+					//bug fixing 469 CRO
+					filter.id = rowid;
+					
+					criteria1.id = rowid;
+					criteria1.num = 1;
+					criteria1.column_name = filterForm.filterCol1.selectedItem.column;
+					criteria1.operator = filterForm.filterOp1.selectedItem.data;
+					//criteria1.param = filterForm.filterParam1.visible?filterForm.filterParam1.text:filterForm.cboFilterParam1.selectedItem.data;
+					criteria1.conjunction = filterForm.filterConj1.selectedValue;
+					criteria1.param = filterForm.filterParam1.visible?filterForm.filterParam1.text:filterForm.cboFilterParam1.selectedItem.data;
+					if(!doEvaluate(criteria1,filter.entity)) {
+						Alert.show(i18n._("GLOBAL_FUNCTION_IS_ERROR"), i18n._('GLOBAL_ERROR'), Alert.OK, filterForm);
+						Database.filterDao.delete_(filter);
+						Database.criteriaDao.delete_(filter);
+						return false;
+					}
+					
+					Database.criteriaDao.insert(criteria1);
+					
+					criteria2.id = rowid;
+					criteria2.num = 2;					
+					criteria2.column_name = filterForm.filterCol2.selectedItem.column;
+					criteria2.operator = filterForm.filterOp2.selectedItem.data;
+					//criteria2.param = filterForm.filterParam2.visible?filterForm.filterParam2.text:filterForm.cboFilterParam2.selectedItem.data;
+					criteria2.conjunction = filterForm.filterConj2.selectedValue;
+					criteria2.param = filterForm.filterParam2.visible?filterForm.filterParam2.text:filterForm.cboFilterParam2.selectedItem.data;
+					if(!doEvaluate(criteria2,filter.entity)) {
+						Alert.show(i18n._("GLOBAL_FUNCTION_IS_ERROR"), i18n._('GLOBAL_ERROR'), Alert.OK, filterForm);
+						Database.filterDao.delete_(filter);
+						Database.criteriaDao.delete_(filter);
+						return false;
+					}
+					Database.criteriaDao.insert(criteria2);
+					
+					criteria3.id = rowid;
+					criteria3.num = 3;
+					criteria3.column_name = filterForm.filterCol3.selectedItem.column;
+					criteria3.operator = filterForm.filterOp3.selectedItem.data;
+					//criteria3.param = filterForm.filterParam3.visible?filterForm.filterParam3.text:filterForm.cboFilterParam3.selectedItem.data;
+					criteria3.conjunction = filterForm.filterConj3.selectedValue;
+					criteria3.param = filterForm.filterParam3.visible?filterForm.filterParam3.text:filterForm.cboFilterParam3.selectedItem.data;
+					if(!doEvaluate(criteria3,filter.entity)) {
+						Alert.show(i18n._("GLOBAL_FUNCTION_IS_ERROR"), i18n._('GLOBAL_ERROR'), Alert.OK, filterForm);
+						Database.filterDao.delete_(filter);
+						Database.criteriaDao.delete_(filter);
+						return false;
+					}
+					Database.criteriaDao.insert(criteria3);
+					
+					criteria4.id = rowid;
+					criteria4.num = 4;
+					criteria4.column_name = filterForm.filterCol4.selectedItem.column;
+					criteria4.operator = filterForm.filterOp4.selectedItem.data;
+					//criteria4.param = filterForm.filterParam4.visible?filterForm.filterParam4.text:filterForm.cboFilterParam4.selectedItem.data;
+					criteria4.conjunction = "";
+					criteria4.param = filterForm.filterParam4.visible?filterForm.filterParam4.text:filterForm.cboFilterParam4.selectedItem.data;
+					if(!doEvaluate(criteria4,filter.entity)) {
+						Alert.show(i18n._("GLOBAL_FUNCTION_IS_ERROR"), i18n._('GLOBAL_ERROR'), Alert.OK, filterForm);
+						Database.filterDao.delete_(filter);
+						Database.criteriaDao.delete_(filter);
+						return false;
+					}
+					Database.criteriaDao.insert(criteria4);	
+					
+					
+					criteria5.id = rowid;
+					criteria5.num = 5;
+					criteria5.column_name = filterForm.filterCol5.selectedItem.column;
+					criteria5.operator = "orderby";
+					//criteria4.param = filterForm.filterParam4.visible?filterForm.filterParam4.text:filterForm.cboFilterParam4.selectedItem.data;
+					criteria5.conjunction = "";
+					criteria5.param=filterForm.sortbyasc.selected?"asc":"desc";					
+					Database.criteriaDao.insert(criteria5);
+					filterList.listFilters();
+					
+					createTranslation();
+					
+					
+					return true;
+				} else {
+					var errorMessageArray:Array = [];
+					for each (var err:Object in validatorErrorArray) {
+						var errField:String = ''; 
+						if (err.currentTarget) {
+							errField = FormItem(err.currentTarget.source.parent).label + " : ";
+						}
+						errorMessageArray.push(errField + Utils.getTranslatedValidation(err.message));
+					}
+					//CRO 05.01.2011
+					Alert.show(errorMessageArray.join("\n"), i18n._('GLOBAL_INVALID_FORM'), Alert.OK, filterForm);
+					return false;
+				}
+			}
+			
+			private function getTitle():String {
+				//return "New " + Database.transactionDao.getDisplayName(filter.entity) + " filter";
+				//CRO 05.01.2011
+				return i18n._('GLOBAL_NEW') + " " + Database.customLayoutDao.getDisplayName(filter.entity) + " " + i18n._('GLOBAL_FILTER');
+			}
+			//CRO #1345
+			private function createTranslation():void{
+				var languages:ArrayCollection = filterForm.cboLanguage.dataProvider as ArrayCollection;
+				Database.begin();
+				for(var i:int=0;i< languages.length;i++){
+					var translate:Object = new Object();
+					translate["entity"] =filter.entity;
+					translate["filter_name"] = filter.name;
+					translate["displayName"] = filterForm.filter.name;
+					translate["languageCode"] =languages.getItemAt(i).data;
+					Database.customFilterTranslatorDao.insertFilter(translate);	
+				}
+				
+				Database.commit();
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="730" height="415" right="0" bottom="0">
+		<control:TitleBar title="{getTitle()}"/>
+		<mx:VBox top="32" left="16" right="16" >
+			<form:FilterForm id="filterForm" filter="{filter}" criteria1="{criteria1}" criteria2="{criteria2}" criteria3="{criteria3}" criteria4="{criteria4}" criteria5="{criteria5}" isCreated="true" width="100%"/>
+			<control:DetailButtonBar buttonLabel="GLOBAL_CREATE" buttonIcon="@Embed('/assets/add.png')" action="create" />
+		</mx:VBox>	
+	</mx:Canvas>
+</mx:Window>

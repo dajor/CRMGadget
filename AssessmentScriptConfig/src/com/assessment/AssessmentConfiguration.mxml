@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"	
+	resizable="false"
+	width="860" height="730"
+	maximizable="true"
+	keyDown="keyDown(event);"
+	showFlexChrome="false" transparent="true" systemChrome="none"  xmlns:assessment="com.assessment.*">
+	<mx:Script>
+		<![CDATA[			
+			[Bindable]  
+			public var iAseesment:IAssessment;
+			[Bindable] public var titleBarColor:String;
+			
+			private function keyDown(evt:KeyboardEvent):void {
+				//bug #452
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			
+		]]>
+	</mx:Script>	
+	<mx:Canvas  horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="100%" height="100%" right="10" bottom="0">
+		<assessment:TitleBar maximizeable="true" window="{this}" id="titlebar" titleBarColor="{titleBarColor}" title="{iAseesment.translate('GLOBAL_ASSESSMENT_CONFIGURATION@Assessment Configuration')}" y="2" x="25"/>
+		<mx:VBox width="100%" height="100%" top="35">		
+		<assessment:AssessmentConfLayout iAseesment="{iAseesment}" top="35" width="100%" height="100%"/>
+		<mx:HBox paddingLeft="15" width="100%" paddingBottom="5" paddingRight="20" horizontalAlign="right">
+			<mx:Button  label="{iAseesment.translate('GLOBAL_CLOSE@Close')}" id="btnClose" click="close()" />		
+		</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>	
+
+</mx:Window>

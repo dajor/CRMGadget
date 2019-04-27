@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox
+	xmlns:mx="http://www.adobe.com/2006/mxml" verticalGap="0">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.util.ImageUtils;
+			import gadget.util.OOPS;
+			import gadget.util.Relation;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.events.ListEvent;
+			[Bindable] public var parentEntity:String;
+			[Bindable] public var links:ArrayCollection;
+			public var source:Object = null;
+			public var list:List;
+
+			public function listLinks():void {
+
+				if (source == null) {
+					datagridHeader.headerText = "Links";
+					links = new ArrayCollection();
+				} else {
+					datagridHeader.headerText = "Linked to " + Utils.getName(source);
+					var entities:ArrayCollection = getEntities();
+					links = Database.linkDao.linkedItems(entities, source);
+					
+					//find primary contact;
+					if(source.gadget_type == 'Activity'){
+						var activity:Object = Database.getDao(source.gadget_type).findByGadgetId(source.gadget_id);
+						for each(var link:Object in links){
+							if(link.gadget_type == 'Contact'){
+								var contact:Object = Database.getDao(link.gadget_type).findByGadgetId(link.gadget_id);
+								if(activity['PrimaryContactId'] == contact['ContactId']){
+									link.primary = true;
+									break;
+								}
+							}
+						}
+					}
+
+					// TILI
+/* 					if (source.Activity && activitiesSelected) {
+						var dao:DAO = Database.getDao('Activity');
+						var columns:ArrayCollection = Database.columnsLayoutDao.selectAll('Activity');
+
+						// ensure ParentActivityId is selected when working on Activities
+						var field:Object = new Object();
+						field.element_name = "ParentActivityId";
+							
+						// remove following line when DB really contains ParentActivityId
+						field.element_name = "CustomText31";
+						columns.addItem(field);
+
+						var record_links:Object = dao.findAll(columns, "ActivityId = '" + source.CustomText31 + "'");
+
+						for each (var record:Object in record_links) {
+							record.name = record.Subject;
+							links.addItem(record);
+						}
+
+						record_links = dao.findAll(columns, "CustomText31 = '" + source.ActivityId + "'");
+
+						for each (var record:Object in record_links) {
+							record.name = record.Subject;
+							links.addItem(record);
+						}
+					} */
+
+					//filterList(links, tbBar.selectedIndex);
+				}
+			}
+			
+			public function getEntities():ArrayCollection{
+				var toggleBtns:Array = linklistBtns.getChildren();
+				var entities:ArrayCollection = new ArrayCollection();
+				for each(var toggleBtn:Button in toggleBtns){
+					if (!toggleBtn.selected) {
+						entities.addItem(toggleBtn.data);
+					}
+				}
+				return entities;
+			}
+
+			public function removeLink(link:Object):void {
+				var referenced:ArrayCollection = Relation.getReferenced(source.gadget_type);
+				var referencers:ArrayCollection = Relation.getReferencers(source.gadget_type);
+				var relation:Object, sourceObj:Object, destObj:Object;
+				// relation based on support table (when relationship between entities is m:n)
+				for each (relation in referenced) {
+					if (relation.supportTable != null && relation.entitySrc == source.gadget_type && relation.entityDest == link.gadget_type) {
+						sourceObj = Database.getDao(relation.entitySrc).findByGadgetId(source.gadget_id); 
+						destObj = Database.getDao(relation.entityDest).findByGadgetId(link.gadget_id);
+						removeLinkSupport(sourceObj, destObj, relation.entityDest, relation.keySrc, relation.keyDest, relation.supportTable);
+					}
+				}
+				for each (relation in referencers) {
+					if (relation.supportTable != null && relation.entityDest == source.gadget_type && relation.entitySrc == link.gadget_type) {
+						destObj = Database.getDao(relation.entityDest).findByGadgetId(source.gadget_id); 
+						sourceObj = Database.getDao(relation.entitySrc).findByGadgetId(link.gadget_id);
+						removeLinkSupport(sourceObj, destObj, relation.entityDest, relation.keySrc, relation.keyDest, relation.supportTable);
+					}
+				}
+
+				// 1:n relations
+				for each (relation in referenced) {
+					if (relation.supportTable == null && relation.entitySrc == source.gadget_type && relation.entityDest == link.gadget_type) {
+						sourceObj = Database.getDao(relation.entitySrc).findByGadgetId(source.gadget_id); 
+						removeLinkObject(sourceObj, relation.entityDest, relation.keySrc, relation.labelSrc);
+					}
+				}
+				
+				for each (relation in referencers) {
+					if (relation.supportTable == null && relation.entityDest == source.gadget_type && relation.entitySrc == link.gadget_type) {
+						sourceObj = Database.getDao(relation.entitySrc).findByGadgetId(link.gadget_id); 
+						removeLinkObject(sourceObj, relation.entityDest, relation.keySrc, relation.labelSrc);
+					}
+				}
+			}
+
+			
+			private function removeLinkSupport(sourceObj:Object, destObj:Object, entityDest:String, keySrc:String, keyDest:String, supportTable:String):void {
+				var supportLink:Object = new Object();
+				//VAHI We have a problem here in case of WS2.0 keySrc=="Id" or keyDest=="Id"
+				supportLink[keySrc] = sourceObj[keySrc];
+				supportLink[keyDest] = destObj[keyDest];
+				OOPS("=missing","removeLink currently unsupported");
+//				Database.getSupportDao(supportTable).sub_delete(supportLink);
+				linkRemovalInfo(sourceObj, entityDest); 
+			}
+			
+			private function removeLinkObject(sourceObj:Object, entityDest:String, keySrc:String, labelSrc:String):void {
+				sourceObj[keySrc] = "";
+				sourceObj[labelSrc] = "";
+				sourceObj.local_update = new Date().getTime();
+				Database.getDao(sourceObj.gadget_type).update(sourceObj);
+				linkRemovalInfo(sourceObj, entityDest); 
+
+			}
+			
+			private function linkRemovalInfo(sourceObj:Object, entityDest:String):void {
+				Alert.show(Utils.getName(sourceObj) + "'s " + entityDest + " removed.", 
+					"Link removal", Alert.OK, this.parentApplication as CRMGadget);
+				listLinks();
+				if (list.entity == sourceObj.gadget_type) {
+					list.selectItem(sourceObj);
+				}
+			}
+			   
+            private function clickHandler(event:ListEvent):void {
+            	listLinks();
+            }
+            
+            private function filterList(list:ArrayCollection, index:int):void
+            {
+            	list.filterFunction = function(item:Object):Boolean{
+	                var array:Array = new Array("", "Account", "Contact", "Opportunity", "Activity", "Campaign", "Service Request", "Product");
+	            	if (index == 0) return true;
+	           		return (item.gadget_type == array[index]);	
+               };
+               list.refresh();
+            }
+            
+            private function newLink():void {
+            	//list.openLinkTo(list.selectedItem);
+            }
+            
+            private function keyHandler(event:KeyboardEvent):void {
+            	if( linkListGrid.selectedItem == null ) return;
+				switch (event.keyCode) {
+					case Keyboard.DELETE:
+						removeLink(linkListGrid.selectedItem);
+						break;
+				}
+            }
+			
+			public function updateFilters(transactions:ArrayCollection):void {
+				
+				var disableLink:Dictionary = Database.relatedButtonDao.findDisableByParent(parentEntity);;
+				for each (var transaction:Object in transactions) {
+					//var disable:Boolean = Database.relatedButtonDao.getDisable(parentEntity,transaction.entity);
+					
+					for each (var btn:Button in linklistBtns.getChildren()) {
+						if (transaction.entity == btn.data) {
+							
+							if (!transaction.enabled || !transaction.display || disableLink[transaction.entity]) {
+								btn.visible = false;
+								btn.includeInLayout = false;
+								btn.selected = true;
+							} else {
+								btn.visible = true;
+								btn.includeInLayout = true;
+								btn.selected = false;
+							}
+							break;
+						}
+					}
+				}
+			}
+
+		]]>
+	</mx:Script>
+   	<mx:HBox id="linklistBtns" horizontalGap="0" width="100%">
+		<!--
+	   	<mx:Button click="listLinks()" toolTip="Accounts" data="Account" toggle="true" width="33" cornerRadius="0"
+	   		selectedDownIcon="@Embed('/assets/account_bw.png')" selectedOverIcon="@Embed('/assets/account_bw.png')" selectedUpIcon="@Embed('/assets/account_bw.png')"
+	   		downIcon="@Embed('/assets/account.png')" overIcon="@Embed('/assets/account.png')" upIcon="@Embed('/assets/account.png')"/>
+	   	<mx:Button click="listLinks()" toolTip="Contacts" data="Contact" toggle="true" width="33" cornerRadius="0" 
+	   		selectedDownIcon="@Embed('/assets/contact_bw.png')" selectedOverIcon="@Embed('/assets/contact_bw.png')" selectedUpIcon="@Embed('/assets/contact_bw.png')"
+	   		downIcon="@Embed('/assets/contact.png')" overIcon="@Embed('/assets/contact.png')" upIcon="@Embed('/assets/contact.png')"/>
+	   	<mx:Button click="listLinks()" toolTip="Opportunities" data="Opportunity" toggle="true" width="33" cornerRadius="0"
+	   		selectedDownIcon="@Embed('/assets/opportunity_bw.png')" selectedOverIcon="@Embed('/assets/opportunity_bw.png')" selectedUpIcon="@Embed('/assets/opportunity_bw.png')" 
+	   		downIcon="@Embed('/assets/opportunity.png')" overIcon="@Embed('/assets/opportunity.png')" upIcon="@Embed('/assets/opportunity.png')"/>
+	   	<mx:Button click="listLinks()" toolTip="Activities" data="Activity" toggle="true" width="33" cornerRadius="0"
+	   		selectedDownIcon="@Embed('/assets/activity_bw.png')" selectedOverIcon="@Embed('/assets/activity_bw.png')" selectedUpIcon="@Embed('/assets/activity_bw.png')"
+	   		downIcon="@Embed('/assets/activity.png')" overIcon="@Embed('/assets/activity.png')" upIcon="@Embed('/assets/activity.png')"/>
+	   	<mx:Button click="listLinks()" toolTip="Campaigns" data="Campaign" toggle="true" width="33" cornerRadius="0"
+	   		selectedDownIcon="@Embed('/assets/campaign_bw.png')" selectedOverIcon="@Embed('/assets/campaign_bw.png')" selectedUpIcon="@Embed('/assets/campaign_bw.png')"
+	   		downIcon="@Embed('/assets/campaign.png')" overIcon="@Embed('/assets/campaign.png')" upIcon="@Embed('/assets/campaign.png')"/>
+	   	<mx:Button click="listLinks()" toolTip="Service Requests" data="Service Request" toggle="true" width="33" cornerRadius="0"
+	   		selectedDownIcon="@Embed('/assets/service_bw.png')" selectedOverIcon="@Embed('/assets/service_bw.png')" selectedUpIcon="@Embed('/assets/service_bw.png')"
+	   		downIcon="@Embed('/assets/service.png')" overIcon="@Embed('/assets/service.png')" upIcon="@Embed('/assets/service.png')"/>
+		-->
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Account')}" data="Account" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Account')}" selectedOverIcon="{ImageUtils.getImage('Account')}" selectedUpIcon="{ImageUtils.getImage('Account')}"
+				   downIcon="{ImageUtils.getImage('Account')}" overIcon="{ImageUtils.getImage('Account')}" upIcon="{ImageUtils.getImage('Account')}" height="24" />
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Contact')}" data="Contact" toggle="true" width="24" cornerRadius="0" 
+				   selectedDownIcon="{ImageUtils.getImage('Contact')}" selectedOverIcon="{ImageUtils.getImage('Contact')}" selectedUpIcon="{ImageUtils.getImage('Contact')}"
+				   downIcon="{ImageUtils.getImage('Contact')}" overIcon="{ImageUtils.getImage('Contact')}" upIcon="{ImageUtils.getImage('Contact')}" height="24" />
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Opportunity')}" data="Opportunity" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Opportunity')}" selectedOverIcon="{ImageUtils.getImage('Opportunity')}" selectedUpIcon="{ImageUtils.getImage('Opportunity')}" 
+				   downIcon="{ImageUtils.getImage('Opportunity')}" overIcon="{ImageUtils.getImage('Opportunity')}" upIcon="{ImageUtils.getImage('Opportunity')}" height="24" />
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Lead')}" data="Lead" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Lead')}" selectedOverIcon="{ImageUtils.getImage('Lead')}" selectedUpIcon="{ImageUtils.getImage('Lead')}" 
+				   downIcon="{ImageUtils.getImage('Lead')}" overIcon="{ImageUtils.getImage('Lead')}" upIcon="{ImageUtils.getImage('Lead')}" height="24" />
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Activity')}" data="Activity" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Activity')}" selectedOverIcon="{ImageUtils.getImage('Activity')}" selectedUpIcon="{ImageUtils.getImage('Activity')}"
+				   downIcon="{ImageUtils.getImage('Activity')}" overIcon="{ImageUtils.getImage('Activity')}" upIcon="{ImageUtils.getImage('Activity')}" height="24" />
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Campaign')}" data="Campaign" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Campaign')}" selectedOverIcon="{ImageUtils.getImage('Campaign')}" selectedUpIcon="{ImageUtils.getImage('Campaign')}"
+				   downIcon="{ImageUtils.getImage('Campaign')}" overIcon="{ImageUtils.getImage('Campaign')}" upIcon="{ImageUtils.getImage('Campaign')}" height="24"/>
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Service Request')}" data="Service Request" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Service Request')}" selectedOverIcon="{ImageUtils.getImage('Service Request')}" selectedUpIcon="{ImageUtils.getImage('Service Request')}"
+				   downIcon="{ImageUtils.getImage('Service Request')}" overIcon="{ImageUtils.getImage('Service Request')}" upIcon="{ImageUtils.getImage('Service Request')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Product')}" data="Product" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Product')}" selectedOverIcon="{ImageUtils.getImage('Product')}" selectedUpIcon="{ImageUtils.getImage('Product')}"
+				   downIcon="{ImageUtils.getImage('Product')}" overIcon="{ImageUtils.getImage('Product')}" upIcon="{ImageUtils.getImage('Product')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Custom Object 1')}" data="Custom Object 1" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Custom Object 1')}" selectedOverIcon="{ImageUtils.getImage('Custom Object 1')}" selectedUpIcon="{ImageUtils.getImage('Custom Object 1')}"
+				   downIcon="{ImageUtils.getImage('Custom Object 1')}" overIcon="{ImageUtils.getImage('Custom Object 1')}" upIcon="{ImageUtils.getImage('Custom Object 1')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Custom Object 2')}" data="Custom Object 2" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Custom Object 2')}" selectedOverIcon="{ImageUtils.getImage('Custom Object 2')}" selectedUpIcon="{ImageUtils.getImage('Custom Object 2')}"
+				   downIcon="{ImageUtils.getImage('Custom Object 2')}" overIcon="{ImageUtils.getImage('Custom Object 2')}" upIcon="{ImageUtils.getImage('Custom Object 2')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Custom Object 3')}" data="Custom Object 3" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Custom Object 3')}" selectedOverIcon="{ImageUtils.getImage('Custom Object 3')}" selectedUpIcon="{ImageUtils.getImage('Custom Object 3')}"
+				   downIcon="{ImageUtils.getImage('Custom Object 3')}" overIcon="{ImageUtils.getImage('Custom Object 3')}" upIcon="{ImageUtils.getImage('Custom Object 3')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('CustomObject7')}" data="CustomObject7" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('CustomObject7')}" selectedOverIcon="{ImageUtils.getImage('CustomObject7')}" selectedUpIcon="{ImageUtils.getImage('CustomObject7')}"
+				   downIcon="{ImageUtils.getImage('CustomObject7')}" overIcon="{ImageUtils.getImage('CustomObject7')}" upIcon="{ImageUtils.getImage('CustomObject7')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('CustomObject14')}" data="CustomObject14" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('CustomObject14')}" selectedOverIcon="{ImageUtils.getImage('CustomObject14')}" selectedUpIcon="{ImageUtils.getImage('CustomObject14')}"
+				   downIcon="{ImageUtils.getImage('CustomObject14')}" overIcon="{ImageUtils.getImage('CustomObject14')}" upIcon="{ImageUtils.getImage('CustomObject14')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('CustomObject4')}" data="CustomObject4" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('CustomObject4')}" selectedOverIcon="{ImageUtils.getImage('CustomObject4')}" selectedUpIcon="{ImageUtils.getImage('CustomObject4')}"
+				   downIcon="{ImageUtils.getImage('CustomObject4')}" overIcon="{ImageUtils.getImage('CustomObject4')}" upIcon="{ImageUtils.getImage('CustomObject4')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('CustomObject5')}" data="CustomObject5" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('CustomObject5')}" selectedOverIcon="{ImageUtils.getImage('CustomObject5')}" selectedUpIcon="{ImageUtils.getImage('CustomObject5')}"
+				   downIcon="{ImageUtils.getImage('CustomObject5')}" overIcon="{ImageUtils.getImage('CustomObject5')}" upIcon="{ImageUtils.getImage('CustomObject5')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('CustomObject6')}" data="CustomObject6" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('CustomObject6')}" selectedOverIcon="{ImageUtils.getImage('CustomObject6')}" selectedUpIcon="{ImageUtils.getImage('CustomObject6')}"
+				   downIcon="{ImageUtils.getImage('CustomObject6')}" overIcon="{ImageUtils.getImage('CustomObject6')}" upIcon="{ImageUtils.getImage('CustomObject6')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('CustomObject8')}" data="CustomObject8" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('CustomObject8')}" selectedOverIcon="{ImageUtils.getImage('CustomObject8')}" selectedUpIcon="{ImageUtils.getImage('CustomObject8')}"
+				   downIcon="{ImageUtils.getImage('CustomObject8')}" overIcon="{ImageUtils.getImage('CustomObject8')}" upIcon="{ImageUtils.getImage('CustomObject8')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('CustomObject10')}" data="CustomObject10" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('CustomObject10')}" selectedOverIcon="{ImageUtils.getImage('CustomObject10')}" selectedUpIcon="{ImageUtils.getImage('CustomObject10')}"
+				   downIcon="{ImageUtils.getImage('CustomObject10')}" overIcon="{ImageUtils.getImage('CustomObject10')}" upIcon="{ImageUtils.getImage('CustomObject10')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('CustomObject9')}" data="CustomObject9" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('CustomObject9')}" selectedOverIcon="{ImageUtils.getImage('CustomObject9')}" selectedUpIcon="{ImageUtils.getImage('CustomObject9')}"
+				   downIcon="{ImageUtils.getImage('CustomObject9')}" overIcon="{ImageUtils.getImage('CustomObject9')}" upIcon="{ImageUtils.getImage('CustomObject9')}" height="24" />
+		
+		<mx:Button click="listLinks()" toolTip="{Database.customLayoutDao.getPlural('Asset')}" data="Asset" toggle="true" width="24" cornerRadius="0"
+				   selectedDownIcon="{ImageUtils.getImage('Asset')}" selectedOverIcon="{ImageUtils.getImage('Asset')}" selectedUpIcon="{ImageUtils.getImage('Asset')}"
+				   downIcon="{ImageUtils.getImage('Asset')}" overIcon="{ImageUtils.getImage('Asset')}" upIcon="{ImageUtils.getImage('Asset')}" height="24" />
+   	</mx:HBox>	
+
+
+	<mx:DataGrid 
+		id='linkListGrid'
+		height="100%" 
+		width="100%" 
+		dataProvider="{links}"
+		doubleClickEnabled="true" 
+		doubleClick="{Utils.openDetail(linkListGrid.selectedItem,this.parentApplication as MainWindow)}"
+		keyUp="keyHandler(event)" 
+		headerHeight="0" >
+		<mx:columns>
+			<mx:DataGridColumn headerText="Links" id="datagridHeader" itemRenderer="gadget.control.LinkListImageRenderer"/>
+		</mx:columns>
+	
+	</mx:DataGrid>
+</mx:VBox>

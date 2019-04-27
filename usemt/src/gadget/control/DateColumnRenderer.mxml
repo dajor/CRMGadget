@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import gadget.util.DateUtils;
+			import gadget.util.ImageUtils;
+			
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			import mx.events.CalendarLayoutChangeEvent;
+			import mx.formatters.DateFormatter;
+			
+			
+			private var grid:AdvancedDataGrid;
+			public var column:AdvancedDataGridColumn;
+			protected function clearDate(event:MouseEvent):void
+			{
+				currentDate.text = "";
+				data[column.dataField] = "";
+			}
+			
+			private function displayDate(item:Date):String{
+				var dformater:DateFormatter = new DateFormatter();
+				dformater.formatString = currentDate.formatString;
+				return dformater.format(item);
+			}
+			
+			override public function set data(value:Object):void{		
+				super.data = value;				
+				if(data!=null){		
+					var dateObject:Date;
+					var tmpDate:Object = data[column.dataField];
+					if(tmpDate is Date){
+						dateObject = tmpDate as Date;
+					} else if(tmpDate != null && tmpDate != ""){
+						dateObject = DateUtils.guessAndParse(tmpDate as String);	
+					}
+					currentDate.selectedDate = dateObject;
+					
+					
+				}
+			}
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						
+					}
+				}
+				
+			}		
+			protected function currentDate_changeHandler(event:CalendarLayoutChangeEvent):void
+			{
+				var value:String = null;
+				if (currentDate.text != '') {
+					value = DateUtils.format(currentDate.selectedDate, DateUtils.DATABASE_DATE_FORMAT);
+				}
+				data[column.dataField]=value;
+			}
+
+		]]>
+	</fx:Script>
+	
+	
+	
+	<mx:HBox horizontalAlign="center" verticalAlign="middle" width="100%" height="100%" id="hBoxCell" paddingLeft="3" paddingRight="3" paddingBottom="3">
+		<mx:DateField width="100%" height="100%" id="currentDate" change="currentDate_changeHandler(event)" labelFunction="{displayDate}"  formatString="{DateUtils.getCurrentUserDatePattern().dateFormat}"/>
+		<mx:LinkButton icon="{ImageUtils.deleteIcon}" height="100%" click="clearDate(event)"/>
+	</mx:HBox>
+</s:MXAdvancedDataGridItemRenderer>

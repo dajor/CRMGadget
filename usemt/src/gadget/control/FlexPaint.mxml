@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml" 
+				styleName="plain" width="320" height="295"
+				pageTitle="Flex Paint 2.0" backgroundColor="#ffffff"
+				resizable="false"
+				title="Signature Capture Touchscreen"
+				minimizable="false" maximizable="false" xmlns:components="gadget.util.components.*" xmlns:control="gadget.control.*"
+				>
+	
+	<mx:Script>
+		
+		// showFlexChrome="false" transparent="true" systemChrome="none"
+		import com.adobe.images.JPGEncoder;
+		
+		import mx.graphics.codec.PNGEncoder;
+		public var saveFlexPaint:Function;
+		// viewSourceURL="srcview/index.html"
+		protected function double_clickHandler(event:MouseEvent):void{
+			
+		}
+		
+		protected function save_clickHandler(event:MouseEvent,isCancel:Boolean=false):void{
+			if(isCancel){
+				saveFlexPaint(null);		
+			}else{
+				var bitmapData:BitmapData = new BitmapData(drawingArea.width,drawingArea.height);
+				bitmapData.draw(drawingArea);	
+				var jpgEncode:JPGEncoder = new JPGEncoder(100);
+				var byteArray:ByteArray = jpgEncode.encode(bitmapData);
+				saveFlexPaint(byteArray);
+			}
+			
+			close();
+								
+			// var byteArray:ByteArray = (new PNGEncoder()).encode(bitmapData);	
+			// (new FileReference()).save(ba, "doodle.png");
+		}
+	</mx:Script>
+	
+	<mx:Boolean id="isDrawing">false</mx:Boolean>
+	<mx:int id="x1"/>
+	<mx:int id="y1"/>
+	<mx:int id="x2"/>
+	<mx:int id="y2"/>
+	
+	<mx:uint id="drawColor"/>
+	
+	<!-- mx:Panel title="Signature">
+		
+		<mx:Canvas id="canvas" width="300" height="200" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+			<mx:mouseDown>
+				x1 = canvas.mouseX;
+				y1 = canvas.mouseY;
+				isDrawing = true;
+			</mx:mouseDown>
+			<mx:click>
+				canvas.graphics.lineStyle(2, drawColor);
+				canvas.graphics.curveTo(x1,y1,x2,y2);
+			</mx:click>
+			<mx:mouseMove>
+				x2 = canvas.mouseX;
+				y2 = canvas.mouseY;
+				if (isDrawing)
+				{
+				canvas.graphics.lineStyle(2, drawColor);
+				canvas.graphics.moveTo(x1, y1);
+				// canvas.graphics.lineTo(x2, y2);
+				canvas.graphics.curveTo(x1,y1,x2,y2);
+				x1 = x2;
+				y1 = y2;
+				}
+			</mx:mouseMove>
+			<mx:mouseUp>
+				isDrawing = false;
+			</mx:mouseUp>
+		</mx:Canvas-->
+		<!--mx:Canvas id="canvas" width="300" height="200" horizontalScrollPolicy="off" verticalScrollPolicy="off" />
+		<components:DrawableCanvas id="canvas" width="300" height="200"/ -->
+		<!-- mx:ControlBar>
+			<mx:ColorPicker change="drawColor = event.target.selectedColor"/>
+			<mx:Button left="20" label="OK" width="70" click="save_clickHandler(event);"/>
+			<mx:Button label="Clear" width="70" click="canvas.graphics.clear();"/>
+			<mx:Button label="Cancel" width="70" click="close();"/> 
+			
+		</mx:ControlBar>
+	</mx:Panel -->
+	
+	<mx:Panel id="p" title="Signature" top="5" horizontalCenter="0" width="320" height="275">
+		
+		<control:DrawingArea id="drawingArea" xmlns="*" width="100%" height="100%"/>
+		
+		<mx:ControlBar>
+			<mx:ColorPicker change="drawingArea.drawColor = event.target.selectedColor"/>
+			<mx:Button left="20" label="OK" width="70" click="save_clickHandler(event);" doubleClick="double_clickHandler(event);"/>
+			<mx:Button label="Clear" width="70" click="drawingArea.erase();" doubleClick="double_clickHandler(event);"/>
+			<mx:Button label="Cancel" width="70" click="save_clickHandler(event,true);" doubleClick="double_clickHandler(event);"/> 
+			<!--s:Button label="Erase" click="drawingArea.erase()"/ >
+			<s:Button label="Save Image" click="drawingArea.save()"/ -->
+		</mx:ControlBar>
+	</mx:Panel>
+	
+</mx:Window>

@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="480" height="480"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init()"
+	creationComplete="form.setFocus();"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.BaseDAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.service.SupportService;
+			import gadget.service.UserService;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			import mx.controls.TextArea;
+			import mx.controls.TextInput;
+			import mx.core.IUIComponent;
+			import mx.validators.Validator;
+			
+			[Bindable] public var entity:String;
+			[Bindable] public var subtype:int = 0;
+			public var fields:Array;
+			[Bindable] public var create:Boolean;
+			private var validators:Array = [];
+			[Bindable] public var item:Object;
+			[Bindable] public var newItem:Function;
+			public var arrayDefaultObject:Array;
+			
+			public var refreshGrid:Function;
+			
+			private var inputFields:ArrayCollection = null;
+			[Bindable] private var disable:Boolean;
+			
+			private function init():void {
+				item.gadget_type = entity;
+				title = titlebar.title = Utils.getTitle(entity, subtype, item, create);
+				
+				// Feature #58
+				var oidName:String = DAOUtils.getOracleId(entity);
+				var odiVal:String = item[oidName] as String;
+				if(odiVal && !create && (odiVal.indexOf('#')==-1) && entity=="Service Request" 
+					&& Database.preferencesDao.getBooleanValue(PreferencesDAO.ENABLE_SR_SYNC_ORDER_STATUS)){
+					if(item.CustomPickList10=="STND" || item.CustomPickList11=="TECO"){
+						disable = true;
+					}
+				}
+				
+				if(create){
+					createNewBtn.width = 120;
+				}else{
+					createNewBtn.width = 0;
+				}
+				initForm();
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			//Bug fixing 436 CRO
+            private function bindEvaluatorValue():void{
+				var fieldsManagement:Dictionary = Database.fieldManagementServiceDao.readAll(entity);
+				var userData:Object = Database.allUsersDao.ownerUser();		
+				for each (var tmpField:Object in fields) { 
+					if (tmpField.custom == null) {
+						var fieldInfo:Object = FieldUtils.getField(entity, tmpField.element_name);
+						if(!fieldInfo) continue;
+						var fieldManagement:Object = fieldsManagement[fieldInfo.element_name];
+						if(fieldManagement!=null){
+							if(!StringUtils.isEmpty( fieldManagement.DefaultValue )){
+								var defaultValue:String = fieldManagement.DefaultValue;
+								if (defaultValue.indexOf("(") == -1 && defaultValue.indexOf("{") == -1) {
+									if( defaultValue.indexOf("CreatedDate")!=-1){
+										item[fieldInfo.element_name] =new Date();
+									}else{
+										item[fieldInfo.element_name] = defaultValue;
+									}
+									
+								} else if(create){  //evaluator do create only
+									// functions
+									var val:String = Utils.doEvaluate(defaultValue,userData,entity,fieldInfo.element_name,item,null);
+									//get Value from Id to display CRO
+									if (fieldInfo.data_type == "Picklist") {
+										val = PicklistService.getId(entity,fieldInfo.element_name,val,userData.LanguageCode);
+									}
+									if(val=='-1' && entity==Database.customObject1Dao.entity && fieldInfo.element_name=='CustomInteger0'){
+										val="";
+									}
+									item[fieldInfo.element_name] = val;
+								}
+							}
+						}
+					}
+				}	
+			}
+				
+			
+			private function initForm():void {
+			    
+				for each(var object:Object in arrayDefaultObject){
+					item[object.key] = object.value;
+				}
+				//Bug fixing 436 CRO
+				bindEvaluatorValue();
+				inputFields = new ArrayCollection();
+				
+				var functions:Object = new Object();
+				functions._finderClick = finderClick;
+				functions._upload = upload_;
+				functions._referenceClick = referenceClick;
+				var tmpHeight:int = 128;
+				
+				// check custom related picklist value.
+				GUIUtils.checkCustomPicklistValue(item,new ArrayCollection(fields),entity,this);
+				
+				for each (var fieldInfo:Object in fields) {
+					var formItem:FormItem = new FormItem();
+					var readonly:Boolean = (fieldInfo.readonly!=null && fieldInfo.readonly);
+					formItem.label = fieldInfo.display_name;
+					formItem.required = fieldInfo.required;
+					formItem.setStyle("labelWidth", 150);
+					var inputField:DisplayObject = GUIUtils.getInputField(true, functions, entity, item, fieldInfo, readonly);
+					
+					if(entity==Database.customObject1Dao.entity && UserService.DIVERSEY==UserService.getCustomerId() && fieldInfo.element_name=='CustomInteger0'){
+						(inputField as IUIComponent).enabled=false;
+					}else{
+						validators = validators.concat(FieldUtils.getValidators(fieldInfo, inputField));
+					}					
+					(inputField as IUIComponent).percentWidth = 100;
+					formItem.addChild(inputField);
+					formItem.percentWidth = 100;
+					formItem.height = 22;
+					if (inputField is TextArea) {
+						formItem.height = 104;
+					}					
+					form.addChild(formItem);
+					inputFields.addItem({formField:fieldInfo, component:inputField});
+					tmpHeight += (formItem.height + 5 /* vertical gap */);
+				}
+				height = tmpHeight;
+				detailCanvas.height = height;
+
+				
+				for each (var inputFieldObj:Object in inputFields){
+					GUIUtils.setupCascadingCombo(inputFieldObj.component, inputFieldObj.formField, inputFields);
+				}
+
+			}
+
+			private function reload():void {
+				validators = [];
+				form.removeAllChildren();
+				initForm();		
+			}
+			
+			private function finderClick(event:MouseEvent):void {
+				updateItemFields();
+				var finder:GenericFinder = new GenericFinder();
+				finder.textInput = (event.currentTarget as TextInput);
+				finder.item = item;
+				finder.reload = reload;
+				finder.dataQuery = event.target.document.data;
+				WindowManager.openModal(finder);
+			}
+			
+			private function upload_(fileName:String, data:Object):void {
+				Database.contactDao.updateImage(data as ByteArray, item);
+				//reload();
+			}
+			
+			private function referenceClick(event:MouseEvent):void {
+				updateItemFields();
+				var itemFinder:ItemFinder = new ItemFinder();
+				itemFinder.relation = (event.currentTarget as TextInput).data;
+				itemFinder.textInput = (event.currentTarget as TextInput);
+				itemFinder.item = item;
+				itemFinder.reload = reload;
+				WindowManager.openModal(itemFinder);
+			}
+
+
+			
+			/**
+			 * Update the item fields with the values in input fields.
+			 */
+			private function updateItemFields():void { 
+				for each(var displayObject:Object in inputFields){
+					var formField:Object = displayObject.formField;
+					var component:DisplayObject = displayObject.component;
+					var value:String = GUIUtils.getInputFieldValue(component, formField);
+					item[formField.element_name] = value;
+				}		
+				
+			}
+			
+			private function checkValidator():Boolean{
+				var validatorErrorArray:Array = Validator.validateAll(validators);
+				var validatorMap:Dictionary = Database.validationDao.selectByEntityAsMap(entity);
+				for each(var displayObject:Object in inputFields){
+					FieldUtils.readValidationRule(validatorErrorArray, displayObject, entity,validatorMap);
+				}
+				
+				if (validatorErrorArray.length != 0) {
+					var errorMessageArray:Array = [];
+					for each (var err:Object in validatorErrorArray) {
+						var errField:String = ''; 
+						if (err.currentTarget) {
+							var parentObj:Object = err.currentTarget.source.parent;
+							if(parentObj is HBox){
+								parentObj = HBox(parentObj).parent;
+							}
+							errField = FormItem(parentObj).label + " : ";
+						}
+						errorMessageArray.push(errField + Utils.getTranslatedValidation(err.message));
+					}
+					//CRO 05.01.2011
+					Alert.show(errorMessageArray.join("\n"), i18n._('GLOBAL_INVALID_FORM'), Alert.OK, this);
+					return true;
+				}
+				return false;
+			}
+			
+			private function update():Boolean {
+				
+				updateItemFields();
+				//only for JD user
+				GUIUtils.calculateTotalHours(item,entity);	
+				
+				// check validatio rule before save.
+				if(GUIUtils.checkValidationRule(item,entity,this)) return false;
+					
+				// vm -- join field value
+				//CRO #833
+				//Utils.doFomulaField(entity,item,true);
+				if(create){
+					
+					//VAHI the old code was a little bit weird.
+					// getNameColumn() returns "FirstName||' '||LastName" for Contact.
+					// So improved it without breaking old things, hopefully.
+					for each (var ns:String in DAOUtils.getNameColumns(entity)) {
+						if (!item[ns])
+							item[ns] = entity;
+					}
+					//bug #2001 CRO
+					if(entity == Database.activityDao.entity){
+						item["Activity"] = "Task";
+					}
+					//VAHI If it is a create, the Id field MUST be NULL.
+					// Note that it CAN BE SET by some weird sideffect,
+					// like objects without name columns use their ID field instead.
+					item[DAOUtils.getOracleId(entity)] = null;
+					item["deleted"] = false;
+					item["error"] = false;
+					//VAHI this only is correct for objects with an OwnerId property.
+					// So this should be done on a "create()" method, not here.
+					item["OwnerId"] = Database.userDao.read().id;
+					var dao:BaseDAO = Database.getDao(entity);
+					try {
+						dao.insert(item);
+					} catch (e:SQLError) {
+						Alert.show(e.toString(), i18n._('MINIDETAIL_ALERT_TITLE_CANNOT_CREATE_RECORD'), Alert.CANCEL, this);
+						return false;
+					}
+					item = dao.selectLastRecord()[0];
+					// by default, sets the OracleId as gadget_id
+					item[DAOUtils.getOracleId(entity)] = "#" + item.gadget_id;
+					
+					// check custom Picklist value.
+					GUIUtils.saveCustomPicklistValue(item,inputFields,entity,this);
+					
+					Database.getDao(entity).update(item);
+				} else {
+					
+					// check custom Picklist value.
+					GUIUtils.saveCustomPicklistValue(item,inputFields,entity,this);
+					
+					item.local_update = new Date().getTime();
+					Database.getDao(entity).update(item);
+					Utils.updateRelationFields(item,entity);
+				}
+				//CR #1911 CRO
+				Utils.updateFieldByChild(entity,item);
+				
+				if(refreshGrid!=null)
+					refreshGrid(item);
+				return true;
+			}
+			
+			private function createClick():void{
+				if(!checkValidator()){
+					if(update()) close();
+				}
+			}
+			private function createAndNew():void{
+				if(!checkValidator() && update()){
+					if(newItem!=null){
+						item = newItem();
+					}else{
+						item = new Object();
+					}
+					
+					reload();
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="480" height="480" right="0" bottom="0">
+		<control:TitleBar icon="{ImageUtils.getImage(entity)}" id="titlebar" y="2" x="25"/>
+		<mx:VBox top="36" left="8" right="8" bottom="8">
+			<mx:Form id="form" width="100%" height="100%"/>
+			<mx:Canvas width="100%">
+				<mx:HBox width="100%" horizontalAlign="right">
+					<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" right="0" icon="{ImageUtils.cancelIcon}"/>
+					<mx:Button id="createNewBtn" visible="{create}" label="{i18n._('GLOBAL_CREATE_AND_NEW')}" click="createAndNew()" right="0" icon="{ImageUtils.acceptIcon}"/>
+					<mx:Button id="createBtn" label="{create ? i18n._('GLOBAL_CREATE') : i18n._('GLOBAL_UPDATE')}" click="createClick()" right="0" icon="{ImageUtils.acceptIcon}" enabled="{!disable}"/>
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

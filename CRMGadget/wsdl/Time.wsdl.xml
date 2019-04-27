@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?Siebel-Property-Set EscapeNames="false"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+	xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" targetNamespace="urn:crmondemand/ws/time/"
+	xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+	xmlns:tns="urn:crmondemand/ws/time/">
+	<types>
+		<xsd:schema elementFormDefault="qualified"
+			attributeFormDefault="unqualified" targetNamespace="urn:crmondemand/ws/time/"
+			xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+			<xsd:element name="TimeWS_GetServerTime_Input">
+				<xsd:complexType>
+					<xsd:sequence />
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="TimeWS_GetServerTime_Output">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="CurrentServerTime" type="xsd:string" />
+						<xsd:element name="TimeZone" type="xsd:string" />
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="TimeWS_SetSessionTimeZone_Input">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="TimeZone" type="xsd:string" />
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="TimeWS_SetSessionTimeZone_Output">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="CurrentServerTime" type="xsd:string" />
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+		</xsd:schema>
+	</types>
+	<message name="TimeWS_GetServerTime_Input">
+		<part name="TimeWS_GetServerTime_Input" element="tns:TimeWS_GetServerTime_Input" />
+	</message>
+	<message name="TimeWS_GetServerTime_Output">
+		<part name="TimeWS_GetServerTime_Output" element="tns:TimeWS_GetServerTime_Output" />
+	</message>
+	<message name="TimeWS_SetSessionTimeZone_Input">
+		<part name="TimeWS_SetSessionTimeZone_Input" element="tns:TimeWS_SetSessionTimeZone_Input" />
+	</message>
+	<message name="TimeWS_SetSessionTimeZone_Output">
+		<part name="TimeWS_SetSessionTimeZone_Output" element="tns:TimeWS_SetSessionTimeZone_Output" />
+	</message>
+	<portType name="Default_Binding_Time">
+		<operation name="GetServerTime">
+			<input message="tns:TimeWS_GetServerTime_Input" />
+			<output message="tns:TimeWS_GetServerTime_Output" />
+		</operation>
+		<operation name="SetSessionTimeZone">
+			<input message="tns:TimeWS_SetSessionTimeZone_Input" />
+			<output message="tns:TimeWS_SetSessionTimeZone_Output" />
+		</operation>
+	</portType>
+	<binding name="Default_Binding" type="tns:Default_Binding_Time">
+		<soap:binding transport="http://schemas.xmlsoap.org/soap/http"
+			style="document" />
+		<operation name="GetServerTime">
+			<soap:operation soapAction="document/urn:crmondemand/ws/time/:GetServerTime" />
+			<input>
+				<soap:body use="literal" />
+			</input>
+			<output>
+				<soap:body use="literal" />
+			</output>
+		</operation>
+		<operation name="SetSessionTimeZone">
+			<soap:operation
+				soapAction="document/urn:crmondemand/ws/time/:SetSessionTimeZone" />
+			<input>
+				<soap:body use="literal" />
+			</input>
+			<output>
+				<soap:body use="literal" />
+			</output>
+		</operation>
+	</binding>
+	<service name="Time">
+		<port binding="tns:Default_Binding" name="Default">
+			<soap:address
+				location="https://secure-ausomxapa.crmondemand.com/Services/Integration" />
+		</port>
+	</service>
+</definitions>

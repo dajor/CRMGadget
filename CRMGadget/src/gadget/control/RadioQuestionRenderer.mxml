@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true" height="100%" width="100%">
+	
+	<fx:Script>
+		<![CDATA[
+			import com.assessment.DtoColumn;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			
+			import spark.components.Label;
+			import spark.components.RadioButton;
+			import spark.components.RadioButtonGroup;
+			
+			
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid;
+			private var list:ArrayCollection;
+			
+			
+			protected var _groupProperties:Array;
+			
+			protected var _dtoCol:DtoColumn;
+			protected var _displayName:Function;
+			protected var _refreshPageTotal:Function;
+			
+			
+			private var radio:RadioButton;
+			private var txtVal:Label;
+			
+			public function set groupProperties(groupProperties:Array):void{
+				this._groupProperties = groupProperties;
+			}
+			
+			public function get groupProperties():Array {
+				return this._groupProperties;
+			}
+			
+			public function set refreshPageTotal(refreshPageTotal:Function):void{
+				this._refreshPageTotal = refreshPageTotal;
+			}
+			public function get refreshPageTotal():Function{
+				return this._refreshPageTotal;
+			}
+			
+			public function set dtoCol(col:DtoColumn):void{
+				this._dtoCol=col;
+			} 
+			public function get dtoCol():DtoColumn{
+				return this._dtoCol;
+			}
+			public function set displayName(funcDisplayname:Function):void{
+				this._displayName = funcDisplayname;
+			}
+			public function get displayName():Function{
+				return this._displayName;
+			}
+			
+			private function clickFunction(e:Event):void{
+				data[column.dataField]= data[column.dataField]=='1'?'0':'1';
+				for each(var dtoColumn:DtoColumn in groupProperties){
+					if(dtoColumn.dataType==DtoColumn.RADIO_TYPE && column.dataField!=dtoColumn.colProperty){
+						data[dtoColumn.colProperty] = '0';
+					}
+				}
+				
+				if(refreshPageTotal!=null){
+					refreshPageTotal();
+				}
+				list = grid.dataProvider as ArrayCollection;
+				grid.dataProvider = list;
+				grid.validateNow();
+				
+			}
+			
+			
+			override public function set data(value:Object):void{		
+				super.data = value;
+				
+				if(column!=null && value){
+					
+					if(data!=null && (!data.isHeader||data.isHeader=='0') && !data.isFooter){
+						if(radio==null){
+							radio = new RadioButton();
+							radio.addEventListener(MouseEvent.CLICK,clickFunction);
+							radio.percentHeight=100;
+							radio.enabled = column.editable;
+							radio.groupName = data["AssessmentId"] + data["QuestionId"];
+							hbcell.addChild(radio);
+						}
+					}else{
+						if(txtVal==null){
+							txtVal = new Label();
+							txtVal.percentHeight=100;
+							txtVal.setStyle("verticalAlign","middle");
+							//txtVal.percentWidth=100;
+							hbcell.addChild(txtVal);
+						}
+					}
+					var val:Object = null;
+					if(displayName!=null){
+						val = displayName(dtoCol,value);
+					}else{
+						val = value[column.dataField];
+					}
+					
+					if(radio!=null){
+						radio.selected=(val==true || val=="true" || val==1 || val=="1");
+						if(radio.selected){
+							hbcell.setStyle("backgroundColor",0xFF0000);
+							
+						}else{
+							hbcell.setStyle("backgroundColor",0x008000);
+						}
+					}else if(txtVal!=null){
+						txtVal.text = String(val);
+						txtVal.setStyle("backgroundColor",0x92B8FF);
+						hbcell.setStyle("backgroundColor", 0x92B8FF);
+						txtVal.setStyle("fontWeight","bold");
+						if(data.isFooter) {
+							txtVal.text = String(val) ;
+						} 
+						//						if(data.isFooter){
+						//							hbcell.setStyle("backgroundColor", 0xA33908);
+						//							txtVal.setStyle("backgroundColor",0xA33908);
+						//						}
+					}
+					
+				}
+				
+			}
+			
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+					}
+					
+				}
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	<mx:HBox id="hbcell" backgroundColor="0xFFFF00"  verticalAlign="middle" width="100%" height="30"   paddingBottom="3" horizontalAlign="center" />	
+	<!--<s:Label id="lblData" top="0" left="0" right="0" bottom="0" text="{listData.label}" />-->
+</s:MXAdvancedDataGridItemRenderer>

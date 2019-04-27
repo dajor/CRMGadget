@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*" 
+	resizable="false"
+	width="460" 
+	height="420"
+	title="{windowTitle}" 
+	showFlexChrome="false" 
+	transparent="true" 
+	systemChrome="none"
+	creationComplete="if (!imagePreview) {canvasThumbnail.width = 0; }">
+	<mx:Script>
+	    <![CDATA[
+	    	import mx.collections.ArrayCollection;
+	    	import gadget.util.Utils;
+	    	import mx.controls.Alert;
+		    import gadget.dao.ContactDAO;
+		    import gadget.dao.Database;
+		    import mx.events.FileEvent;
+			import gadget.i18n.i18n;
+		    
+		    [Bindable] public var extensions:Array = ['.png','.gif','.jpg'];
+		    [Bindable] public var textLabel:String = i18n._('BROWSELOCALFILEDIALOG_LABEL_CHOOSE_AN_IMAGE');
+		    [Bindable] public var imagePreview:Boolean = true;
+		    [Bindable] public var windowTitle:String = i18n._('BROWSELOCALFILEDIALOG_TITLE_PHOTO_UPLOAD');
+		     
+		    
+		    public var callback:Function;
+		    
+		    private var file:File;
+
+			private function upload():Boolean {
+				if (file && file.extension) {
+					callback(file);
+					return true;
+				} else {
+					fileList.openSubdirectory(file.nativePath);
+					return false;
+				}	
+			}	        
+			
+			private function clickHandler(event:MouseEvent):void {	
+				file = (event.currentTarget as FileSystemTree).selectedItem as File;
+				if (file != null) {
+					if (imagePreview) {
+						imgThumbnail.source = file.url;
+						imgThumbnail.visible = file.extension != null ? true : false;
+					}
+				} else {
+					imgThumbnail.visible = false;
+				}
+			}
+			
+
+	    ]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar title="{windowTitle}"/>
+		<mx:VBox top="40" left="16" right="16">
+			<mx:HBox width="100%">				
+				<mx:VBox width="100%" height="100%">
+				    <mx:Label color="#000000" text="{textLabel}"/>
+				    <mx:FileSystemTree id="fileList" click="clickHandler(event);" width="100%" height="300" extensions="{extensions}" />
+				</mx:VBox>
+				<mx:Canvas width="137" height="100%" id="canvasThumbnail">
+					<mx:Image id="imgThumbnail" top="2" bottom="2" left="2" right="2" horizontalAlign="center" verticalAlign="middle"/>
+				</mx:Canvas>
+			</mx:HBox>
+			<control:DetailButtonBar buttonLabel="BROWSELOCALFILEDIALOG_DETAILBUTTONBAR_BUTTONLABEL_OPEN" action="upload"/>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

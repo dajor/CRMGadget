@@ -1,0 +1,589 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="absolute"
+		   width="600" height="500"
+		   showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+		   initialize="initEditor()"
+		   resizable="true"
+		   creationComplete="init()" xmlns:control="gadget.control.*"
+		   >
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.net.getClassByAlias;
+			import flash.utils.flash_proxy;
+			import flash.utils.getDefinitionByName;
+			import flash.utils.getQualifiedClassName;
+			
+			import gadget.control.ImageTextInput;
+			import gadget.dao.BaseDAO;
+			import gadget.dao.CustomPicklistValueDAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.service.SupportService;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.CheckBox;
+			import mx.controls.ComboBox;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.events.ItemClickEvent;
+			
+			[Bindable] public var entity:String;
+			[Bindable] public var items:ArrayCollection;
+			public var fields:Array;
+			private var subtype:int = 0;
+			
+			public var arrayDefaultObject:Array;
+			
+			[Bindable] public var create:Boolean;
+			private var validators:Array = [];
+			
+			public var functions:Object;
+			public var refreshGrid:Function;
+			private var keyCode:int;
+			private var accountingIndicators:ArrayCollection;
+			private const mapRequiredFields:Object = {ProductName:"ProductName",IndexedPick0:"IndexedPick0",IndexedNumber0:"IndexedNumber0"}
+			private function getObjectInPicklist(item:Object, fieldName:String, picklist:ArrayCollection):void {
+				var value:String = item[fieldName];
+				for (var i: int = 0; i < picklist.length; i++) {
+					var tmp:Object = picklist.getItemAt(i);
+					if ( value == tmp.data) {
+						item[fieldName] = tmp;
+						break;
+					} 			
+				}
+			}
+			private function getListSelectedData():void{
+				var data:ArrayCollection = editableGrid.dataProvider as ArrayCollection;
+				var isDelete:Boolean ;
+				if(!create){
+					for(var i:int=0;i<data.length;i++){
+						if(data[i].batchUpdate == true){
+							isDelete = true;
+							break;
+						}
+					}
+					if(isDelete){
+						Alert.show(i18n._('GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE'),i18n._('GLOBAL_DELETE') , Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+							if (event.detail==Alert.YES){
+								
+								//Database.begin();
+								for(var i:int=0;i<data.length;i++){
+									if(data[i].batchUpdate == true){
+										Database.getDao(entity).delete_(data[i]);
+										data.removeItemAt(i);
+										i--;
+									}
+								}
+								//Database.commit();
+								refreshGrid();
+							}    	 
+						});	
+						
+					}else{
+						Alert.show(i18n._("GLOBAL_PLEASE_SELECT_A_RECORD"),"", Alert.OK, this);
+					}
+					
+				}else{
+					for(var j:int=0;j<data.length-1;j++){
+						if(data[j].batchUpdate == true){
+							isDelete = true;
+							break;
+						}
+					}
+					if(isDelete){
+						Alert.show(i18n._('GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE'),i18n._('GLOBAL_DELETE') , Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+							if (event.detail==Alert.YES){
+								
+								for(var k:int=0;k<data.length-1;k++){
+									if(data[k].batchUpdate == true){	
+										data.removeItemAt(k);
+										k --;
+									}
+								}		
+							}    	 
+						});	
+						
+					}else if(data[data.length-1].batchUpdate){
+						
+						Alert.show(i18n._("You can not delete last record."),"", Alert.OK, this);
+					}else{
+						Alert.show(i18n._("GLOBAL_PLEASE_SELECT_A_RECORD"),"", Alert.OK, this);
+					}
+				}
+			}
+			private function initEditor():void {
+				accountingIndicators = PicklistService.getPicklist(entity, "IndexedPick0");
+				for each(var tmp:Object in items){
+					getObjectInPicklist(tmp, "IndexedPick0", accountingIndicators);
+					//					GUIUtils.checkCustomPicklistValue(tmp,new ArrayCollection(fields),entity,this);
+					checkCustomPicklistValue(tmp,new ArrayCollection(fields),entity);
+					bindEvaluatorValue(tmp);
+				}	
+			}
+			
+			private function checkCustomPicklistValue(item:Object,fields_:ArrayCollection,entity:String):void{
+				for (var i:int = 0; i < fields_.length; i++) {
+					var columnName:String = fields_[i].column_name!=null?fields_[i].column_name:fields_[i].element_name;
+					var fieldInfo:Object = FieldUtils.getField(entity, columnName);
+					if (fieldInfo && fieldInfo.data_type=='Picklist') {
+						var customPicklistValue:Object = Database.customPicklistValueDAO.selectByFieldName(entity,columnName,item.gadget_id);
+						if(customPicklistValue){
+							var customCode:String = customPicklistValue.crmCode;
+							if(customCode.indexOf('$$')<0) 
+								customCode = customCode.replace("/","$$");
+							else
+								var label:String = customCode.substring(customCode.indexOf('$$')+2);
+							item[columnName] = {"label": label,"data":customCode};
+						} 
+					}
+				}	
+			}
+			
+			private function initEntityId(item:Object):void {
+				for each(var object:Object in arrayDefaultObject){
+					item[object.key] = object.value;
+				}	
+			}
+			
+			private function findEvaluatorDefaultValue(item:Object, fieldName:String):void {
+				initEntityId(item);
+				item[fieldName] = GUIUtils.findEvaluatorDefaultValue(entity,fieldName,item); //default accounting indicator value
+			}
+			
+			private function init():void {
+				
+				if(create){ //add a new row if it is a created screen.
+					editableGrid.addEventListener(KeyboardEvent.KEY_DOWN, function(evt:KeyboardEvent):void {
+						if(evt.keyCode == Keyboard.ENTER || evt.keyCode == Keyboard.TAB){
+							if( editableGrid.editedItemPosition &&  items.length-1 == editableGrid.editedItemPosition.rowIndex  && editableGrid.editedItemPosition.columnIndex == editableGrid.columns.length -1 ){
+								var newObj:Object = {'ProductName':'','IndexedNumber0':'','IndexedPick0':'','QuickSearch1':''};
+								findEvaluatorDefaultValue(newObj,"IndexedPick0");
+								getObjectInPicklist(newObj, "IndexedPick0", accountingIndicators);
+								items.addItem(newObj); //add a blank record
+								var index:Number = editableGrid.editedItemPosition.rowIndex+1;
+								editableGrid.dataProvider = items;
+								//								editableGrid.selectedIndex = index;
+								editableGrid.editedItemPosition = {columnIndex:0, rowIndex:index};
+							}
+						}
+					});
+				}
+				setTitle();
+				initButtons();
+				initColumns();
+			}
+			
+			private function setTitle():void {
+				title = titlebar.title = Utils.getTitle(entity, subtype, null, create);
+			}
+			
+			private function initButtons():void {
+				//bug #1711 CRO
+				//if(create){
+					btnAction.dataProvider = new ArrayCollection([
+						i18n._('GLOBAL_CANCEL'),
+						i18n._('GLOBAL_DELETE'),
+						i18n._('GLOBAL_SAVE')
+						
+					]);
+//				//}else{
+//					btnAction.dataProvider = new ArrayCollection([
+//						i18n._('GLOBAL_CANCEL'),
+//						i18n._('GLOBAL_SAVE')
+//						
+//					]);	
+//				//}
+				
+				
+			}
+			
+			private function initColumns():void {	
+				var headerKeyLabel:Object = new Object;
+				for each(var fld:Object in fields){
+					headerKeyLabel[fld.element_name] = fld.display_name;
+				}
+				
+				//add formula field if it's update mode
+				if(!create){
+					var columns:Array = editableGrid.columns;
+					var formulaColumn:DataGridColumn = new DataGridColumn();
+					formulaColumn.dataField = "mat_desc";
+					formulaColumn.editable = false;
+					columns.push(formulaColumn);
+					editableGrid.columns = columns;
+					editableGrid.validateNow();
+				}
+				
+				for(var i:int=0; i<editableGrid.columns.length; i++){
+					var column:DataGridColumn = editableGrid.columns[i];
+					if(mapRequiredFields[column.dataField]  == null){ //bug #1987 CRO
+						column.headerText = headerKeyLabel[column.dataField] ;
+					}else{
+						column.headerText = headerKeyLabel[column.dataField] + "*";
+					}
+				}
+				
+				if(create){ //add a new row if it is a created screen.
+					var newObj:Object = {'ProductName':'','IndexedNumber0':'','IndexedPick0':'','QuickSearch1':''};
+					findEvaluatorDefaultValue(newObj,"IndexedPick0");
+					getObjectInPicklist(newObj, "IndexedPick0", accountingIndicators);
+					items.addItem(newObj); //add a blank record
+				}
+				editableGrid.dataProvider = items;
+				editableGrid.validateNow();
+			}
+			
+			private function bindEvaluatorValue(item:Object):void{
+				var fieldsManagement:Dictionary = Database.fieldManagementServiceDao.readAll(entity);
+				
+				var currentUser:Object = Database.userDao.read();
+				var userDataList:ArrayCollection=null;
+				var userData:Object = null;
+				if(currentUser!=null){
+					userDataList= Database.allUsersDao.findAll(new ArrayCollection([{element_name:"*"}]), "userSignInId = '" + currentUser.user_sign_in_id + "'");
+				}
+				
+				if (userDataList!=null && userDataList.length > 0) {
+					userData = userDataList.getItemAt(0);	
+				} 
+				
+				for each (var tmpField:Object in fields) { 
+					if (tmpField.custom == null) {
+						var fieldInfo:Object = FieldUtils.getField(entity, tmpField.element_name);
+						if(!fieldInfo) continue;
+						var fieldManagement:Object = fieldsManagement[fieldInfo.element_name];
+						if(fieldManagement!=null){
+							if(!StringUtils.isEmpty( fieldManagement.DefaultValue )){
+								var defaultValue:String = fieldManagement.DefaultValue;
+								if (defaultValue.indexOf("(") == -1 && defaultValue.indexOf("{") == -1) {
+									if( defaultValue.indexOf("CreatedDate")!=-1){
+										item[fieldInfo.element_name] =new Date();
+									}else{
+										item[fieldInfo.element_name] = defaultValue;
+									}
+									
+								} else if(create){  //evaluator do create only
+									// functions
+									var val:String = evaluateExpression(fieldInfo.element_name,item, defaultValue,userData);
+									//get Value from Id to display CRO
+									if (fieldInfo.data_type == "Picklist") {
+										val = PicklistService.getId(entity,fieldInfo.element_name,val,userData.LanguageCode);
+									}
+									if(val=='-1' && entity==Database.customObject1Dao.entity && fieldInfo.element_name=='CustomInteger0'){
+										val="";
+									}
+									item[fieldInfo.element_name] = val;
+								}
+							}
+						}
+					}
+				}	
+			}	
+			
+			private function evaluateExpression(element_name:String,item:Object, value:String,userData:Object):String{
+				return Utils.doEvaluate(value, userData, entity, element_name, item,null);
+			}
+			
+			private function getLabelMaterialNumber(item:Object, col:DataGridColumn):String {
+				if(item == null || item == "") return "";
+				if(item[col.dataField] == "") return "";
+				var relation:Object = Relation.getFieldRelation(entity, "ProductName");
+				var objRel:Object = Database.getDao(relation.entityDest).findByOracleId(item[relation.keySrc]);
+				if(objRel){
+					for(var i:int=0; i<relation.labelDest.length; i++){
+						item[relation.labelSrc[i]] = objRel[relation.labelDest[i]];
+					}			
+				}
+				return item[col.dataField] ;
+			}
+			
+			private function getLabelAccIndicator(item:Object, col:DataGridColumn):String {
+				if(item == null) return "";
+				if( StringUtils.isEmpty(item[col.dataField]) ) return "";
+				if(item[col.dataField].hasOwnProperty("label")) return item[col.dataField].label;
+				return "";
+			}
+			
+			
+			protected function itemClickHandler(event:ItemClickEvent):void
+			{
+				switch(event.index){
+					case 0://close
+						close();
+						break;
+				    case 1:
+						//if(create){
+							getListSelectedData();
+//						}else{
+//							commit();
+//						}
+						break;
+					default://save
+						commit();
+				}
+			}
+			//bug #1711 CRO
+			private function commit():void{
+//				for each(var item:Object in items){
+//					if(GUIUtils.checkValidationRule(item,entity,this)) return ;
+//				}
+				var missingIndex:int = checkValidator(); 
+				if( missingIndex == -1){
+					if(doSave()) close();	
+				}else{
+					Alert.show("Please input the missing fields.","Missing fields",Alert.OK,this, function(eventObj:CloseEvent):void {
+						if (eventObj.detail==Alert.OK) {
+							editableGrid.selectedIndex = missingIndex; 
+						}
+					});	
+				}
+			}
+			/*
+			returns missing index, return -1 is no missing
+			*/
+			private function checkValidator():int {
+				var index:int = -1;
+				var isMissing:Boolean = false;
+				for each(var item:Object in items){
+					index++;
+					if( checkEmpty(item,"IndexedNumber0") ||
+						checkEmpty(item,"IndexedPick0") ||
+						//Bug #1987 CRO 
+						checkEmpty(item,"ProductName")
+					){
+						isMissing = true;						
+						break;
+					}
+				}
+				return isMissing ? index : -1;
+			}
+			
+			private function checkEmpty(item:Object, fieldName:String):Boolean {
+				var obj:Object = item[fieldName];
+				//bug 1710 CRO  obj != null 
+				if(obj != null && obj.hasOwnProperty("data")){
+					if(obj.data == "") return true;
+				}
+				
+				if( StringUtils.isEmpty(item[fieldName]) ) return true;
+				
+				return false;
+				
+			}
+			
+			private function doSave():Boolean {
+				var hasError:Boolean = false;
+				var dp:ArrayCollection = editableGrid.dataProvider as ArrayCollection;
+				
+				//				//check the last index in the grid, if they don't input for "Material Number", "Quantity" and "Accounting Indicator" then we remove it
+				dp.filterFunction =  function(item:Object):Boolean {
+					if( StringUtils.isEmpty(item["IndexedNumber0"]) ||
+						(item["IndexedPick0"] == null || item["IndexedPick0"] == "")
+					){
+						return false;
+					}else{
+						return true;
+					}
+				};
+				dp.refresh();
+				
+				var newDataProvider:ArrayCollection = new ArrayCollection();
+				for each(var tmp:Object in dp){
+					var t:Object = new Object;
+					for(var p:String in tmp){
+						if(tmp[p] && tmp[p].hasOwnProperty("data")){
+							t[p] = tmp[p].data;
+						}else{
+							t[p] = tmp[p];
+						}
+					}
+					newDataProvider.addItem(t);
+				}
+				
+				for each(var item:Object in newDataProvider){
+					
+					item.gadget_type = entity;
+					initEntityId(item);
+					
+					//only for JD user
+					GUIUtils.calculateTotalHours(item,entity);
+					
+					doEvaluate(item,"mat_desc");
+					doEvaluate(item,"mat_unit");
+					
+					if(create){
+						for each (var ns:String in DAOUtils.getNameColumns(entity)) {
+							if (!item[ns])
+								item[ns] = entity;
+						}
+						item[DAOUtils.getOracleId(entity)] = null;
+						item["deleted"] = false;
+						item["error"] = false;
+						item["OwnerId"] = Database.userDao.read().id;
+						var dao:BaseDAO = Database.getDao(entity);
+						try {
+							dao.insert(item);
+						} catch (e:SQLError) {
+							Alert.show(e.toString(), i18n._('MINIDETAIL_ALERT_TITLE_CANNOT_CREATE_RECORD'), Alert.CANCEL, this);
+							hasError = true;
+						}
+						item = dao.selectLastRecord()[0];
+						item[DAOUtils.getOracleId(entity)] = "#" + item.gadget_id;
+						saveCustomPicklistValue(item);
+						Database.getDao(entity).update(item);
+					} else {
+						saveCustomPicklistValue(item);
+						item.local_update = new Date().getTime();
+						Database.getDao(entity).update(item);
+					}
+					
+				}
+				//CR #1911 CRO
+				Utils.updateFieldByChild(entity,item);
+				
+				refreshGrid();
+				return hasError ? false : true;
+			}
+			
+			private function doEvaluate(item:Object, fieldName:String):void {
+				//calculate formula field
+				var objectCustomField:Object = Database.customFieldDao.selectByFieldName(entity,fieldName);
+				if (objectCustomField) {
+					var ownerUser:Object = Database.allUsersDao.ownerUser();
+					item[fieldName] = Utils.doEvaluate(objectCustomField.value,ownerUser, objectCustomField.entity, objectCustomField.fieldName,item,Utils.getSqlListCounts(entity,new ArrayCollection(fields)));
+				}
+			}
+			
+			private function saveCustomPicklistValue(item:Object):void {
+				for (var i:int = 0; i < fields.length; i++) {
+					if (fields[i].data_type == "Picklist") {
+						var colName:String = fields[i].element_name;
+						var picValue:String = item[colName];
+						if(picValue){
+							var picklistValue:Object = CustomPicklistValueDAO.newObject();
+							picklistValue.entity = entity;
+							picklistValue.fieldName = colName;
+							picklistValue.oracleCode = picValue.split("$$")[0];
+							picklistValue.crmCode = picValue;
+							picklistValue.oracleId = item.IntegrationId;
+							picklistValue.gadgetId = item.gadget_id;
+							if(picValue.indexOf('$$')>0){
+								Database.customPicklistValueDAO.update_(picklistValue);
+								item[colName] = picklistValue.oracleCode;
+							}else{
+								Database.customPicklistValueDAO.deleteByFieldName(picklistValue);
+							}
+						}
+					}
+				}				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar icon="{ImageUtils.getImage(entity)}" id="titlebar" y="2" x="25"/>
+		<mx:VBox top="36" left="8" right="8" bottom="8">	
+			<mx:DataGrid id="editableGrid" editable="true" sortableColumns="false" width="100%" height="100%" >
+				
+				<mx:columns>
+					<mx:DataGridColumn sortable="false" width="30"  itemRenderer="CheckBoxRenderer"  rendererIsEditor="false" editable="false" />
+					<mx:DataGridColumn dataField="ProductName" editorDataField="item" labelFunction="getLabelMaterialNumber" headerText="Material Number" >
+						<mx:itemEditor>
+							<fx:Component >
+								<control:ImageTextInput creationComplete="{initimagetextinput(data)}">
+									<fx:Script>
+										<![CDATA[
+											import gadget.service.PicklistService;
+											import gadget.service.UserService;
+											import gadget.util.GUIUtils;
+											import gadget.util.Relation;
+											import gadget.window.WindowManager;
+											
+											import mx.collections.ArrayCollection;
+											import mx.controls.TextInput;
+											private function initimagetextinput(data:Object):void {
+												var relation:Object = Relation.getFieldRelation("Custom Object 2", "ProductName");
+												if (relation != null) {
+													this.text = data["ProductName"];
+													this.data = relation;
+													this.clickFunc = function(event:Event):void {
+														var itemFinder:ItemFinder = new ItemFinder();
+														itemFinder.relation = (event.currentTarget as TextInput).data;
+														itemFinder.textInput = (event.currentTarget as TextInput);
+														itemFinder.item = data;
+														itemFinder.reload = null;
+														// bug #113 fix
+														if (UserService.getCustomerId() == UserService.VETOQUINOL) {
+															if (itemFinder.relation.entitySrc == "Activity" && itemFinder.relation.entityDest == "Contact" && item["AccountId"] != null && item["AccountId"] != "") {
+																itemFinder.filter = "AccountId = '" + item["AccountId"] + "'";
+															}				
+														}
+														// end bug #113 fix
+														WindowManager.openModal(itemFinder);
+													};
+												}
+											}
+										]]>
+									</fx:Script>
+								</control:ImageTextInput>
+							</fx:Component>
+						</mx:itemEditor>
+					</mx:DataGridColumn>
+					
+					<mx:DataGridColumn dataField="IndexedPick0" editorDataField="selectedItem" labelFunction="getLabelAccIndicator" headerText="Accounting Indicator" >
+						<mx:itemEditor>
+							<fx:Component>
+								<mx:ComboBox dataProvider="{getDataProvider()}" >
+									
+									<fx:Script>
+										<![CDATA[
+											import gadget.service.PicklistService;
+											import gadget.util.GUIUtils;
+											import gadget.util.Utils;
+											
+											import mx.collections.ArrayCollection;
+											
+											private function getDataProvider():ArrayCollection {
+												
+												
+												
+												var picklist:ArrayCollection = PicklistService.getPicklist("Custom Object 2", "IndexedPick0");
+												return picklist;
+											}
+											
+										]]>
+									</fx:Script>
+								</mx:ComboBox>
+							</fx:Component>
+						</mx:itemEditor>
+					</mx:DataGridColumn>
+					
+					<mx:DataGridColumn dataField="IndexedNumber0" headerText="Quantity"/>
+					
+				</mx:columns>				
+			</mx:DataGrid>
+			
+			<mx:HBox width="100%" horizontalAlign="right">
+				<mx:ButtonBar id="btnAction" itemClick="itemClickHandler(event)"/>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

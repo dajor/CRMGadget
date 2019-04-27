@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel
+	xmlns:control="gadget.control.*"
+	xmlns:mx="http://www.adobe.com/2006/mxml"  
+	titleStyleName="panelHeader" verticalScrollPolicy="off"
+	horizontalScrollPolicy="off"
+	creationComplete="init();"
+	>
+	
+	<mx:Style>
+		.DataGrid{
+			border-bottom:1px;
+		}
+	</mx:Style>
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Button;
+			import mx.controls.Label;
+			import mx.controls.LinkButton;
+			import mx.events.ListEvent;
+			
+			import org.flexunit.internals.RealSystem;
+			
+			public var previousDayClick:Function;
+			public var nextDayClick:Function;
+			public var previousMonthClick:Function;
+			public var nextMonthClick:Function;
+			private var labelDay:Label;
+			
+			[Bindable] public var dataProvider:ArrayCollection;
+				
+			private const DATESETPANEL_TOOLTIP_PREVIOUS_MONTH:String = 'DATESETPANEL_TOOLTIP_PREVIOUS_MONTH';
+			private const DATESETPANEL_TOOLTIP_PREVIOUS_DAY:String = 'DATESETPANEL_TOOLTIP_PREVIOUS_DAY';
+			private const DATESETPANEL_TOOLTIP_NEXT_DAY:String = 'DATESETPANEL_TOOLTIP_NEXT_DAY';
+			private const DATESETPANEL_TOOLTIP_NEXT_MONTH:String = 'DATESETPANEL_TOOLTIP_NEXT_MONTH';
+			private const DATESETPANEL_LABEL_TEXT_NO_APPOINTMENT:String = 'DATESETPANEL_LABEL_TEXT_NO_APPOINTMENT';
+			public static const KM2MILES:Number=0.621371;
+			public static const FEET2MILES:Number=0.000189394;
+			public static const M2FEET:Number=3.28084;
+			
+			private function init():void{
+				var hBox:HBox = new HBox();
+				hBox.setStyle("paddingTop", "3");
+				hBox.visible = true;
+				hBox.includeInLayout = true;
+				hBox.width = this.titleBar.width;
+				hBox.height = this.titleBar.height;				
+				hBox.addChild(createButton(ImageUtils.previousDayIcon,i18n._(DATESETPANEL_TOOLTIP_PREVIOUS_MONTH),previousMonthClick));
+				hBox.addChild(createButton(ImageUtils.previousDayIcon,i18n._(DATESETPANEL_TOOLTIP_PREVIOUS_DAY),previousDayClick));
+				
+				labelDay = new Label();
+				labelDay.setStyle("fontSize", "12");
+				labelDay.setStyle("fontWeight", "bold");
+				labelDay.setStyle("textAlign", "center");
+				labelDay.percentWidth = 100;
+				hBox.addChild(labelDay);
+							
+				hBox.addChild(createButton(ImageUtils.nextDayIcon,i18n._(DATESETPANEL_TOOLTIP_NEXT_DAY),nextDayClick));
+				hBox.addChild(createButton(ImageUtils.nextDayIcon,i18n._(DATESETPANEL_TOOLTIP_NEXT_MONTH),nextMonthClick));
+							
+				hBox.name = "hboxComponent"
+				this.titleBar.addChild(hBox);
+			}
+			
+			
+			public function createButton(_icon:Class,_tootip:String, _clikHandler:Function):LinkButton{
+				var button:LinkButton = new LinkButton();
+				button.setStyle("icon", _icon);
+				button.toolTip = _tootip;
+				button.addEventListener(MouseEvent.CLICK, _clikHandler);
+				return button;
+			}
+			
+			public function setTextLabel(text:String, date:Date):void{
+				labelDay.text = text;
+				labelDay.data = date;
+			}
+			
+			public function getDataLabel():Object{
+				return labelDay.data;
+			}
+			public function getDurationAsStringFromObject(duration:Object):String{
+				
+				var hour:int = duration.hour;
+				var min:int = duration.mn;
+				var realMin:int=min%60;
+				if(min>60){
+					hour+=((min-realMin)/60);
+				}	
+				
+				if(hour>0){
+					if(realMin>0){						
+						return hour+"h "+realMin+" min";
+					}
+					return hour+"h";
+				}
+				
+				return realMin +" min"
+			}
+			
+			public function getDurationAsString(n:Number):String{
+				var duration:Object = getDuration(n);
+				return getDurationAsStringFromObject(duration);
+			}
+			
+			public function getDuration(n:Number):Object{
+				var min:int=n%3600;
+				var hour:int=(n-min)/3600;
+				var realMin:int = min/60;
+				var duration:Object = new Object();
+				duration.hour = hour;
+				duration.mn = realMin;
+				
+				return duration;			
+				
+			}
+			
+			public function getDistanceAsStringFromKM(o:Object):String{
+				if(Database.preferencesDao.getGoolgeMapDistance()=='imperial'){
+					
+					if(o.mi>=0.1){														
+						var miles:Number = o.mi;
+						
+						var strMiles:String = miles.toFixed(1);
+						if(StringUtil.endsWith(strMiles,".0")){
+							return int(miles)+" mi";
+						}else{
+							return strMiles+" mi";
+						}
+					}else{
+																
+						return int(o.mi/FEET2MILES)+" ft"
+						
+					}
+				}else{
+					if(o.km>=0.1){			
+						var km:Number = o.km;
+						var strKm:String = km.toFixed(1);
+						if(StringUtil.endsWith(strKm,".0")){
+							return int(km)+" km";
+						}
+						return strKm+" km";
+						
+					}else{
+						return int(km*1000)+" m"
+					}
+				}
+			}
+			
+			public function getDistanceAsString(dist:Number):String{
+				
+				var km:Object = getDistanceAsKmAnMiles(dist);
+				
+				return getDistanceAsStringFromKM(km);
+			}
+			
+			public function getDistanceAsKmAnMiles(dist:Number):Object{
+				var meters:int = dist%100;
+				var km:Number = (dist-meters)/1000;
+				if(meters>100){
+					km =km+(meters/100);
+				}
+				var distance:Object = new Object();
+				distance.km = parseFloat(km.toFixed(1));
+				var miles:Number = distance.km*KM2MILES;
+				distance.mi= parseFloat(miles.toFixed(1));
+				
+				return distance;
+			
+			}
+
+			public function refreshTotal():void{				
+				var lblTotal:String = i18n._("TOTAL_TRAVEL@Total Travel");
+				var totalDistance:Object ={km:0,mi:0};
+				var totalDuration:Object ={hour:0,mn:0};
+				for each(var obj:Object in tileList.dataProvider){
+					if(obj.mapDistance){
+						var distance:Object = obj.mapDistance.distance;
+						var duration:Object = obj.mapDistance.duration;							
+						if(duration!=null){
+							var objDuration:Object = getDuration(duration.value);
+							totalDuration.hour+=objDuration.hour;
+							totalDuration.mn+=objDuration.mn;
+						}
+						if(distance!=null){
+							var objDistance=getDistanceAsKmAnMiles(distance.value);
+							totalDistance.km+=objDistance.km;
+							totalDistance.mi+=objDistance.mi;
+						}
+						
+						
+					}
+				}
+				lblTotal+=": "+getDistanceAsStringFromKM(totalDistance)+"/"+getDurationAsStringFromObject(totalDuration);
+				txtTotal.text = lblTotal;				
+				
+			}
+			
+			
+			
+			
+		]]>
+	</mx:Script>
+	
+	<mx:ViewStack id="vs" width="100%" height="100%">
+		<mx:VBox width="100%">
+			<mx:DataGrid 
+				id="tileList"
+				width="100%"
+				height="100%"
+				dataProvider="{dataProvider}"
+				borderStyle="inset"
+				
+				>
+				<mx:columns>
+					<mx:DataGridColumn id="colTitle">
+						<mx:headerRenderer>
+							<mx:Component>
+								<mx:HBox paddingLeft="8" horizontalGap="20" horizontalScrollPolicy="off">
+									<mx:Script>
+										<![CDATA[
+											import gadget.dao.Database;
+											import gadget.i18n.i18n;
+											//CRO 05.01.2011
+											private const DATESETPANEL_LABEL_TEXT_START_TIME:String = 'GLOBAL_START_TIME';
+											private const DATESETPANEL_LABEL_TEXT_END_TIME:String = 'GLOBAL_ENDTIME';
+											private const DATESETPANEL_LABEL_TEXT_SUBJECT:String = 'GLOBAL_SUBJECT';
+											private const DATESETPANEL_LABEL_TEXT_MARKER:String = 'DATESETPANEL_LABEL_TEXT_MARKER';
+											
+											private function getDurationTitle():String{
+												var dtitle:String='';
+												if(Database.preferencesDao.getGoolgeMapDistance()=='imperial'){
+													dtitle = 'mi';
+												}else{
+													dtitle="km";
+												}
+												return dtitle+'/'+i18n._('SYNCHRONIZE_DATAGRID_COLUMN_TIME')
+											}
+											
+										]]>
+									</mx:Script>
+									<mx:Label text="{i18n._(DATESETPANEL_LABEL_TEXT_START_TIME)}" />
+									<mx:Label text="" />
+									<mx:Label text="{i18n._(DATESETPANEL_LABEL_TEXT_SUBJECT)}" width="100%" />
+									<mx:Label id="lblDurationTitle" text="{getDurationTitle()}" />
+									<mx:Label text="{i18n._(DATESETPANEL_LABEL_TEXT_MARKER)}" />
+								</mx:HBox>
+							</mx:Component>
+						</mx:headerRenderer>
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox paddingLeft="8" horizontalGap="20" horizontalScrollPolicy="off">
+									<mx:Script>
+										<![CDATA[
+											import com.adobe.utils.StringUtil;
+											
+											import gadget.dao.Database;
+											import gadget.util.DateUtils;
+											import gadget.util.GUIUtils;
+											import gadget.util.StringUtils;
+											
+											private function getLabelTime(data:String):String{
+												var date:Date = DateUtils.guessAndParse(data);
+												return DateUtils.format(new Date(date.getTime()+DateUtils.getCurrentTimeZone(date)*GUIUtils.millisecondsPerHour), DateUtils.getCurrentUserDatePattern().timeFormat);
+											}
+											
+											
+											
+											protected function getRowDistance(obj:Object):String{
+												if(obj.mapDistance){
+													var distance:Object = obj.mapDistance.distance;
+													var duration:Object = obj.mapDistance.duration;	
+													return outerDocument.getDistanceAsString(distance.value)+"/"+outerDocument.getDurationAsString(duration.value);
+												}
+												
+												return "";
+											}
+											
+										]]>
+									</mx:Script>
+									<mx:Label text="{getLabelTime(data.StartTime)}" />
+									<mx:Image source="{data.icon}" />
+									<mx:Label text="{StringUtils.reduceTextLength(data.Subject,11)}" width="100%" toolTip="{data.Subject}" />
+									<mx:Label id="duration" text="{getRowDistance(data)}" />
+									<mx:Label id="markLabel" text="{data.mark}" />
+								</mx:HBox>
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox horizontalAlign="right" width="100%">
+				<mx:Label id="txtTotal"/>
+			</mx:HBox>
+		</mx:VBox>
+		<mx:HBox width="100%">
+			<mx:Label text="{i18n._(DATESETPANEL_LABEL_TEXT_NO_APPOINTMENT)}" />
+		</mx:HBox>
+		<!--
+		<mx:TileList id="tileList"
+		itemRenderer="gadget.control.ItemRenderDateSet"
+		dataProvider="{dataProvider}"
+		textAlign="left"
+		columnCount="1"
+		borderStyle="solid"
+		rowHeight="35"
+		width="100%"
+		height="100%"
+		/>
+		-->
+	</mx:ViewStack>
+</mx:Panel>

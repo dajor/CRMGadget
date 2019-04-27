@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   showFlexChrome="false" transparent="true" systemChrome="none"
+		    width="470" height="480" xmlns:control="gadget.control.*"
+			creationComplete="init();">
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.FieldUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.validators.StringValidator;
+			import mx.validators.Validator;
+			
+			[Binable] public var items:ArrayCollection;
+			private var validators:Array = [];
+			private function init():void{
+				initColumns();
+				if(items!=null){
+					griditem.dataProvider = items;
+					griditem.validateNow();
+				}
+				//add validator
+				var stringValidator:StringValidator = new StringValidator();
+				stringValidator.property = "text";
+				stringValidator.source = txtOrderName;				
+				validators.push(stringValidator);	
+				
+			}
+			
+			private function save(e:Event):void{
+				var validatorErrorArray:Array = Validator.validateAll(validators);
+				if (validatorErrorArray.length > 0) {
+					var errorMessageArray:Array = [];
+					for each (var err:Object in validatorErrorArray) {
+						var errField:String = ''; 
+						if (err.currentTarget) {
+							var parent:DisplayObject = err.currentTarget.source.parent; 
+							if(parent is FormItem){
+								errField = (parent as FormItem).label + " : ";
+							}else if(parent.parent is FormItem){
+								errField = (parent.parent as FormItem).label + " : ";
+							} 
+							//							errField = FormItem(err.currentTarget.source.parent).label + " : ";
+						}
+						errorMessageArray.push(errField +Utils.getTranslatedValidation(err.message));
+					}
+					
+					Alert.show(errorMessageArray.join("\n"), i18n._('GLOBAL_INVALID_FORM'), Alert.OK, this);
+					
+				}else{
+					
+					var exist:Object = Database.templateDao.first({Name:txtOrderName.text});
+					if(exist==null){
+						Database.begin();
+						try{
+							var templateObj:Object = new Object();
+							templateObj.Name = txtOrderName.text;
+							templateObj.Description = txtDescription.text;
+							Database.templateDao.insert(templateObj);
+							templateObj = Database.templateDao.selectLastRecord();
+							for each(var item:Object in griditem.dataProvider){
+								item.TemplateId = templateObj.gadget_id;
+								item.TemplateName = templateObj.Name;
+								Database.templateItemDao.insert(item);
+							}
+							Database.commit();
+							close();
+						}catch(e:SQLError){
+							Database.rollback();
+						}
+					}else{
+						Alert.show(i18n._("TEMPLATE_NAME_EXIST@The template name already exist"), i18n._('GLOBAL_INVALID_FORM'), Alert.OK, this);
+					}
+					
+				}
+			}
+			
+			private function initColumns():void{
+				var cols:Array = new Array();				
+				//itemname
+				var col:DataGridColumn =SampleItemView.createColumn('Name',43,Database.customObject14Dao.entity,false);				
+				col.dataField="ItemName";
+				cols.push(col);
+				
+				//item no
+				col=SampleItemView.createColumn('CustomObject14ExternalSystemId',30,Database.customObject12Dao.entity,false);
+				col.dataField = 'ItemNo';
+				cols.push(col);
+				
+				//item qty
+				col=SampleItemView.createColumn('IndexedNumber0',20,Database.customObject12Dao.entity,false);
+				col.dataField = 'Qty';
+				cols.push(col);			
+				//deleted column
+				var deleteCol:DataGridColumn = SampleItemView.createColumn("",7,Database.customObject12Dao.entity,false);
+				var deleteRender:ClassFactory = new ClassFactory(DeleteColRender);
+				deleteRender.properties={parentComp:this,addEmptyRow:false};
+				deleteCol.itemRenderer=deleteRender;				
+				cols.push(deleteCol);
+				griditem.columns = cols;
+			}
+		]]>
+	</fx:Script>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar title="{i18n._('ORDER_TEMPLATE@Order Template')}" icon="@Embed(source='/assets/customize.png')" id="titlebar" y="2" x="25"/>
+		<mx:VBox top="30" left="0" right="0" bottom="0" width="100%">
+			<mx:Canvas width="100%" height="100%">
+				<mx:VBox width="100%" height="100%" paddingRight="10" paddingLeft="10">
+					<mx:Form paddingTop="5" paddingLeft="0" width="100%">	
+						<mx:FormItem required="true" label="{i18n._('GLOBAL_NAME@Name')}" >
+							<mx:VBox>
+								<mx:TextInput id="txtOrderName" width="300" />	
+							</mx:VBox>
+						</mx:FormItem>
+						<mx:FormItem required="false" label="{i18n._('GLOBAL_DESCRIPTION')}" >
+							<mx:TextArea id="txtDescription" width="300" height="100"/>
+						</mx:FormItem>
+						
+					</mx:Form>
+					<mx:DataGrid id="griditem" editable="false" sortableColumns="false" width="100%" height="100%">	
+						
+					</mx:DataGrid>
+					<mx:HBox horizontalAlign="right" width="100%" paddingRight="10" paddingBottom="10">
+						<mx:Button id="btnCancel"   label="{i18n._('GLOBAL_CANCEL@Cancel')}" click="{this.close()}"/>
+						<mx:Button id="btnSave"   label="{i18n._('GLOBAL_SAVE@Save')}" click="save(event)"/>						
+					</mx:HBox>
+				</mx:VBox>	
+			</mx:Canvas>
+			
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

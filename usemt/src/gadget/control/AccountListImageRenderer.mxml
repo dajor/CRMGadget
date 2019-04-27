@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	horizontalScrollPolicy="off" 
+	horizontalAlign="left"
+	horizontalGap="0"
+	verticalAlign="top">
+	<mx:Script>
+		<![CDATA[
+		
+    		[Embed(source='/assets/green_circle.png')] [Bindable] public var prospectImg:Class;
+    		[Embed(source='/assets/yellow_circle.png')] [Bindable] public var customerImg:Class;
+	        [Embed(source='/assets/blue_circle.png')] [Bindable] public var partnerImg:Class;
+	        [Embed(source='/assets/red_circle.png')] [Bindable] public var competitorImg:Class;
+	        [Embed(source='/assets/blank_circle.png')] [Bindable] public var defaultImg:Class;
+		
+			private function getImage(type:String):Class {
+				var image:Class;
+				switch (type) {
+					case 'Prospect': image = prospectImg; break; 
+					case 'Customer': image = customerImg; break;
+					case 'Partner': image = partnerImg; break;
+					case 'Competitor': image = competitorImg; break;
+					default: image = defaultImg; break;
+				}
+				return image;
+		    }  
+
+		]]>
+	</mx:Script>
+	<mx:Canvas>
+		<mx:Image top="2" source="{getImage(data.AccountType)}"/>	
+	</mx:Canvas>
+	<mx:Label text="{data.AccountName}" width="100%"/>
+</mx:HBox>

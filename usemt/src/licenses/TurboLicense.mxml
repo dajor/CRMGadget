@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:mx="library://ns.adobe.com/flex/mx" 						
+						initialize="init();"
+						height="225" width="381"
+						showFlexChrome="false" transparent="true" systemChrome="none"
+						resizable="false"
+						close="closeWindow();
+						">
+	<fx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			import gadget.window.WindowManager;
+			private var ta:TurboActivate = new TurboActivate();
+
+			private var isActivated:Boolean = false;
+			private var trialDaysRemaining:uint = 0;
+			private var isExit:Boolean=true;
+			[Bindable] public var initUI:Function;
+			[Bindable] public var exit:Function; 	
+			private var fMax:Boolean = false;
+
+			public function init():void
+			{
+				ta.VersionGUID = "3136788334e37ccc50634a8.18480956";
+
+				// these are TurboActivate event handlers that will be used at
+				// both the start of your program and throughout the use of your program
+				ta.addEventListener(TurboActivateEvent.IS_ACTIVATED, onIsActivated);
+				ta.addEventListener(TurboActivateEvent.USE_TRIAL, onUseTrial);
+				ta.addEventListener(TurboActivateEvent.TRIAL_DAYS_REMAINING, onTrialDaysRemaining);
+
+				BeforeLicensingCheck();
+				ta.IsActivated();
+			}
+			private function closeWindow():void{
+				if(isExit){
+					exit();
+				}else{
+					this.close();
+				}
+			}
+
+			/**
+			 * This function simply hides your app until all the licensing 
+			 * checks have been made. Your app is shown again in EndLicensingCheck().
+			 */
+			private function BeforeLicensingCheck():void
+			{
+				this.visible = false;
+			}
+
+			/**
+			 * This function is called after the activation is checked
+			 * or the number of trial days remaining is checked.
+			 */
+			private function EndLicensingCheck():void
+			{
+				this.visible = true;
+
+				//TODO: put any "init" code here which is dependent on whether
+				//      the user is activated, in trial mode, or trial expired
+
+				if (isActivated)
+				{
+					ShowTrial(false);
+					EnableAppFeatures();					
+				}
+				else
+				{
+					ShowTrial(true);
+
+					if (trialDaysRemaining > 0)
+					{
+						// there are trials days left, reenable app features
+						EnableAppFeatures();
+
+						// tell the user how many days are left in the trial
+						lblTrialMessage.text = "Your trial expires in " + trialDaysRemaining + " days.";
+					}
+					else
+					{
+						DisableAppFeatures();
+					}
+				}
+			}
+
+			private function ShowTrial(show:Boolean):void
+			{
+				lblTrialMessage.visible = show;
+				btnExtendTrial.visible = show;
+				btnTrial.visible = show;
+
+				btnActivateDeactivate.label = show ? "Activate..." : "Deactivate";
+			}
+
+			private function DisableAppFeatures():void
+			{
+				//TODO: disable all the features of the program
+				txtBox.enabled = false;				
+				lblTrialMessage.text = "The trial has expired. Get a trial extension at YourAppSite.com";				
+			}
+
+			private function EnableAppFeatures():void
+			{
+				//TODO: re-enable all the features of the program
+				if(isActivated){					
+					initUI();
+					isExit = false;
+					closeWindow();
+					
+				}
+				txtBox.enabled = true;
+				
+			}
+
+			private function onIsActivated(evt:TurboActivateEvent):void
+			{
+				if (evt.ErrorObj == null)
+				{
+					if (evt.boolResponse)
+					{
+						// is activated, reenable any features
+						isActivated = true;
+						EndLicensingCheck();
+					}
+					else
+					{
+						// not activated, disable any app features
+						isActivated = false;
+						ta.UseTrial();
+					}
+				}
+				else
+				{
+					// the function call failed, disable any features
+					isActivated = false;
+					EndLicensingCheck();
+
+					// in a real world app don't throw exceptions. This is for debugging only
+					throw evt.ErrorObj;
+				}
+			}
+
+			private function onUseTrial(evt:TurboActivateEvent):void
+			{
+				if (evt.ErrorObj == null)
+				{
+					// get the TrialDaysRemaining
+					ta.TrialDaysRemaining();
+				}
+				else
+				{
+					// in a real world app don't throw exceptions. This is for debugging only
+					throw evt.ErrorObj;
+				}
+			}
+
+			private function onTrialDaysRemaining(evt:TurboActivateEvent):void
+			{
+				if (evt.ErrorObj == null)
+				{
+					trialDaysRemaining = evt.uintResponse;
+					EndLicensingCheck();
+				}
+				else
+				{
+					// in a real world app don't throw exceptions. This is for debugging only
+					throw evt.ErrorObj;
+				}
+			}
+
+			private var trialExt:TrialExtension;
+
+			protected function extendTrial(event:MouseEvent):void
+			{
+				btnExtendTrial.enabled = false;
+
+				trialExt = new TrialExtension();
+				WindowManager.openModal(trialExt);
+				trialExt.nativeWindow.addEventListener(Event.CLOSING, onTrialExtWindowClosing);
+			}
+
+			protected function onTrialExtWindowClosing(event:Event):void
+			{
+				if (trialExt.okClicked)
+				{
+					// either there's an error or we need to activate
+					// either way, we can't let the window close yet
+					// hence "preventDefault()"
+					event.preventDefault();
+
+					if (trialExt.txtTrialExt.text == "")
+					{
+						trialExt.ShowError("You must enter a trial extension");
+					}
+					else
+					{
+						// disable the window when we're extending the trial
+						trialExt.enabled = false;
+
+						// extend the trial
+						ta.addEventListener(TurboActivateEvent.EXTEND_TRIAL, onExtendTrial);
+						ta.ExtendTrial(trialExt.txtTrialExt.text);
+					}
+
+					trialExt.okClicked = false;
+				}
+				else
+				{
+					btnExtendTrial.enabled = true;
+				}
+			}
+
+			private function onExtendTrial(evt:TurboActivateEvent):void
+			{
+				ta.removeEventListener(TurboActivateEvent.EXTEND_TRIAL, onExtendTrial);
+
+				trialExt.enabled = true;
+
+				if (evt.ErrorObj == null)
+				{
+					// the remaining trial days will be checked
+					// and eventually calling EndLicensingCheck()
+					ta.UseTrial();
+					trialExt.close();
+				}
+				else
+				{
+					trialExt.ShowError(evt.ErrorObj.message);
+				}
+			}
+
+			private var pkeyWin:PKey;
+
+			protected function btnActivateDeactivate_clickHandler(event:MouseEvent):void
+			{
+				// prevent double clicking while the result is being processed
+				btnActivateDeactivate.enabled = false;
+
+				if (isActivated)
+				{
+					ta.addEventListener(TurboActivateEvent.DEACTIVATE, onDeactivate);
+					ta.Deactivate();
+				}
+				else
+				{
+					ta.addEventListener(TurboActivateEvent.GET_PKEY, onGetPkey);
+					ta.GetPKey();
+				}
+			}
+
+			private function onDeactivate(evt:TurboActivateEvent):void
+			{
+				ta.removeEventListener(TurboActivateEvent.DEACTIVATE, onDeactivate);
+
+				if (evt.ErrorObj == null)
+				{
+					isActivated = false;
+
+					// the remaining trial days will be checked
+					// and eventually calling EndLicensingCheck()
+					ta.UseTrial();
+				}
+
+				//TODO: perhaps show why the deactivation failed
+
+				btnActivateDeactivate.enabled = true;
+			}
+
+			private function onGetPkey(evt:TurboActivateEvent):void
+			{
+				ta.removeEventListener(TurboActivateEvent.GET_PKEY, onGetPkey);
+
+				// create the pkey window and show it
+				pkeyWin = new PKey();
+				WindowManager.openModal(pkeyWin);
+
+				if (evt.ErrorObj == null)
+				{
+					// add the pkey to the textbox in the pkey window
+					pkeyWin.txtPkey.text = evt.stringResponse;
+				}
+
+				pkeyWin.nativeWindow.addEventListener(Event.CLOSING, onPKeyWindowClosing);
+			}
+
+			protected function onPKeyWindowClosing(event:Event):void
+			{
+				if (pkeyWin.okClicked)
+				{
+					// either there's an error or we need to activate
+					// either way, we can't let the window close yet
+					// hence "preventDefault()"
+					event.preventDefault();
+
+					if (pkeyWin.txtPkey.text == "")
+					{
+						pkeyWin.ShowError("You must enter a product key to activate");
+					}
+					else
+					{
+						// disable the window when we're activating
+						pkeyWin.enabled = false;
+
+						// check and save the product key, followed by activating
+						ta.addEventListener(TurboActivateEvent.CHECK_AND_SAVE_PKEY, onCheckAndSavePkey);
+						ta.CheckAndSavePKey(pkeyWin.txtPkey.text);
+					}
+
+					pkeyWin.okClicked = false;
+				}
+				else
+				{
+					// the window has closed, re-enable the button
+					btnActivateDeactivate.enabled = true;
+				}
+			}
+
+			private function onCheckAndSavePkey(evt:TurboActivateEvent):void
+			{
+				ta.removeEventListener(TurboActivateEvent.CHECK_AND_SAVE_PKEY, onCheckAndSavePkey);
+
+				if (evt.ErrorObj == null)
+				{
+					ta.addEventListener(TurboActivateEvent.ACTIVATE, onActivate);
+					ta.Activate();
+				}
+				else
+				{
+					pkeyWin.ShowError(evt.ErrorObj.message);
+					pkeyWin.enabled = true;
+				}
+			}
+
+			private function onActivate(evt:TurboActivateEvent):void
+			{
+				ta.removeEventListener(TurboActivateEvent.ACTIVATE, onActivate);
+
+				pkeyWin.enabled = true;
+
+				if (evt.ErrorObj == null)
+				{
+					isActivated = true;
+
+					// we're now activated, close the pkey window
+					pkeyWin.close();
+
+					// the window has closed, re-enable the button
+					btnActivateDeactivate.enabled = true;
+
+					// reenable features, etc.
+					EndLicensingCheck();
+				}
+				else
+				{
+					pkeyWin.ShowError(evt.ErrorObj.message);
+				}
+			}
+			private function trial(event:MouseEvent):void{
+				if(trialDaysRemaining>0){
+					initUI();
+				}
+				isExit = false;
+				closeWindow();
+			}			
+			
+		]]>
+	</fx:Script>	
+	<fx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" width="100%" height="100%" left="0" top="0" right="0" bottom="0" verticalScrollPolicy="off" horizontalScrollPolicy="off">
+		<mx:Canvas id="windowTitleBar" backgroundColor = "#EEEEEE" styleName="titleBar" doubleClickEnabled="true"  mouseDown="nativeWindow.startMove()" height="24" top="2" left="2" right="2">			
+			<mx:Image source="@Embed(source='/assets/smallIcon.png')" height="16" width="16" top="2" left="4"/>			
+			<mx:Button styleName="iconClose" height="16" width="16" top="2" right="4" click="close()"/>
+		</mx:Canvas>
+		<mx:VBox width="100%" top="30" left="2">
+			<mx:Button label="Activate..."  id="btnActivateDeactivate" click="btnActivateDeactivate_clickHandler(event)"/>
+			<mx:TextArea width="360" height="109" id="txtBox" text="This is a simple Text Editor app that demonstrates how to use TurboActivate in your application.&#xd;&#xd;The one &quot;feature&quot; of this app is this text editor. This will be disabled when the user is not activated and the trial is expired. All other times this text box will be enabled."/>
+			<mx:Label  text="The trial has expired. Get a trial extension at YourAppSite.com" id="lblTrialMessage" fontWeight="bold" />
+			<mx:HBox width="100%">
+				<mx:Button label="Extend trial" enabled="true" click="extendTrial(event)" id="btnExtendTrial" />
+				<mx:Button label="Continuous trial" enabled="true" click="trial(event)" id="btnTrial" />
+			</mx:HBox>			
+		</mx:VBox>		
+	</mx:Canvas>	
+</mx:Window>

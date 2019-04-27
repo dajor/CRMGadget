@@ -1,0 +1,26 @@
+package gadget.dao
+{
+	import flash.data.SQLConnection;
+
+	public class _________CHANGEME_________ DAO extends BaseDAO {
+
+		public function _________CHANGEME_________ DAO(sqlConnection:SQLConnection, work:Function) {
+			super(work, sqlConnection, {
+				table: '_________CHANGEME_________',
+				oracle_id: 'Id',
+				name_column: [ 'Name' ],	//_________CHANGEME_________?
+				display_name : "_________CHANGEME_________",
+				index: [ 'Id' ],
+				columns: { 'TEXT' : textColumns }
+			});
+		}
+
+		override public function get entity():String {
+			return "_________CHANGEME_________";
+		}
+		
+		private var textColumns:Array = [
+			// _________CHANGEME_________
+			];
+	}
+}

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable = "false"	
+	width="800" height="400"
+	title="MS Exchange Synchronization"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init()" xmlns:local="*">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.control.GridColumnRenderFactory;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			
+			public var entity:String;
+			[Bindable] public var dataRecord:ArrayCollection;
+			public var updateLastSync:Function;
+			private var pckList:ArrayCollection;
+			private function init():void{
+				pckList = PicklistService.getPicklist("Contact", "AlternateCountry");
+				for each(var tmp:Object in dataRecord){
+					getObjectInPicklist(tmp, "AlternateCountry", pckList);
+				}	
+				dataGrid.dataProvider = dataRecord;
+				//dataGrid.dataProvider = dataRecord;
+			}
+			private function getObjectInPicklist(item:Object, fieldName:String, picklist:ArrayCollection):void {
+				var value:String = item[fieldName];
+				item[fieldName] = '';
+				for (var i: int = 0; i < picklist.length; i++) {
+					var tmp:Object = picklist.getItemAt(i);
+					if ( value == tmp.label) {
+						item[fieldName] = tmp;
+						break;
+					} 			
+				}
+			}
+			
+			private function onSaveData():void{
+				var list:ArrayCollection = dataGrid.dataProvider as ArrayCollection;
+				var isUpdateLastSync:Boolean = false;
+				if(list.length >0){
+					for each(var obj:Object in list){
+						if(obj['isSync'] == true){
+							
+							if(isUpdateLastSync == false){
+								updateLastSync(obj['getMyClassName']);
+							}
+							if( Database.getDao(entity).findByMSId(obj['ms_id']) == null){
+								// inser into table here
+								obj["deleted"] = false;
+								obj["error"] = false;
+								obj["OwnerId"] = obj["OwnerId"] == null || obj["OwnerId"]=="" ? Database.userDao.read().id : obj["OwnerId"];
+								Database.getDao(entity).insert(obj,false);
+								obj = Database.getDao(entity).selectLastRecord()[0];
+								var oidName:String = DAOUtils.getOracleId(entity);
+								obj[oidName] = "#" + obj.gadget_id;
+							}else{
+								obj.local_update = new Date().getTime();
+							}
+							for(var p:String in obj){
+								if(obj[p] && obj[p].hasOwnProperty("data")){
+									obj[p] = obj[p].data;;
+								}
+							}
+							
+							Database.getDao(entity).update(obj);
+							isUpdateLastSync = true;
+						}
+					}
+				}
+				if(isUpdateLastSync){
+					
+					close();
+				}else{
+					Alert.show('Please select at least one item','', Alert.OK, this);
+				}
+			}
+			private function getLabelAccIndicator(item:Object, col:AdvancedDataGridColumn):String {
+				if(item == null) return "";
+				if( StringUtils.isEmpty(item[col.dataField]) ) return "";
+				if(item[col.dataField].hasOwnProperty("label")) return item[col.dataField].label;
+				return "";
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/sync.png')" title="{'MS Exchange Record'}"/>
+		<mx:VBox top="32" left="16" right="16" bottom="16" verticalGap="16">
+			<mx:Panel id="panelTitle" title="{i18n._('GLOBAL_SYNCHRONIZATOIN') + ' Record' }" width="100%">
+				<mx:VBox width="100%" paddingLeft="8" paddingRight="8" paddingTop="8" paddingBottom="8">
+					<mx:AdvancedDataGrid editable="true" id="dataGrid" dataProvider="{dataRecord}" rowCount="10" width="100%" height="235" variableRowHeight="true">
+						<mx:columns>
+							<mx:AdvancedDataGridColumn width="60" editable="false" headerText="" dataField="isSync">
+								<mx:itemRenderer>
+									<mx:Component>
+										<mx:HBox horizontalAlign="center" width="100%">
+											<mx:Script >
+											
+												<![CDATA[
+													import gadget.dao.Database;
+													
+													private function updateAttachment(data:Object):void{
+														if( data != null){
+															data['isSync'] = chkSave.selected;
+														}
+													}
+												]]>
+											</mx:Script>
+											<mx:CheckBox  id="chkSave" click="updateAttachment(data);"/>											
+										</mx:HBox>
+									</mx:Component>
+								</mx:itemRenderer>
+							</mx:AdvancedDataGridColumn>
+							<mx:AdvancedDataGridColumn width="200" editable="false" dataField="ContactFirstName" headerText="First Name" />
+							<mx:AdvancedDataGridColumn width="200" editable="false" dataField="ContactLastName" headerText="Last Name" />
+							<mx:AdvancedDataGridColumn editable="true" editorDataField="selectedItem" width="200" labelFunction="getLabelAccIndicator" dataField = "AlternateCountry" headerText="Country">
+								<mx:itemEditor>
+									<mx:Component>
+										<mx:ComboBox dataProvider="{getDataProvider()}">
+											<mx:Script>
+												<![CDATA[
+													import gadget.service.PicklistService;
+													import gadget.util.GUIUtils;
+													import gadget.util.Utils;
+													
+													import mx.collections.ArrayCollection;
+													
+													private function getDataProvider():ArrayCollection {
+														var picklist:ArrayCollection = PicklistService.getPicklist("Contact", "AlternateCountry");
+														return picklist;
+													}
+												]]>
+											</mx:Script>
+										</mx:ComboBox>
+									</mx:Component>
+								</mx:itemEditor>
+							</mx:AdvancedDataGridColumn>
+						</mx:columns>
+					</mx:AdvancedDataGrid>
+				</mx:VBox>
+			</mx:Panel>	
+			<mx:Canvas width="100%">
+				<mx:HBox right="0">
+					<mx:Button id="btnOk" label="{i18n._('GLOBAL_SAVE')}" click="onSaveData()" />
+					<mx:Button id="btnClose" label="{i18n._('GLOBAL_CLOSE')}"  click="close();" right="0"/>	
+				</mx:HBox>
+			</mx:Canvas>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

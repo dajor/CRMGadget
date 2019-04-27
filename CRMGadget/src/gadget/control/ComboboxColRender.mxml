@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.dao.OpportunityDAO;
+			import gadget.service.PicklistService;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			public var column:AdvancedDataGridColumn;
+			private var _entity:String;
+			private var _updateFunction:Function;
+			private var _hideItems:Function;
+			private var _refreshRow:Boolean=true;
+			
+			public function get entity():String
+			{
+				return _entity;
+			}
+
+			public function set entity(value:String):void
+			{
+				_entity = value;
+			}
+
+			override public function set data(value:Object):void{		
+				 super.data = value;
+				 if(column!=null){
+					 
+					 if(value!=null){
+						 var val:String = value[column.dataField];						
+						 var pickList:ArrayCollection = null;
+						 var colName:String = column.dataField;
+						 colName = colName.replace(OpportunityDAO.CO7_PREFIX,"");
+						 if("SalesStage" == colName){
+							 pickList = Utils.getDefaultSalesStage();
+						 }else{
+							 pickList = PicklistService.getPicklist(entity,colName);
+						 }
+						 if(hideItems!=null){
+							 hideItems(pickList,data);
+						 }
+						 cborender.dataProvider = pickList;
+						 cborender.selectedIndex=getSelectedIndex(val);
+						 if(value.hasOwnProperty("isTotal") && value.isTotal){
+							 cborender.enabled=false;
+						 }
+					 }
+					 cborender.setFocus();
+				 }			
+			 }		
+			private function getSelectedIndex(label:String):int{
+				var ls:ArrayCollection = cborender.dataProvider as ArrayCollection;
+				var index:int = -1;
+				if(ls != null && ls.length>0){
+					for(var i:int=0;i<ls.length;i++){
+						var obj:Object = ls[i];
+						if(label == obj.data){
+							index = i;
+							break;
+						}
+					}
+				}
+				return index;
+			}
+			private function itemChange(event:Event):void{
+				if(data!=null && column!=null && cborender.selectedItem != null){
+					var oldSelected:String = this.data[column.dataField];
+					this.data[column.dataField] = cborender.selectedItem.data + "";		
+					if("SalesStage" == column.dataField){
+						this.data['Probability']=cborender.selectedItem.probability;						
+						this.data['SalesStageId']=cborender.selectedItem.key;						
+					}
+					if(updateFunction!=null){
+						try{
+							//try with tow parameters
+							updateFunction(super.data,oldSelected);
+						}catch(e:Error){
+							//some function hase only one paramter
+							updateFunction(super.data);
+						}
+					}
+					if(refreshRow){
+						var list:AdvancedDataGridListData = super.listData as AdvancedDataGridListData;					
+						var grid:AdvancedDataGrid = list.owner as AdvancedDataGrid;
+						if(grid is MyAdvancedDataGrid){							
+							MyAdvancedDataGrid(grid).refreshRow(list.rowIndex);						
+						}
+					}
+					
+				}
+			}
+			public function get updateFunction():Function
+			{
+				return _updateFunction;
+			}
+			
+			public function set updateFunction(value:Function):void
+			{
+				_updateFunction = value;
+			}
+			public function get selectedItem():Object{
+				return cborender.selectedLabel;
+			}
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					var grid:AdvancedDataGrid = value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						cborender.width = column.width-3;
+					}
+				
+				}
+			}
+
+			public function get hideItems():Function
+			{
+				return _hideItems;
+			}
+
+			public function set hideItems(value:Function):void
+			{
+				_hideItems = value;
+			}
+			public function get refreshRow():Boolean
+			{
+				return _refreshRow;
+			}
+			
+			public function set refreshRow(value:Boolean):void
+			{
+				_refreshRow = value;
+			}
+		
+
+
+		]]>
+		
+	</fx:Script>
+	<mx:ComboBox id="cborender" change="itemChange(event)" selectedIndex="-1"/>
+</s:MXAdvancedDataGridItemRenderer>

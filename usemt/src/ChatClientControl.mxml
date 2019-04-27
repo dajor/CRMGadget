@@ -1,0 +1,604 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   initialize="initChat()" width="100%" height="100%"
+		   creationComplete="initData()"
+		   xmlns:control="gadget.control.*"
+		   borderStyle="none" xmlns:code="http://code.google.com/p/flexlib/"
+		   >
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.utils.setInterval;
+			
+			import gadget.chatclient.CRMXAMPPConnection;
+			import gadget.control.FellowImageRenderer;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.FeedOwnerDAO;
+			import gadget.i18n.i18n;
+			import gadget.util.CacheUtils;
+			import gadget.util.DateUtils;
+			import gadget.util.FeedUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.StringUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.HRule;
+			import mx.controls.Image;
+			import mx.controls.TextInput;
+			import mx.events.CloseEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.utils.Base64Decoder;
+			
+			import org.igniterealtime.xiff.core.EscapedJID;
+			import org.igniterealtime.xiff.core.UnescapedJID;
+			import org.igniterealtime.xiff.data.Message;
+			import org.igniterealtime.xiff.data.Presence;
+			import org.igniterealtime.xiff.events.ConnectionSuccessEvent;
+			import org.igniterealtime.xiff.events.DisconnectionEvent;
+			import org.igniterealtime.xiff.events.IncomingDataEvent;
+			import org.igniterealtime.xiff.events.LoginEvent;
+			import org.igniterealtime.xiff.events.MessageEvent;
+			import org.igniterealtime.xiff.events.PresenceEvent;
+			import org.igniterealtime.xiff.events.RegistrationSuccessEvent;
+			import org.igniterealtime.xiff.events.RoomEvent;
+			import org.igniterealtime.xiff.events.XIFFErrorEvent;
+			
+			public var selectList:Function;
+			
+			private var crmXMPPConnection:CRMXAMPPConnection;
+			private var currentUser:Object;
+			private var cachUsers:CacheUtils;
+			private var users:ArrayCollection;
+			private var enabledFeedEntities:ArrayCollection;
+			private var entityRecords:ArrayCollection;
+			private var pref:Object;
+			
+			private var feeds:Dictionary = new Dictionary();
+			private var enabledFeeds:ArrayCollection;
+			private var channels:Array;
+			[Bindable] private var followers:ArrayCollection = new ArrayCollection();
+			[Bindable] private var followings:ArrayCollection = new ArrayCollection();
+			
+			private var KEY_COMMENTCHANNEL:String = "<COMMENTCHANNEL>";
+			private var KEY_ISPARENT:String = "<ISPARENT>";
+			private var KEY_USERID:String = "<USERID>";
+			private var KEY_USERNAME:String = "<USERNAME>";
+			private var KEY_COMMENTTIME:String = "<COMMENTTIME>";
+			private var KEY_COMMENTTEXT:String = "<COMMENTTEXT>";
+			private var KEY_FEEDFILTER:String = "<FEEDFILTER>";
+			private var KEY_OPERATION:String = "<OPERATION>";
+			private var KEY_RECORDID:String = "<RECORDID>";
+			private var KEY_RECORDNAME:String = "<RECORDNAME>";
+			private var KEY_ENTITY:String = "<ENTITY>";
+			private var KEY_COMMENTCHILDCHANNEL:String = "<COMMENTCHILDCHANNEL>";
+			
+			
+			private function onXiffError(event:XIFFErrorEvent):void{
+				//conflict means the user is already created or logged. 
+				if( event.errorCode == 409 || 
+					event.errorCode == 401 || 
+					event.errorCode == 503
+				){ //409: Conflict; 401: not-authentication; 503: service unavailable
+					crmXMPPConnection.disconnect();
+					crmXMPPConnection.isRegisterUser = false;
+					crmXMPPConnection.connect(currentUser);
+					crmXMPPConnection.removeEventListener( XIFFErrorEvent.XIFF_ERROR, onXiffError);
+				}
+			}
+			
+			private function initChat():void {
+				
+				pref = Database.preferencesDao.read();
+				if(pref==null) return;
+				
+				var serverURL:String = pref.feed_url;
+				serverURL = serverURL.replace("http://","");
+				var SERVER_NAME:String = serverURL;
+				var SERVER_PORT:Number = pref.feed_port;
+				
+				currentUser = getCurrentUser();
+				if(currentUser == null){
+					return;
+				}
+				var companyName:String = currentUser.usersigninid;
+				if( companyName.indexOf("/") != -1 )
+				{
+					companyName = companyName.substring( 0, companyName.indexOf("/") );
+				}
+				trace("Company Name", companyName);
+				
+				crmXMPPConnection = CRMXAMPPConnection.getInstance();
+				crmXMPPConnection.fnRefresh = reloadData;
+				crmXMPPConnection.setupChat(SERVER_NAME,SERVER_PORT);
+				crmXMPPConnection.addEventListener( XIFFErrorEvent.XIFF_ERROR, onXiffError);
+				crmXMPPConnection.addEventListener( ConnectionSuccessEvent.CONNECT_SUCCESS, function(event:ConnectionSuccessEvent):void {
+					trace("ConnectionSuccessEvent");
+				});
+				crmXMPPConnection.addEventListener( DisconnectionEvent.DISCONNECT, function(event:DisconnectionEvent):void {
+					trace("DisconnectionEvent");
+				});
+				crmXMPPConnection.addEventListener( LoginEvent.LOGIN, function(event:LoginEvent):void {
+					trace("LoginEvent");
+				});
+				crmXMPPConnection.addEventListener( RegistrationSuccessEvent.REGISTRATION_SUCCESS, function(event:RegistrationSuccessEvent):void {
+					trace("RegistrationSuccessEvent");
+					crmXMPPConnection.connect(currentUser);
+				});
+				crmXMPPConnection.addEventListener( PresenceEvent.PRESENCE, function(event:PresenceEvent):void {
+					trace("PresenceEvent");
+				});
+				crmXMPPConnection.addEventListener( MessageEvent.MESSAGE, function(event:MessageEvent):void {
+					trace("MessageEvent");
+				});
+				crmXMPPConnection.addEventListener( IncomingDataEvent.INCOMING_DATA, function(event:IncomingDataEvent):void {
+					crmXMPPConnection.connection.sendKeepAlive();
+				});
+				crmXMPPConnection.room.addEventListener( RoomEvent.GROUP_MESSAGE, onGroupMessage, false, 0, true );
+				crmXMPPConnection.jointRoomName(companyName + "_feed");
+				crmXMPPConnection.register(currentUser);
+			}
+			
+			private function onGroupMessage( event:RoomEvent ):void {
+				var msg:Message = event.data as Message;
+				var jid:EscapedJID = msg.from;
+				var nick:String = jid.resource;
+				var message:String = msg.body;
+				if (nick != null) {
+					parseMessage(message);
+				}
+			}
+			
+			private function parseMessage(msg:String):void {
+				var msgObj:Object = new Object();
+				msgObj[KEY_COMMENTCHANNEL] = parseKey(msg, KEY_COMMENTCHANNEL);
+				msgObj[KEY_ISPARENT] = parseKey(msg, KEY_ISPARENT);
+				msgObj[KEY_USERID] = parseKey(msg, KEY_USERID);
+				msgObj[KEY_USERNAME] = parseKey(msg, KEY_USERNAME);
+				msgObj[KEY_COMMENTTIME] = parseKey(msg, KEY_COMMENTTIME);
+				msgObj[KEY_COMMENTTEXT] = parseKey(msg, KEY_COMMENTTEXT);
+				msgObj[KEY_OPERATION] = parseKey(msg, KEY_OPERATION);
+				msgObj[KEY_RECORDID] = parseKey(msg, KEY_RECORDID);
+				msgObj[KEY_RECORDNAME] = parseKey(msg, KEY_RECORDNAME);
+				msgObj[KEY_ENTITY] = parseKey(msg, KEY_ENTITY);
+				msgObj[KEY_COMMENTCHILDCHANNEL] = parseKey(msg, KEY_COMMENTCHILDCHANNEL);
+				
+				var key:String = msgObj[KEY_COMMENTCHANNEL];
+				var feedFilter:String = parseKey(msg, KEY_FEEDFILTER);
+				
+				//do filter feed by following here
+				//feedFilter can be userid or userid_entity. channel is the same as feedFilter
+				var isAccepted:Boolean = false;
+				for(var i:int=0; i<channels.length; i++){
+					var channel:String = channels[i];
+					if( feedFilter.toUpperCase() == channel.toUpperCase() ){
+						isAccepted = true;
+						break;
+					}
+				}
+				if( !isAccepted ) return; 
+				
+				var isParent:Boolean = msgObj[KEY_ISPARENT] == 'true' ? true : false;
+				var feed:Object = feeds[key];
+				if(feed == null){
+					feed = new Object();
+				}
+				if(isParent){
+					feed['parent'] = msgObj;
+				}else{
+					var childFeed:Object = feed['child'];
+					if(childFeed == null) childFeed = new Object();
+					var keyChild:String = msgObj[KEY_COMMENTCHILDCHANNEL];
+					childFeed[keyChild] = msgObj;
+					feed['child'] = childFeed;
+				}
+				feeds[key] = feed;
+				drawMainFeed();
+			}
+			
+			private function parseKey(msg:String, key:String):String {
+				var endKey:String = key.replace("<","</");
+				var strFound:String = msg.substring( msg.indexOf( key ), msg.indexOf( endKey ) );
+				return strFound.replace(key,"");
+			}
+			
+			private function getSortArray(obj:Object, isDescending:Boolean = false):Array {
+				var sorts:Array = new Array();
+				for(var key:String in obj){
+					var tmp:Object = obj[key];
+					var keys:Array = key.split("_");
+					var timeStamp:String = keys[keys.length-1];
+					sorts.push( {'time':timeStamp,'data':tmp} );
+				}
+				return isDescending ? sorts.sortOn('time', Array.NUMERIC | Array.DESCENDING) : sorts.sortOn('time', Array.NUMERIC);
+			}
+			
+			private function drawMainFeed():void {
+				mainFeed.removeAllChildren();
+				var sortFeeds:Array = getSortArray(feeds, true);
+				for(var index:int = 0; index < sortFeeds.length; index++){
+					var feed:Object = sortFeeds[index].data;
+					var feedParentObject:Object = feed['parent'];
+					var feedChild:Object = feed['child'];
+					var feedBlock:VBox = new VBox();
+					feedBlock.percentWidth = 100;
+					if(feedParentObject != null)
+						feedBlock.addChild( drawFeedBlock( feedParentObject, true , feedChild == null ) );
+					if(feedChild != null){
+						var sortChildFeeds:Array = getSortArray(feedChild);
+						for(var indexChild:int = 0; indexChild < sortChildFeeds.length; indexChild++){
+							var feedChildObject:Object = sortChildFeeds[indexChild].data;
+							feedBlock.addChild( drawFeedBlock(feedChildObject, false) );
+						}
+					}
+					feedBlock.addChild( drawFeedCommentButton(feedParentObject) );
+					var hRule:HRule = new HRule();
+					hRule.percentWidth = 100;
+					feedBlock.addChild(hRule);
+					mainFeed.addChild(feedBlock);
+				}
+			}
+			
+			private function drawFeedBlock(feed:Object, isParent:Boolean = true, drawLine:Boolean = true):VBox {
+				var avatar:String;
+				var avatarBytes:ByteArray = null;
+				var id:String = feed[KEY_USERID];
+				
+				if( id == currentUser.id ){ //get avatar for the current user
+					avatar = currentUser.avatar;
+				}else{ //get avatar for the following
+					var feedUser:Array = Database.feedUserDAO.fetch( {'Id':id} );
+					avatar = feedUser.length == 0 ? "" : feedUser[0].Avatar;
+				}
+				
+				if (!StringUtils.isEmpty(avatar)) {
+					avatarBytes = ImageUtils.getByteArray(avatar);
+				}
+				
+				var feedMainBlock:VBox = new VBox();
+				feedMainBlock.setStyle("paddingLeft", 5);
+				
+				if( !isParent ){
+					feedMainBlock.setStyle("paddingLeft", 50);
+				}
+				
+				feedMainBlock.percentWidth = 100;
+				var feedBlock:HBox = new HBox();
+				var image:Image = new Image();
+				image.width = image.height = 50;
+				image.source = ( avatarBytes == null ? ImageUtils.noPhoto : avatarBytes );
+				feedBlock.addChild(image);
+				
+				var feedMessageBlock:VBox = new VBox();
+				var feedNameTimeBlock:HBox = new HBox();
+				var lblUserName:Label = new Label();
+				lblUserName.setStyle("color",0x333399);
+				lblUserName.text = feed[KEY_USERNAME];
+				var lblCommentTime:Label = new Label();
+				lblCommentTime.text = feed[KEY_COMMENTTIME];
+				feedNameTimeBlock.addChild(lblUserName);
+				feedNameTimeBlock.addChild(lblCommentTime);
+				feedMessageBlock.addChild(feedNameTimeBlock);
+				
+				
+				var recordId:String = feed[KEY_RECORDID];
+				var entity:String = feed[KEY_ENTITY];
+				
+				var hboxOperation:HBox = new HBox();
+				hboxOperation.setStyle("horizontalGap", 5);
+				
+				var lblOperation:Label = new Label();
+				lblOperation.text = feed[KEY_OPERATION];
+				
+				var lblEntity:Label = new Label();
+				lblEntity.text = feed[KEY_ENTITY];
+				
+				var recordControl:DisplayObject;
+				if( recordId.indexOf("#") == -1 ){
+					recordControl = new LinkButton();
+					(recordControl as LinkButton).label = feed[KEY_RECORDNAME];
+					(recordControl as LinkButton).setStyle("color", 0x333399);
+					(recordControl as LinkButton).addEventListener(MouseEvent.CLICK, function(event:MouseEvent):void {
+						var item:Object = Database.getDao(entity).findByOracleId(recordId);
+						selectList(entity).editScreenDetail(item);
+					});
+				}else{
+					recordControl = new Label();
+					(recordControl as Label).text = feed[KEY_RECORDNAME];
+					(recordControl as Label).setStyle("color", 0x333399);
+				} 
+				
+				if( !StringUtils.isEmpty( feed[KEY_OPERATION] ) ){
+					hboxOperation.addChild(lblOperation);
+					hboxOperation.addChild(lblEntity);
+					hboxOperation.addChild(recordControl);
+					feedMessageBlock.addChild(hboxOperation);
+				}
+				
+				var commentText:String = feed[KEY_COMMENTTEXT];
+				var commentLines:Array = commentText.split("\n");
+				for(var i:int=0; i<commentLines.length; i++){
+					var comment:String = commentLines[i];
+					if( comment == "") continue;
+					var lblComment:Label = new Label();
+					lblComment.text = comment;
+					feedMessageBlock.addChild(lblComment);	
+				}
+				
+				feedBlock.addChild(feedMessageBlock);
+				feedMainBlock.addChild(feedBlock);
+				return feedMainBlock;
+			}
+			
+			private function drawFeedCommentButton(feed:Object):HBox {
+				var hboxComment:HBox = new HBox();
+				hboxComment.percentWidth = 100;
+				hboxComment.setStyle("paddingLeft", 50);
+				
+				var commentLinkButton:LinkButton = new LinkButton();
+				commentLinkButton.label = "Comment";
+				commentLinkButton.setStyle("color", 0x3380DD);
+				commentLinkButton.setStyle("textDecoration","underline");
+				commentLinkButton.addEventListener(MouseEvent.CLICK, function(event:MouseEvent):void {
+					visibleReply(true);
+				});
+				
+				function visibleReply(visible:Boolean):void {
+					txtReply.visible = txtReply.includeInLayout = visible;
+					imgHidden.visible = imgHidden.includeInLayout = visible;
+					commentLinkButton.visible = commentLinkButton.includeInLayout = !visible;
+				}
+				
+				var txtReply:PromptingTextInput = new PromptingTextInput();
+				txtReply.percentWidth = 100;
+				txtReply.prompt = "Write a comment here...";
+				txtReply.addEventListener(KeyboardEvent.KEY_DOWN, function(event:KeyboardEvent):void {
+					if( event.keyCode == Keyboard.ENTER ){
+						var msgObj:Object = new Object();
+						msgObj.CommentChannel = feed[KEY_COMMENTCHANNEL];
+						msgObj.IsParent = 'false';
+						msgObj.CommentText = txtReply.text;
+						FeedUtils.formatAndSendFeed( msgObj );
+						txtReply.text = "";
+						visibleReply(false);
+					}
+				});
+				var imgHidden:Image = new Image();
+				imgHidden.source = ImageUtils.cancelIcon;
+				imgHidden.toolTip = "Cancel";
+				imgHidden.addEventListener(MouseEvent.CLICK, function(event:MouseEvent):void {
+					txtReply.text = "";
+					visibleReply(false);
+				});
+				visibleReply(false);
+				
+				hboxComment.addChild(commentLinkButton);
+				hboxComment.addChild(txtReply);
+				hboxComment.addChild(imgHidden);
+				return hboxComment;
+			}
+			
+			private function getCurrentUser():Object {
+				var tmpUser:Object = Database.currentUserDAO.getCurrentUser();
+				if(tmpUser==null) return null;
+				var userloginid:String = tmpUser.id;
+				return {username:userloginid, password:userloginid, id:tmpUser.id, usersigninid:tmpUser.user_sign_in_id, avatar:tmpUser.Avatar};
+			}
+				
+			public function initData():void {
+				visibleAddFollowing(false);
+				reloadData();
+			}
+			
+			public function reloadCurrentUser():void {
+				currentUser = getCurrentUser();
+			}
+			
+			public function reloadData():void {
+				followings = new ArrayCollection(Database.feedUserDAO.fetch());
+				followers = new ArrayCollection(Database.feedFollowerDAO.fetch());
+				enabledFeeds = Database.feedDAO.getEnabledFeeds();
+				channels = new Array();
+				for each(var following:Object in followings){
+					channels.push( following.Id );
+					for each(var enabledFeed:Object in enabledFeeds){
+						var channel:String = following.Id + "_" + enabledFeed.entity;
+						channels.push( channel );
+					}
+				}
+				
+				channels.push( currentUser.id );
+				for each(enabledFeed in enabledFeeds){
+					channel = currentUser.id + "_" + enabledFeed.entity;
+					channels.push( channel );
+				}
+				
+				tileListFollowing.validateNow();
+				
+			}
+
+			protected function btnPostComment_clickHandler(event:MouseEvent):void
+			{
+				if( StringUtils.isEmpty( txtPostComment.text ) ) return;
+				var msgObj:Object = new Object();
+				msgObj.Entity = "";
+				msgObj.IsParent = "true";
+				msgObj.UserID = currentUser.id;
+				msgObj.CommentText = txtPostComment.text;
+				FeedUtils.formatAndSendFeed( msgObj );
+				txtPostComment.text = "";
+			}
+
+			protected function toogleFollowBar_itemClickHandler(event:ItemClickEvent):void
+			{
+				vsFollow.selectedIndex = event.index;
+				visibleAddFollowing(event.index == 1);
+				reloadData();
+			}
+
+
+			protected function btnAddFollowing_clickHandler(event:MouseEvent):void
+			{
+				var addFollowingWindow:AddFollowingWindow = new AddFollowingWindow();
+				addFollowingWindow.chatClientControl = this;
+				WindowManager.openModal(addFollowingWindow);
+			}
+			
+			private function visibleAddFollowing(visible:Boolean):void {
+				btnAddFollowing.visible = btnAddFollowing.includeInLayout = visible;
+			}
+
+
+			protected function btnAddFollowing_mouseOutHandler(event:MouseEvent):void
+			{
+				btnAddFollowing.setStyle('icon', ImageUtils.addBWIcon);
+			}
+
+
+			protected function btnAddFollowing_mouseOverHandler(event:MouseEvent):void
+			{
+				btnAddFollowing.setStyle('icon', ImageUtils.addIcon);
+			}
+
+
+			protected function tileListFollower_itemClickHandler(event:ListEvent):void
+			{
+				var data:Object = (event.itemRenderer as FellowImageRenderer).data;
+				refreshContactInfomation(data);
+			}
+
+
+			protected function tileListFollowing_itemClickHandler(event:ListEvent):void
+			{
+				var data:Object = (event.itemRenderer as FellowImageRenderer).data;
+				refreshContactInfomation(data);
+			}
+			
+			private function refreshContactInfomation(item:Object):void {
+				
+				if(item==null){
+					lblTitle.text = "";
+					lblFirstName.text = "";
+					lblLastName.text = "";
+					lblJobTitle.text = "";
+					lblEMail.text = "";
+					lblPhoneNumber.text = "";
+					lblDepartment.text = "";
+					return;
+				}
+				
+				lblTitle.text = item.MrMrs;
+				lblFirstName.text = item.FirstName;
+				lblLastName.text = item.LastName;
+				lblJobTitle.text = item.Title;
+				lblEMail.text = item.EMail;
+				lblPhoneNumber.text = item.PhoneNumber;
+				lblDepartment.text = item.Department;
+			}
+
+
+			protected function txtPostComment_keyDownHandler(event:KeyboardEvent):void
+			{
+				if( event.keyCode == Keyboard.ENTER && txtPostComment.text != "" ){
+					btnPostComment_clickHandler(null);
+				}
+			}
+
+
+			protected function tileListFollowing_keyDownHandler(event:KeyboardEvent):void
+			{
+				if( event.keyCode == Keyboard.DELETE ){
+					var selectedFollowing:Object = tileListFollowing.selectedItem;
+					if( selectedFollowing == null) return;
+					Alert.show("Remove " + selectedFollowing.Alias + " from the following?","",Alert.OK|Alert.CANCEL,this,function(event:CloseEvent):void {
+						if( event.detail == Alert.OK ) {
+							//remove the selected following here.
+//							Database.feedUserDAO.delete_({Id:selectedFollowing.Id});
+							crmXMPPConnection.removeFollowing(selectedFollowing.Id);
+							reloadData();
+						}
+					});
+				}
+			}
+
+		]]>
+	</fx:Script>
+	
+	<fx:Style source="styles.css"/>
+	
+	<mx:Canvas styleName="main" left="0" top="0" right="0" bottom="0" backgroundColor="0xeeeeee">
+		<mx:VBox top="15" left="5" right="5" bottom="5">
+			<mx:HBox width="70%">
+				<code:PromptingTextInput prompt="What are you working on?" id="txtPostComment" width="90%" keyDown="txtPostComment_keyDownHandler(event)"/>
+				<mx:Button id="btnPostComment" label="Share" click="btnPostComment_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" id="feedScreen">
+				<mx:VBox id="mainFeed" width="75%" height="{feedScreen.height-5}" borderStyle="solid" backgroundColor="0xFFFFFF" horizontalScrollPolicy="auto"/>
+				<mx:VBox width="25%" height="100%" verticalGap="15">
+					<mx:HBox>
+						<mx:ToggleButtonBar id="toogleFollowBar" itemClick="toogleFollowBar_itemClickHandler(event)">
+							<mx:dataProvider>
+								<fx:Array>
+									<fx:String>Follower</fx:String>
+									<fx:String>Following</fx:String>
+								</fx:Array>
+							</mx:dataProvider>
+						</mx:ToggleButtonBar>
+						<mx:LinkButton id="btnAddFollowing" toolTip="Add Following" mouseOut="btnAddFollowing_mouseOutHandler(event)" mouseOver="btnAddFollowing_mouseOverHandler(event)" icon="{ImageUtils.addBWIcon}" click="btnAddFollowing_clickHandler(event)"/>
+					</mx:HBox>
+					<mx:ViewStack id="vsFollow" width="100%">
+						<mx:HBox width="100%">
+							<mx:TileList id="tileListFollower" width="260"
+										 dataProvider="{followers}"
+										 columnCount="4"
+										 columnWidth="60"
+										 rowCount="2"
+										 rowHeight="60"
+										 itemRenderer="gadget.control.FellowImageRenderer" itemClick="tileListFollower_itemClickHandler(event)"/>
+						</mx:HBox>
+						<mx:HBox width="100%">
+							<mx:TileList id="tileListFollowing" width="260"
+										 dataProvider="{followings}"
+										 columnCount="4"
+										 columnWidth="60"
+										 rowCount="2"
+										 rowHeight="60"
+										 itemRenderer="gadget.control.FellowImageRenderer" itemClick="tileListFollowing_itemClickHandler(event)" keyDown="tileListFollowing_keyDownHandler(event)"/>
+						</mx:HBox>
+					</mx:ViewStack>
+					<mx:VBox width="100%">
+						<mx:Label text="Contact Information" fontWeight="bold"/>
+						<mx:Form top="-10">
+							<mx:FormItem label="Title:">
+								<mx:Label id="lblTitle"/>
+							</mx:FormItem>
+							<mx:FormItem label="First Name:">
+								<mx:Label id="lblFirstName"/>
+							</mx:FormItem>
+							<mx:FormItem label="Last Name:">
+								<mx:Label id="lblLastName"/>
+							</mx:FormItem>
+							<mx:FormItem label="Job Title:">
+								<mx:Label id="lblJobTitle"/>
+							</mx:FormItem>
+							<mx:FormItem label="EMail:">
+								<mx:Label id="lblEMail"/>
+							</mx:FormItem>
+							<mx:FormItem label="Phone Number:">
+								<mx:Label id="lblPhoneNumber"/>
+							</mx:FormItem>
+							<mx:FormItem label="Department:">
+								<mx:Label id="lblDepartment"/>
+							</mx:FormItem>
+						</mx:Form>
+					</mx:VBox>
+				</mx:VBox>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Canvas>

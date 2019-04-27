@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  xmlns:control="gadget.control.*"
+		  width="330" 
+		  title="{i18n._('GLOBAL_RELATION_ORDER')}" 
+		  showFlexChrome="false"
+		  transparent="true" 
+		  systemChrome="none"
+		  height="200"
+		  keyDown="keyDown(event);"
+		  creationComplete="init()"
+		  >
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.FieldUtils;
+			import gadget.util.StringUtils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.containers.VBox;
+			import mx.controls.CheckBox;
+			
+			import spark.components.Button;
+			import spark.components.Spinner;
+			private const DEFAULT_HEIGHT:int=200;
+			
+			//CRO 05.01.2011
+			private const SUPPORTWINDOW_TITLEBAR_SUPPORT:String = "GLOBAL_RELATION_ORDER";
+			public var entity:String;
+			public var redrawSubTab:Function;
+			private var listParentFields:ArrayCollection = null;
+			private function init():void {
+				if(entity){
+					spinnersMove.removeAllChildren();
+					vBoxSubEntity.removeAllChildren();
+					vBoxSubEntity.addChild(Preferences.createLabel(i18n._('GLOBAL_SUB_ENTITY')));
+				
+					spinnersMove.addChild(Preferences.createLabel(" "));
+					var listChildren:Array = Database.subSyncDao.listSubEnabledOrder(entity);// Utils.getChildObject(entity);
+					var h:int=10;
+					listParentFields = FieldUtils.allFields(entity);
+					var mapSub:Dictionary = new Dictionary();
+					
+					
+					if(listChildren != null && listChildren.length>0){
+						for each(var child:Object in listChildren){
+							var subEntity:String =  child.entity_name;
+							
+							if("Asset" == child.sodname || StringUtils.isEmpty(subEntity)){
+								continue;
+							}
+							if(child.enabled){
+								createRowSub(child);
+							}
+							h = h+35;
+						}
+					}
+					
+				
+					
+					if(h<DEFAULT_HEIGHT){
+						h = DEFAULT_HEIGHT;
+					}
+					
+					if(h > 400){
+						h = 400;
+						height = 500;
+					}else{
+						height = h + 100;
+					}
+					entityLayout.height = h;
+				}
+			}
+			private function createRowSub(child:Object):void{
+				
+				var visible:Boolean = true;
+				
+				var spinnerEntity:Spinner = new Spinner();
+				spinnerEntity.addEventListener(MouseEvent.CLICK, spinnerEntityClick);
+				spinnerEntity.height = 25;
+				spinnersMove.addChild(spinnerEntity);
+
+				var check:CheckBox = new CheckBox();
+				var pluralName:String = "";
+				if(child.entity_name == Database.accountAddressDao.entity){
+					pluralName = i18n._("GLOBAL_ADDRESS");
+				}else{
+					pluralName = Database.customLayoutDao.getPlural(child.entity_name);
+				}
+				if(StringUtils.isEmpty(pluralName)){
+					pluralName  = child.sub;
+				}
+				check.label = pluralName;
+				check.data = child;
+				check.selected = true;
+				check.height = 25;
+				check.enabled = false;
+				vBoxSubEntity.addChild(check);
+			
+				
+			}
+			
+			private var editStatus:Boolean = false;
+			private function spinnerEntityClick(e:MouseEvent):void{
+				var targetButton:spark.components.Button = e.target as spark.components.Button;
+				var spinner:Spinner = e.currentTarget as Spinner;
+				var index:int = spinnersMove.getChildIndex(spinner);
+				var numChild:int = spinnersMove.getChildren().length;
+				
+				if(targetButton.id == "incrementButton"){
+					if(index > 1){
+						vBoxSubEntity.addChildAt(vBoxSubEntity.removeChildAt(index), index - 1);
+						editStatus = true;
+					}
+				}else if(targetButton.id == "decrementButton"){
+					if(index < numChild - 1){
+						vBoxSubEntity.addChildAt(vBoxSubEntity.removeChildAt(index), index + 1);
+						editStatus = true;
+					}
+				}
+			}
+			
+			private function keyDown(evt:KeyboardEvent):void {
+				//bug #452
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function saveChange():void{
+				var chkBoxList:Array = vBoxSubEntity.getChildren();
+					// clear enable all object for update order num
+					//Database.subSyncDao.clearOrder(entity);
+				for (var i:int = 1;i < chkBoxList.length;i++){
+						var checkBox:CheckBox =  chkBoxList[i] as CheckBox;
+						var obj:Object = null;
+						if(checkBox.data == null){
+							continue;
+						}else{
+								obj = checkBox.data;
+						}
+						obj["order_num"] = i;
+						Database.subSyncDao.update(obj,{entity: obj["entity"],sodname:obj["sodname"]});
+							
+				}
+				if(editStatus){
+					this.redrawSubTab();
+				}
+//				Utils.updChildSyncStatus = true;
+				this.close();
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Style source="styles.css"/>
+	<mx:Canvas keyDown="keyDown(event);" styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar  title="{i18n._(SUPPORTWINDOW_TITLEBAR_SUPPORT)}"/>
+		<mx:VBox top="40" left="16" right="16" bottom="16" width="100%">
+			<mx:VBox id="entityLayout" maxHeight="400" width="100%"  left="20" top="5" >
+				<mx:HBox width="100%" height="100%">
+					<mx:VBox id="spinnersMove" horizontalAlign="center"/>
+					<mx:VBox id="vBoxSubEntity" />
+				</mx:HBox>
+			</mx:VBox>
+			
+			<mx:HBox height="40" width="100%" horizontalAlign="right" right="10">
+				<control:DetailButtonBar id="buttonbardetail" buttonLabel="PREFERENCES_DETAILBUTTONBAR_BUTTONLABEL_SAVE_CHANGES" action="saveChange"/>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

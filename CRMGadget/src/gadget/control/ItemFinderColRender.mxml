@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true" xmlns:control="gadget.control.*">
+	<fx:Script>
+		<![CDATA[
+			import gadget.util.Relation;
+			import gadget.window.WindowManager;
+			
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.TextInput;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid;
+			private var _entity:String;
+			private var _reloadFunc:Function;
+			public function get entity():String
+			{
+				return _entity;
+			}
+			
+			public function set entity(value:String):void
+			{
+				_entity = value;
+			}
+			
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						
+					}
+					
+					
+					
+				}
+				
+			}	
+			override public function set data(value:Object):void{
+				super.data = value;
+				if(column!=null){
+					finder.setFocus();
+				}
+				if(value.hasOwnProperty("isTotal") && value.isTotal){
+					finder.enabled = false;
+				}
+			}
+			
+			private function finderClick(event:MouseEvent):void{
+				var itemFinder:ItemFinder = new ItemFinder();
+				itemFinder.relation = (event.currentTarget as TextInput).data;
+				itemFinder.textInput = (event.currentTarget as TextInput);
+				itemFinder.item = data;
+				itemFinder.reload = function():void{
+					if(reloadFunc!=null){
+						var relation:Object = itemFinder.relation;
+						var newVal:Object = new Object();
+						newVal[relation.keySrc] = data[relation.keySrc];
+						for(var i:int=0; i<relation.labelSrc.length; i++){
+							newVal[relation.labelSrc[i]] = data[relation.labelSrc[i]];
+						}	
+						reloadFunc(data,newVal);
+					}				
+				};
+				WindowManager.openModal(itemFinder);
+			}
+			public function get selectedItem():Object{
+				return data[column.dataField];
+			}
+			
+			private function initimagetextinput(data:Object):void {
+				var relation:Object = Relation.getFieldRelation(entity, column.dataField);
+				if (relation != null) {
+					finder.text = data[column.dataField];
+					finder.data = relation;
+					
+				}
+			}
+
+			public function get reloadFunc():Function
+			{
+				return _reloadFunc;
+			}
+
+			public function set reloadFunc(value:Function):void
+			{
+				_reloadFunc = value;
+			}
+			
+			
+		]]>
+		
+	</fx:Script>
+	<control:ImageTextInput clickFunc="finderClick" id="finder"  creationComplete="{initimagetextinput(data)}"/>
+</s:MXAdvancedDataGridItemRenderer>

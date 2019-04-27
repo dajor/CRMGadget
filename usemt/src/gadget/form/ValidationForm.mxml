@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Form
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	creationComplete="init()"
+	>
+	<mx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+			import gadget.service.PicklistService;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.validators.Validator;
+			
+			[Bindable] public var validation:Object;
+
+			private function init():void {
+				loadData();
+				manageViewParam(operator_rule, validation);
+				nameInput.setFocus(); //set focus to any controls to avoid problem with dropdownlist of combobox
+			}
+			
+			private function loadData():void {
+				field_rule.dataProvider = Utils.getColumns(validation.entity);
+				field_rule.labelField = "label";
+				field_rule.selectedIndex = Utils.getComboColIndex(validation.field, validation.entity);
+				
+				operator_rule.dataProvider = Utils.operatorData;
+				operator_rule.selectedIndex = Utils.getComboOpIndex(validation.operator);
+				
+				value_rule.text = validation.value;
+				
+				cbovalue_rule.dataProvider = PicklistService.getPicklist(validation.entity, validation.field);
+				cbovalue_rule.selectedIndex = Utils.getComboParamIndex(validation.field, validation.entity, validation.value);				
+			}
+			
+			public function validate(create:Boolean):Array {
+				// check mandatory field
+				var validatorErrorArray:Array = Validator.validateAll([nameValidator,messageValidator]);
+				
+				//if the filterName is not typed, so no need to check the criterias.
+				if(validatorErrorArray.length > 0) return validatorErrorArray;
+				
+				// check criterias
+				if(!Utils.isCriteriaCompleted(field_rule, operator_rule, value_rule, cbovalue_rule)){
+					addCriteriaError(validatorErrorArray);
+				}
+				
+				return validatorErrorArray;
+			}
+			
+			private function addCriteriaError(validatorErrorArray:Array):void {
+				var error:Object = new Object();
+				error.message = i18n._('VALIDATIONFORM_THE_CRITERIA_MUST_BE_COMPLETED_COLUMN_NAME_OPERATOR_AND_VALUE_MUST_BE_SET');
+				validatorErrorArray.push(error);
+			}
+			
+			private function changeAction(event:Event):void{
+				var colComboBox:ComboBox = event.currentTarget as ComboBox;
+				manageViewParam(operator_rule, colComboBox.selectedItem);
+			}
+			
+			private function operatorChange(event:Event):void {
+				var operatorComboBox:ComboBox = event.currentTarget as ComboBox;
+				manageViewParam(operatorComboBox, field_rule.selectedItem);
+			}
+			
+			private function manageViewParam(operatorComboBox:ComboBox, obj:Object):void {
+				var bUnselected:Boolean = Utils.isEmptyOrIsNotEmptyUnselected(operatorComboBox);
+				if( !bUnselected ){
+					value_rule.visible = false;
+					cbovalue_rule.visible = false;
+				}else{
+					var show:Boolean = Utils.columnNameIsPickList(obj.column, obj.entity);
+					value_rule.visible = !show;
+					if(show){
+						var dataSource:ArrayCollection = PicklistService.getPicklist(obj.entity, obj.column);
+						cbovalue_rule.dataProvider = dataSource;
+					}
+					cbovalue_rule.visible = show;
+				}
+			}
+					
+		]]>
+	</mx:Script><!--CRO 05.01.2011-->
+	<mx:FormItem required="true" label="{i18n._('GLOBAL_NAME')}">
+		<mx:TextInput id="nameInput" text="{validation.rule_name}"/>
+	</mx:FormItem>
+	<mx:FormItem required="true" label="{i18n._('VALIDATIONFORM_FORMITEM_LABEL_CRITERIA')}">
+		<mx:HBox>
+			<mx:ComboBox width="160" id="field_rule" change="changeAction(event);"/>
+			<mx:ComboBox width="120" id="operator_rule" change="operatorChange(event)"/>
+			<mx:TextInput includeInLayout="false" width="160" id="value_rule"/>		
+			<mx:ComboBox includeInLayout="false" width="160" id="cbovalue_rule"/>
+		</mx:HBox>
+	</mx:FormItem><!-- CRO 05.01.2011-->
+	<mx:FormItem required="true" label="{i18n._('GLOBAL_MESSAGE')}">
+		<mx:TextInput id="messageInput" text="{validation.message}"/>
+	</mx:FormItem>	
+	<mx:StringValidator id="nameValidator" source="{nameInput}" property="text"/>
+	<mx:StringValidator id="messageValidator" source="{messageInput}" property="text"/>
+</mx:Form>
+

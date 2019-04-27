@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="800" height="400" title="{i18n._('Dashboard Filter')}" 
+	showFlexChrome="false" creationComplete="init()" transparent="true" systemChrome="none" xmlns:form="gadget.form.*" 
+	>
+	
+	<mx:NumberValidator id="cboFilterValidator" source="{cboFilter}" lowerThanMinError="This field is required." property="selectedIndex" minValue="1"/>
+	<mx:NumberValidator id="cboOperatorValidator" source="{cboOperator}" lowerThanMinError="This field is required." property="selectedIndex" minValue="1"/>
+	<mx:NumberValidator id="cboFilterColValidator" source="{cboFilterCol}" lowerThanMinError="This field is required." property="selectedIndex" minValue="1"/>
+	<mx:NumberValidator id="cboGroupByColValidator" source="{cboGroupByCol}" lowerThanMinError="This field is required." property="selectedIndex" minValue="1"/>
+	<mx:NumberValidator id="txtLimitValidator" source="{txtLimit}" lowerThanMinError="Please, input value between 1 to 1000." exceedsMaxError="Please, input value between 1 to 1000." integerError="Enter Integer value" property="text" minValue="1" maxValue="1000"/>
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.DashboardUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.TextInput;
+			import mx.validators.Validator;
+			[Embed(source='/assets/chart_bar.png')] [Bindable] public static var dashIcon:Class;
+			
+			[Bindable] private var filterProvider:ArrayCollection;
+			[Bindable] private var filterColumns:ArrayCollection;
+			[Bindable] private var filterColumnNumber:ArrayCollection;
+			[Bindable] private var availableItems:ArrayCollection;
+			[Bindable] private var selectedItems:ArrayCollection;
+			[Bindable] private var column_name:String;
+			[Bindable] private var isGrid:Boolean;
+			[Bindable] public var iTextInput:TextInput;
+			[Bindable] public var iData:Object;
+			private var validator:Array;
+			
+			public static const FIELD_FILTERID:String = '0';
+			public static const FIELD_OPERATOR:String = '1';
+			public static const FIELD_SUM:String = '2';
+			public static const FIELD_GROUPBY:String = '3';
+			public static const FIELD_ORDERBY:String = '4';
+			public static const FIELD_ORDER_DESC:String = '5';
+			public static const FIELD_LIMIT:String = '6';
+			public static const FIELD_MULTISELECTLIST:String = '7';
+			
+			[Bindable] private var OPERATORS:ArrayCollection =  new ArrayCollection([
+				{data: "", label: ""},
+				{data: "SUM", label: "SUM"}
+			]);
+			
+			private function init():void{
+				column_name = iData.column_name;
+				validator = [];
+				manageInitGUI();
+				addValidator();
+			}
+			
+			private function addValidator():void {
+				validator = [cboFilterValidator, cboOperatorValidator, cboFilterColValidator, cboGroupByColValidator];
+				switch(getIndex(iData)) {
+					case 0: // List
+						isGrid = true;
+						validator = validator.concat([txtLimitValidator]);
+						break;
+					case 1: // Pie chart, Bar chart
+						//validator = validator.concat([cboOperatorValidator, cboFilterColValidator, cboGroupByColValidator]);
+						break;						
+				}
+			}
+			
+			private function initData():void{
+				filterProvider = new ArrayCollection();
+				filterColumns = new ArrayCollection();
+				filterColumnNumber = new ArrayCollection();
+				availableItems = new ArrayCollection();
+				selectedItems = new ArrayCollection();
+			}
+			
+			private function manageInitGUI():void {
+				
+				var filter_id:String = DashboardUtils.find(column_name, FIELD_FILTERID);
+				
+				if(!StringUtils.isEmpty(filter_id)) {
+					
+					var filter:Object = Database.filterDao.findFilter(filter_id);
+					
+					// set selected entity
+					cboEntity.selectedIndex = Utils.getComboIndex(cboEntity, filter.entity, 'entity');
+					
+					// set selected filter
+					filterProvider = Database.filterDao.listDashboardFilters(filter.entity);
+					cboFilter.selectedIndex = Utils.getComboIndex(cboFilter, DashboardUtils.find(column_name, FIELD_FILTERID), 'id');
+					
+					// set selected filter column
+					filterColumns = DashboardUtils.getColumns(filter.entity, filter.type);
+					filterColumnNumber = DashboardUtils.getColumns(filter.entity, filter.type, ["Number", "Currency"]);
+					switch(getIndex(iData)) {
+						case 0: // List
+							txtLimit.text = DashboardUtils.find(column_name, FIELD_LIMIT);							
+							availableItems = DashboardUtils.getColumns(filter.entity, filter.type, ["Number", "Currency"], false);
+							selectedItems = DashboardUtils.fromStringColumns(filter.entity, DashboardUtils.find(column_name, FIELD_MULTISELECTLIST));
+							break;
+						case 1: // Pie chart, Bar chart
+							break;
+					}
+					
+					cboOperator.selectedIndex = Utils.getComboIndex(cboOperator, DashboardUtils.find(column_name, FIELD_OPERATOR), 'data');
+					cboFilterCol.selectedIndex = Utils.getComboIndex(cboFilterCol, DashboardUtils.find(column_name, FIELD_SUM), 'column');
+					cboGroupByCol.selectedIndex = Utils.getComboIndex(cboGroupByCol, DashboardUtils.find(column_name, FIELD_GROUPBY), 'column');
+					cboOrderByCol.selectedIndex = Utils.getComboIndex(cboOrderByCol, DashboardUtils.find(column_name, FIELD_ORDERBY), 'column');
+					DashboardUtils.find(column_name, FIELD_ORDER_DESC) == "ASC" ? sortbyasc.selected = true : sortbydesc.selected = true;
+					
+				}else {
+					initData();
+				}
+				
+			}
+			
+			private function entityChangeHandler(e:Event):void {
+				var entity:String = (e.currentTarget as ComboBox).selectedItem.entity;
+				if(!StringUtils.isEmpty(entity)) {
+					filterProvider = Database.filterDao.listDashboardFilters(entity);
+				}else {
+					initData();
+				}
+			}
+			
+			private function ok():void {
+				
+				var validaterError:Array = Validator.validateAll(validator);
+				if(validaterError.length > 0) return;
+				
+				var dashboardFilter:ArrayCollection = new ArrayCollection();
+				
+				var filter_id:String = cboFilter.selectedItem.id;
+				
+				var objFilter:Object;
+				
+				switch(getIndex(iData)) {
+					case 0: // List
+						// LIMIT
+						objFilter = DashboardUtils.setFilter(column_name, FIELD_LIMIT, txtLimit.text);
+						dashboardFilter.addItem(objFilter);
+						Database.dashboardFilterDAO.replace(objFilter);
+						
+						objFilter = DashboardUtils.setFilter(column_name, FIELD_MULTISELECTLIST, DashboardUtils.toStringColumns(selectedItems));
+						dashboardFilter.addItem(objFilter);
+						Database.dashboardFilterDAO.replace(objFilter);
+						break;
+					case 1: // Pie chart, Bar chart						
+						break;						
+				}						
+				
+				// Column filter_id
+				objFilter = DashboardUtils.setFilter(column_name, FIELD_FILTERID, filter_id);
+				dashboardFilter.addItem(objFilter);
+				Database.dashboardFilterDAO.replace(objFilter);
+				
+				// Column operator
+				objFilter = DashboardUtils.setFilter(column_name, FIELD_OPERATOR, cboOperator.selectedItem.data);
+				dashboardFilter.addItem(objFilter);
+				Database.dashboardFilterDAO.replace(objFilter);
+				
+				// Column sum
+				objFilter = DashboardUtils.setFilter(column_name, FIELD_SUM, cboFilterCol.selectedItem.column);
+				dashboardFilter.addItem(objFilter);
+				Database.dashboardFilterDAO.replace(objFilter);
+				
+				// Group by column
+				objFilter = DashboardUtils.setFilter(column_name, FIELD_GROUPBY, cboGroupByCol.selectedItem.column);
+				dashboardFilter.addItem(objFilter);
+				Database.dashboardFilterDAO.replace(objFilter);
+				
+				// Order by column
+				objFilter = DashboardUtils.setFilter(column_name, FIELD_ORDERBY, cboOrderByCol.selectedItem.column);
+				dashboardFilter.addItem(objFilter);
+				Database.dashboardFilterDAO.replace(objFilter);
+				
+				// Order by desc
+				objFilter = DashboardUtils.setFilter(column_name, FIELD_ORDER_DESC, sortbyasc.selected ? 'ASC' : 'DESC');
+				dashboardFilter.addItem(objFilter);
+				Database.dashboardFilterDAO.replace(objFilter);
+				
+				// iTextInput.text = DashboardUtils.getSQLString(iData);
+				iTextInput.text = column_name;
+				iData.custom = column_name;
+				iData.dashboardFilter = dashboardFilter;
+				
+				close();
+			}
+			
+			public static function getIndex(data:Object):int {
+				if (data.custom != null) {
+					if(data.column_name.indexOf(DashboardLayout.DATAGRID_CODE)>-1) {
+						return 0; // List
+					} else if(data.column_name.indexOf(DashboardLayout.PIE_CHART_CODE)>-1 || data.column_name.indexOf(DashboardLayout.COLUMN_CHART_CODE)>-1) {
+						return 1; // Pie chart, Column chart
+					}
+				}
+				return 0;
+			}
+			
+			private function filterChangeHandler(e:Event):void {
+				// selectedItem = {id, entity, name, predefined, type}
+				var filter_id:String = (e.currentTarget as ComboBox).selectedItem.id;
+				if(!StringUtils.isEmpty(filter_id)) {
+					var filter:Object = Database.filterDao.findFilter(filter_id);
+					filterColumns = DashboardUtils.getColumns(filter.entity, filter.type);
+					filterColumnNumber = DashboardUtils.getColumns(filter.entity, filter.type, ["Number", "Currency"]);
+					availableItems = DashboardUtils.getColumns(filter.entity, filter.type, ["Number", "Currency"], false);
+					selectedItems = new ArrayCollection();
+				}else {					
+					filterColumns = new ArrayCollection();
+					filterColumnNumber = new ArrayCollection();
+					availableItems = new ArrayCollection();
+					selectedItems = new ArrayCollection();
+				}
+			}
+			
+			private function operatorChangeHandler(e:Event):void {
+				var oper:String = (e.target as ComboBox).selectedItem.data;
+				trace(">>>>>>>" + oper + ">>>>>>>");
+			}
+		]]>
+	</mx:Script>	
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/chart_bar.png')" title="{i18n._('Dashboard Filter')}"/>
+		<mx:VBox width="100%" height="100%" verticalGap="8" top="30" left="8" right="8">
+			<mx:HBox width="100%" >
+				<mx:VBox width="40%" top="15">
+					<mx:Form width="100%">
+						<mx:FormItem label="Object">
+							<mx:ComboBox id="cboEntity" width="160" labelField="entity" dataProvider="{DashboardUtils.listEnableTransaction()}" change="entityChangeHandler(event)" />
+						</mx:FormItem>
+						<mx:FormItem label="Filter">
+							<mx:ComboBox id="cboFilter" width="160" labelField="name" dataProvider="{filterProvider}" change="filterChangeHandler(event)"/>
+						</mx:FormItem>
+					</mx:Form>
+				</mx:VBox>
+				<mx:VRule height="100%" />
+				<mx:VBox width="60%" top="15">
+					<mx:VBox width="100%">
+						<mx:HBox width="100%">
+							<mx:Label text="Operator" width="120"/>
+							<mx:ComboBox id="cboOperator" width="160" dataProvider="{OPERATORS}" change="operatorChangeHandler(event)"/>
+						</mx:HBox>
+						<mx:HBox width="100%">
+							<mx:Label text="Column SUM" width="120"/>
+							<mx:ComboBox id="cboFilterCol" width="160" dataProvider="{filterColumnNumber}"/>
+						</mx:HBox>
+						<mx:HBox width="100%">
+							<mx:Label text="Group By" width="120"/>
+							<mx:ComboBox width="160" id="cboGroupByCol" dataProvider="{filterColumns}"/>
+						</mx:HBox>
+						<mx:VBox width="100%" includeInLayout="{isGrid}" visible="{isGrid}">
+							<mx:HBox width="100%">
+								<mx:Label text="LIMIT" width="120"/>
+								<mx:TextInput id="txtLimit"/>
+							</mx:HBox>
+							<mx:HBox width="100%">
+								<mx:Label text="Total column" width="120"/>
+								<control:MultiSelectList id="multiSelectList" availableItems="{availableItems}" selectedItems="{selectedItems}" height="150"/>
+							</mx:HBox>
+						</mx:VBox>
+						<mx:HBox>
+							<mx:Label text="Order By"  width="120"/>
+							<mx:ComboBox width="160" id="cboOrderByCol" dataProvider="{filterColumns}" />
+							<mx:RadioButton id="sortbyasc" selected="true" groupName="sortType" value="asc" label="{i18n._('Ascending')}" />
+							<mx:RadioButton id="sortbydesc" groupName="sortType" value="desc" label="{i18n._('Descending')}"  />
+						</mx:HBox>
+					</mx:VBox>
+				</mx:VBox>
+			</mx:HBox>
+		</mx:VBox>
+		<mx:HBox horizontalAlign="right" width="100%" height="40" right="40" bottom="8">
+			<mx:Button id="btnOk" label="Ok" click="ok()" />
+			<mx:Button id="btnClose" label="{i18n._('GLOBAL_CLOSE')}" click="close()" />
+		</mx:HBox>
+	</mx:Canvas>
+	
+</mx:Window>

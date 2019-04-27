@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true">
+	<fx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid;
+			private var list:ArrayCollection;
+			override public function set data(value:Object):void{		
+				super.data = value;
+				if(data!=null && data.hasTextInput){
+					
+					cboAnswer.dataProvider = Database.answerDao.getByQuestion(value.assessmentName,value.Ordering);
+					cboAnswer.selectedItem = data.answer;
+					cboAnswer.visible = true;
+					cboAnswer.validateNow();
+					txtVal.visible = false;
+					txtVal.includeInLayout= false;
+				}else if(data != null){
+					cboAnswer.visible=false;
+					cboAnswer.includeInLayout= false;
+					txtVal.text = data.answer;
+					txtVal.visible=true;
+					txtVal.setStyle("backgroundColor",0xECECEC);
+					hBoxCell.setStyle("backgroundColor", 0xECECEC);
+					cboAnswer.setStyle("backgroundColor", 0xECECEC);
+					
+				}
+				//if(txtVal.visible)return;
+			}
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];
+						
+					}
+				}
+			}
+			private function changeFunction():void{
+				if(column!=null){	
+					data[column.dataField] = cboAnswer.selectedItem.field;
+//					data.checkBoxPercent = 1;
+//					list = grid.dataProvider as ArrayCollection;
+//					for(var i:int = 1;i<list.length;i++){ // First row is header
+//						list[i].checkBoxPercent == 1;
+//					}
+//					grid.dataProvider = list;
+//					grid.validateNow();
+				}
+			}
+		]]>
+		
+	</fx:Script>
+	<mx:HBox horizontalAlign="center" verticalAlign="middle" width="100%" height="25" id="hBoxCell" paddingLeft="3" paddingRight="3" paddingBottom="3">
+		<s:ComboBox id="cboAnswer"   visible="false" width="100%"  change="{changeFunction()}"/>
+		<s:Label id="txtVal"    visible="false" verticalAlign="middle" />
+	</mx:HBox>	
+
+</s:MXAdvancedDataGridItemRenderer>

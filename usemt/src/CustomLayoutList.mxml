@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:control="gadget.control.*"
+		   resizable="false"
+		   title="Custom layouts"
+		   width="550" height="390" verticalAlign="middle"
+		   showFlexChrome="false" transparent="true" systemChrome="none"
+		   creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.FieldUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.ButtonBar;
+			import mx.events.CloseEvent;
+			import mx.events.ItemClickEvent;
+			
+			//[Bindable] public var entity:String;
+			[Bindable] private var updateLabel:String = i18n._(GLOBAL_UPDATE);
+			private const GLOBAL_CLOSE:String = 'GLOBAL_CLOSE' ;
+			private const GLOBAL_ADD:String = 'GLOBAL_ADD' ;
+			private const GLOBAL_EDIT:String = 'GLOBAL_EDIT' ;
+			private const GLOBAL_DELETE:String = 'GLOBAL_DELETE';
+			private const GLOBAL_UPDATE:String = 'GLOBAL_UPDATE';
+			private const CUSTOMLAYOUTLIST_ALERT_MSG_DEFAULT_LAYOUTS_CANNOT_BE_DELETED:String = 'CUSTOMLAYOUTLIST_ALERT_MSG_DEFAULT_LAYOUTS_CANNOT_BE_DELETED' ;
+			private const CUSTOMLAYOUTLIST_TITLEBAR_TITLE_CUSTOM_LAYOUTS:String = 'CUSTOMLAYOUTLIST_TITLEBAR_TITLE_CUSTOM_LAYOUTS' ;
+			private const CUSTOMLAYOUTLIST_DATAGRIDCOLUMN_HEADERTEXT_LAYOUT_ID:String = 'GLOBAL_LAYOUT_ID' ;
+			private const CUSTOMLAYOUTLIST_DATAGRIDCOLUMN_HEADERTEXT_ENTITY:String = 'GLOBAL_ENTITY';
+			private const CUSTOMLAYOUTLIST_DATAGRIDCOLUMN_HEADERTEXT_DISPLAY_NAME:String = 'GLOBAL_DISPLAY_NAME';
+			
+			public var mainWindow:MainWindow;
+			
+			private function init():void {
+				refreshList();
+				initButtons();
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			private function initButtons():void {
+				actionButton.removeAllChildren();
+				var buttonBar:ButtonBar = new ButtonBar();
+				buttonBar.setStyle("right", "0");
+				var obj:Object = null;
+				var buttons:ArrayCollection = new ArrayCollection();
+				
+				buttons.addItem({label: i18n._(GLOBAL_CLOSE), icon:ImageUtils.cancelIcon}); 
+				buttons.addItem({label: i18n._(GLOBAL_ADD), icon: ImageUtils.addIcon});
+				buttons.addItem({label: i18n._(GLOBAL_EDIT), icon: ImageUtils.editIcon});
+				buttons.addItem({label: i18n._(GLOBAL_DELETE), icon: ImageUtils.deleteIcon});
+				
+				buttonBar.dataProvider = buttons;
+				buttonBar.addEventListener(ItemClickEvent.ITEM_CLICK, handleButtonBar);
+				
+				actionButton.addChild(buttonBar);
+			}
+			
+			private function handleButtonBar(event:ItemClickEvent):void {
+				if(event.label == i18n._(GLOBAL_CLOSE)){
+					this.close();
+				}else if(event.label == i18n._(GLOBAL_DELETE)){
+					confirmDelete();
+				}else{
+					opentCustomLayoutDetail(event.label);
+				}
+			}	
+			private function confirmDelete():void{
+				Alert.show(i18n._('GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE'),i18n._(GLOBAL_DELETE) , Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+					if (event.detail==Alert.YES){
+						deleteCustomLayout();
+					}    	 
+				});	
+			}
+			private function deleteCustomLayout():void {
+				if(customLayoutGrid.selectedItems.length == 0) {
+					Alert.show(i18n._('MENU_UTILS_ALERT_TEXT_PLEASE_SELECT_RECORD_BEFORE_EXECUTE_THIS_OPERATOR'), "", Alert.OK, this);
+					return;
+				}
+				var customLayoutObject:Object = customLayoutGrid.selectedItem;
+				if(Boolean(customLayoutObject.deletable)){
+					Database.customLayoutDao.delete_one(customLayoutObject.entity, customLayoutObject.subtype);
+					Database.layoutDao.deleteLayout(customLayoutObject.entity, customLayoutObject.subtype);
+					Database.customLayoutConditionDAO.deleted(customLayoutObject.entity, customLayoutObject.subtype);
+					refreshList();
+				}else{
+					Alert.show(i18n._(CUSTOMLAYOUTLIST_ALERT_MSG_DEFAULT_LAYOUTS_CANNOT_BE_DELETED), "", Alert.OK, this);
+				}
+			}
+			
+			private function opentCustomLayoutDetail(mode:String="Update"):void{
+//				var show:Boolean = true;
+				var customLayoutDetail:CustomLayoutDetail = new CustomLayoutDetail();
+				customLayoutDetail.customLayoutList = this;
+				if(mode == i18n._(GLOBAL_ADD)){
+					customLayoutDetail.isCreate = true;
+				}else{
+					if(customLayoutGrid.selectedItems.length == 0) return;
+					customLayoutDetail.isCreate = false;
+					var customLayoutObject:Object = customLayoutGrid.selectedItem;
+					customLayoutDetail.customLayout = customLayoutObject;
+					customLayoutDetail.mainWindow = mainWindow;
+//					show = Boolean(customLayoutObject.deletable);
+				}
+//				if(show){
+					WindowManager.openModal(customLayoutDetail);
+//				}else{
+//					Alert.show("Default layouts cannot be edited", "", 4, this);
+//				}
+			}
+
+			public function refreshList():void {
+				var listCustomLayout:ArrayCollection = Database.customLayoutDao.readAll();
+				var provider:ArrayCollection = new ArrayCollection();
+				for each(var object:Object in listCustomLayout){
+					var newObject:Object = Utils.copyModel(object);
+					var conditionCollection:ArrayCollection = Database.customLayoutConditionDAO.list(newObject.entity, newObject.subtype);
+					if(conditionCollection.length >0){
+						var objCondition:Object = conditionCollection.getItemAt(0);
+						var objField:Object = Database.fieldDao.findFieldByPrimaryKey(objCondition.entity,objCondition.column_name);
+						var colName:String = objField==null?"":objField.display_name;
+						// var operator:String = objCondition.operator=='='?'equal':'difference';
+						newObject.column_name = colName + " " + objCondition.operator + " " + objCondition.params;
+				
+					}
+					provider.addItem(newObject);
+				}
+				Utils.suppressWarning(provider);
+				customLayoutGrid.dataProvider = provider;
+				(customLayoutGrid.dataProvider as ArrayCollection).refresh();
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="550" height="390" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/customize.png')" title="{i18n._(CUSTOMLAYOUTLIST_TITLEBAR_TITLE_CUSTOM_LAYOUTS)}"/>
+		<mx:VBox top="40" left="16" right="16" bottom="16" width="100%" height="100%">
+			<mx:DataGrid id="customLayoutGrid" width="100%" height="100%" doubleClickEnabled="true" doubleClick="opentCustomLayoutDetail()">
+				<mx:columns>
+					<mx:DataGridColumn headerText="{i18n._(CUSTOMLAYOUTLIST_DATAGRIDCOLUMN_HEADERTEXT_LAYOUT_ID)}" visible="false">
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox width="100%" horizontalScrollPolicy="off">
+									<mx:Script>
+										<![CDATA[
+											private function setToBold(data:Object):String {
+												if (data == null) return "normal";
+												return !data.deletable ? 'bold' : 'normal';
+											}
+										]]>
+									</mx:Script>
+									<mx:Label width="100%" text="{data.layout_name}" fontWeight="{setToBold(data)}"/>
+								</mx:HBox>
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+					<mx:DataGridColumn headerText="{i18n._(CUSTOMLAYOUTLIST_DATAGRIDCOLUMN_HEADERTEXT_ENTITY)}">
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox width="100%" horizontalScrollPolicy="off">
+									<mx:Script>
+										<![CDATA[
+											private function setToBold(data:Object):String {
+												if (data == null) return "normal";
+												return !data.deletable ? 'bold' : 'normal';
+											}
+										]]>
+									</mx:Script>
+									<mx:Label width="100%" text="{data.entity}" fontWeight="{setToBold(data)}"/>
+								</mx:HBox>
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+					<mx:DataGridColumn headerText="{i18n._(CUSTOMLAYOUTLIST_DATAGRIDCOLUMN_HEADERTEXT_DISPLAY_NAME)}">
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox width="100%" horizontalScrollPolicy="off">
+									<mx:Script>
+										<![CDATA[
+											import gadget.util.StringUtils;
+											private function setToBold(data:Object):String {
+												if (data == null) return "normal";
+												return !data.deletable ? 'bold' : 'normal';
+											}
+										]]>
+									</mx:Script>
+									<mx:Label width="100%" text="{data.display_name}" fontWeight="{setToBold(data)}"/>
+								</mx:HBox>
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+					<mx:DataGridColumn headerText="{i18n._('Filter')}">
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox width="100%" horizontalScrollPolicy="off">
+									<mx:Script>
+										<![CDATA[
+											import gadget.util.StringUtils;
+											private function setToBold(data:Object):String {
+												if (data == null) return "normal";
+												return !data.deletable ? 'bold' : 'normal';
+											}
+										]]>
+									</mx:Script>
+									<!--<mx:Label width="100%" text="{data.custom_layout_title}" fontWeight="{setToBold(data)}"/>-->
+									<mx:Label width="100%" text="{data.column_name}" fontWeight="{setToBold(data)}"/>
+								</mx:HBox>
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox id="actionButton" horizontalAlign="right" width="100%"/>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

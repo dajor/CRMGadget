@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	width="100%" height="100%" 
+	xmlns:form="gadget.form.*" 
+	initialize="initial()"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.rtc.sharedManagers.descriptors.FileDescriptor;
+			import com.google.analytics.utils.Environment;
+			import com.google.analytics.utils.Variables;
+			
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.util.DashboardUtils;
+			import gadget.util.GUIUtils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Form;
+			import mx.containers.HBox;
+			import mx.controls.VRule;
+			import mx.events.IndexChangedEvent;
+			import mx.events.ItemClickEvent;
+			import mx.managers.SystemManager;
+			
+			import org.igniterealtime.xiff.data.whiteboard.Path;
+			[Embed(source='/assets/chart_bar.png')] [Bindable] public static var dashIcon:Class;
+			private static const GLOBAL_EDIT:String = 'GLOBAL_EDIT';
+			
+			private var numOfPage:int = 4;
+			private var fields:ArrayCollection;
+			[Bindable] private var innerCanvasL:Array = new Array();
+			[Bindable] private var leftFormL:Array = new Array();
+			[Bindable] private var vRuleL:Array = new Array();
+			[Bindable] private var rightFormL:Array = new Array();
+			[Bindable] private var heightLeftL:Array = new Array();
+			[Bindable] private var heightRightL:Array = new Array();
+			[Bindable] public var list:List;
+			
+			private function getListButtons():ArrayCollection {
+				var buttons:ArrayCollection = new ArrayCollection();
+				buttons.addItem({label:i18n._(GLOBAL_EDIT),  icon:dashIcon});
+				return buttons;
+			}
+			
+			private function initial():void {
+				initTab();
+				initForm();
+			}
+			
+			private function initTab():void {
+				for(var p:int = 0; p < numOfPage; p++){
+					var innerCanvas:Canvas = new Canvas();
+					innerCanvas.horizontalScrollPolicy = "off";
+					innerCanvas.percentWidth = 100;
+					innerCanvas.percentHeight = 100;
+					
+					var hBox:HBox = new HBox();
+					hBox.setStyle('horizontalGap', 0);
+					hBox.percentWidth = 100;
+					hBox.percentHeight = 100;
+					
+					var leftForm:Form = new Form();
+					leftForm.percentWidth = 100;
+					leftForm.setStyle('paddingTop', 0);
+					//leftForm.setStyle('verticalGap', 2);
+					
+					//var vRule:VRule = new VRule();
+					//vRule.percentHeight = 100;
+					
+					var rightForm:Form = new Form();
+					rightForm.percentWidth = 100;
+					rightForm.setStyle('paddingTop', 0);
+					//rightForm.setStyle('verticalGap', 0);
+					
+					hBox.addChild(leftForm);
+					///hBox.addChild(vRule);
+					hBox.addChild(rightForm);
+					innerCanvas.addChild(hBox);
+					
+					innerCanvas.label = i18n._('GLOBAL_PAGE') + " " + (p+1);
+					viewstack.addChild(innerCanvas);
+					
+					innerCanvasL[p] = innerCanvas;
+					leftFormL[p] = leftForm;
+					//vRuleL[p] = vRule;
+					rightFormL[p] = rightForm;
+					
+					heightLeftL[p] = 0;
+					heightRightL[p] = 0;
+				}
+			}
+			
+			private var pageIndex:int = 0;
+			private function initForm():void {
+				
+				fields = Database.dashboardLayoutDAO.selectLayout();
+				
+				for (var i:int = 0; i < fields.length; i++) {
+					
+					pageIndex = fields[i].col==1?0:fields[i].col/2;
+					if(pageIndex>=numOfPage) continue;
+					
+					var objHeight:int = 26;
+					var displayObj:DisplayObject = null;
+					
+					if (fields[i].custom != null) {
+						if (fields[i].column_name.indexOf(DashboardLayout.DATAGRID_CODE)>-1) {
+							displayObj = DashboardUtils.getQueryGrid(fields[i]);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+							displayObj = isNotEmptyDisplayObject(displayObj) ? displayObj : GUIUtils.getHeader("Datagrid error no dashboard filter define.");
+						}else if (fields[i].column_name.indexOf(DashboardLayout.PIE_CHART_CODE)>-1) {
+							displayObj = DashboardUtils.drawChart(fields[i]);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+							displayObj = isNotEmptyDisplayObject(displayObj) ? displayObj : GUIUtils.getHeader("Pie chart error no dashboard filter define.");
+						}else if (fields[i].column_name.indexOf(DashboardLayout.COLUMN_CHART_CODE)>-1) {
+							displayObj = DashboardUtils.drawChart(fields[i]);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+							displayObj = isNotEmptyDisplayObject(displayObj) ? displayObj : GUIUtils.getHeader("Column chart error no dashboard filter define.");
+						}else if(fields[i].column_name.indexOf("#")>-1){
+							displayObj = GUIUtils.getHeaderTranslate(fields[i]);
+						}else if(fields[i].column_name.indexOf(DashboardLayout.OPPORTUNITY_BY_ACCOUNT)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.OPPORTUNITY_BY_ACCOUNT,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}else if(fields[i].column_name.indexOf(DashboardLayout.OPPORTUNITY_BY_SALES_STAGE)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.OPPORTUNITY_BY_SALES_STAGE,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}else if(fields[i].column_name.indexOf(DashboardLayout.ACTIVITIES_BY_OPPORTUNITY)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.ACTIVITIES_BY_OPPORTUNITY,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}else if(fields[i].column_name.indexOf(DashboardLayout.ACCOUNTS_BY_SALES_REP)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.ACCOUNTS_BY_SALES_REP,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}else if(fields[i].column_name.indexOf(DashboardLayout.CONTACT_MAILING_LIST)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.CONTACT_MAILING_LIST,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}else if(fields[i].column_name.indexOf(DashboardLayout.EMPLOYEES_AND_MANAGERS_LIST)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.EMPLOYEES_AND_MANAGERS_LIST,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}
+						//change request #1061 CRO
+						else if(fields[i].column_name.indexOf(DashboardLayout.NEXT_BIRSTDAY)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.NEXT_BIRSTDAY,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}else if(fields[i].column_name.indexOf(DashboardLayout.NEW_CONTACTS)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.NEW_CONTACTS,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}else if(fields[i].column_name.indexOf(DashboardLayout.NEW_OPPORTUNITIES)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.NEW_OPPORTUNITIES,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}else if(fields[i].column_name.indexOf(DashboardLayout.NEW_MODIFIED_CUSTOMERS)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.NEW_MODIFIED_CUSTOMERS,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}else if(fields[i].column_name.indexOf(DashboardLayout.NEW_CUSTOMERS)>-1){
+							displayObj = DashboardUtils.getDashboardReport(DashboardLayout.NEW_CUSTOMERS,list);
+							objHeight = isNotEmptyDisplayObject(displayObj) ? 290 : objHeight;
+						}
+					
+					}
+					
+					createFieldLayout(displayObj,objHeight,i,pageIndex);
+					
+				}
+			}
+			
+			private function isNotEmptyDisplayObject(disObject:DisplayObject):Boolean {
+				return disObject != null;
+			}
+			
+			private function createFieldLayout(displayObj:DisplayObject,objHeight:int,i:int,pageIndex:int):void {
+				if(displayObj != null) {
+					displayObj.height = objHeight;
+					if(fields[i].col%2==0){
+						leftFormL[pageIndex].addChild(displayObj);
+						heightLeftL[pageIndex] += displayObj.height + 4;
+					}else{
+						rightFormL[pageIndex].addChild(displayObj);
+						heightRightL[pageIndex] += displayObj.height + 4;
+					}
+				}
+			}
+			
+			
+			private var currentSelected:int = 0;
+			public function reload():void {
+				viewstack.removeAllChildren();
+				initTab();
+				initForm();
+				if(viewstack.getChildren().length <= currentSelected){
+					currentSelected = 0;
+				}				
+				viewstack.selectedIndex = currentSelected;
+//				if(currentSelected != -1) {
+//					if(viewstack.getChildren().length > 0){
+//						(viewstack.getTabAt(currentSelected) as Button).setFocus();
+//					}
+//				}
+			}
+			
+			private function upperBarHandler(event:ItemClickEvent):void {
+				var layout:DashboardLayout = new DashboardLayout();
+				layout.dashboardChart = this;
+				WindowManager.openModal(layout);
+			}
+			
+			private var fMax:Boolean = false;
+			private function viewRestoreMaxWindow():void {
+				if (fMax) {
+					fMax = false;
+					//restore();
+				} else { 
+					fMax = true; 
+					//maximize();
+				}
+			}
+			
+			private function tabChangeAction(e:IndexChangedEvent):void {
+				currentSelected = e.newIndex;
+			}
+			
+			
+		]]>
+	</mx:Script>
+	
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="100%" height="100%" right="0" bottom="0" backgroundColor="0xeeeeee">
+		<mx:VBox width="100%" height="100%" verticalGap="8" top="5" left="8" right="8" bottom="8">			
+			<control:ButtonPanel id="mainPanel"  titleStyleName="panelHeader" dataProvider="{getListButtons()}" width="100%" height="32"
+								 itemClick="{upperBarHandler}" borderStyle="solid"/>
+			<mx:TabNavigator id="viewstack" width="100%" height="100%" tabHeight="24" creationPolicy="all" change="tabChangeAction(event)"/>
+			
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Canvas>

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	title="{i18n._(GLOBAL_ALL_USERS)}"
+	width="350" height="320" verticalAlign="middle"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	creationComplete="init();">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.util.ImageUtils;
+			import gadget.util.OOPS;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.ButtonBar;
+			import mx.events.ItemClickEvent;
+			import mx.utils.StringUtil;
+			
+			public var activityId:String;
+			public var modifiedLocalUpdateItem:Function;
+			public var loadData:Function;			
+			
+			private function init():void{
+				initButton();
+				refreshList();
+			}
+			private function initButton():void{
+				actionButton.removeAllChildren();
+				var buttonBar:ButtonBar = new ButtonBar();
+				buttonBar.setStyle("right", "0");
+				var obj:Object = null;
+				var buttons:ArrayCollection = new ArrayCollection();
+				//CRO 14.01.2011
+				buttons.addItem({label: i18n._("GLOBAL_CLOSE"), icon:ImageUtils.cancelIcon}); 
+				buttons.addItem({label: i18n._("GLOBAL_ADD"), icon: ImageUtils.acceptIcon});
+				
+				buttonBar.dataProvider = buttons;
+				buttonBar.addEventListener(ItemClickEvent.ITEM_CLICK, handleButtonBar);
+				
+				actionButton.addChild(buttonBar);
+			}
+			
+			private function handleButtonBar(event:ItemClickEvent):void{
+				if(event.label == i18n._("GLOBAL_ADD")){
+					delegateUser();
+					modifiedLocalUpdateItem();
+					loadData();
+				}
+				this.close();
+			}
+			
+			private function refreshList():void {
+				var columns:ArrayCollection = new ArrayCollection([
+																	{element_name:"LastName"},
+																	{element_name:"FirstName"},
+																	{element_name:"Alias"},
+																	{element_name:"EMailAddr"}
+																]);
+				gridUser.dataProvider = Database.allUsersDao.findAll(columns);
+			}
+			
+			private function delegateUser():void {
+				for each(var userSelected:Object in gridUser.selectedItems){
+					//var userSelected:Object = gridUser.selectedItem;
+					var activityUser:Object = new Object();
+					activityUser.activityId = activityId;
+					activityUser.userId = userSelected.Id;
+					try{
+						OOPS("=missing",i18n._("GLOBAL_INSERT_DELEGATEUSER_CURRENTLY_DISABLED"));
+//						Database.activityUserDao.insert(activityUser);
+					}catch(e:Error){
+						//user has already added for the selected activity
+						trace(e.message);
+					}
+				}
+			}
+			
+			private function filter():void {
+				var data:ArrayCollection = gridUser.dataProvider as ArrayCollection;
+				data.filterFunction = filterData;
+				data.refresh();
+			}
+			
+			private function filterData(o:Object):Boolean {
+				if(StringUtil.trim(searchUser.text) == null) return true;
+				else return o.FirstName.toString().toLocaleLowerCase().indexOf(searchUser.text.toLocaleLowerCase()) > -1;
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style source="styles.css"/>
+	<mx:Canvas styleName="main" left="0" top="0" width="350" height="320" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/attachment.png')" title="All Users"/>
+		<mx:VBox top="40" left="16" right="16" width="100%" height="270">
+			<mx:HBox>
+				<mx:Label text="{i18n._("GLOBAL_SEARCH")}"/>
+				<mx:TextInput id="searchUser" keyUp="filter()"/>
+			</mx:HBox>
+			<mx:DataGrid id="gridUser" width="100%" allowMultipleSelection="true" doubleClickEnabled="true" doubleClick="delegateUser()" height="205">
+				<mx:columns>
+					<!--CRO 14.01.2011 -->
+					<mx:DataGridColumn headerText="{i18n._('GLOBAL_LAST_NAME')}" dataField="LastName"/>
+					<mx:DataGridColumn headerText="{i18n._('GLOBAL_FIRST_NAME')}" dataField="FirstName"/>
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox id="actionButton" horizontalAlign="right" width="100%"/>
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

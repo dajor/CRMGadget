@@ -1,0 +1,810 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:control="gadget.control.*"
+		   width="100%" height="100%" 
+		   xmlns:form="gadget.form.*" 
+		   creationComplete="init()" xmlns:components="com.ibm.ilog.elixir.maps.components.*" xmlns:s="library://ns.adobe.com/flex/spark" xmlns:itemRenderer="org.flexunit.flexui.controls.left.itemRenderer.*" xmlns:maps="com.google.maps.*"
+		   >
+
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSON;
+			import com.google.analytics.API;
+			import com.google.maps.InfoWindowOptions;
+			import com.google.maps.LatLng;
+			import com.google.maps.Map;
+			import com.google.maps.MapEvent;
+			import com.google.maps.MapMouseEvent;
+			import com.google.maps.MapOptions;
+			import com.google.maps.MapType;
+			import com.google.maps.controls.ControlPosition;
+			import com.google.maps.controls.MapTypeControl;
+			import com.google.maps.controls.MapTypeControlOptions;
+			import com.google.maps.controls.ZoomControl;
+			import com.google.maps.interfaces.IInfoWindow;
+			import com.google.maps.overlays.Marker;
+			import com.google.maps.overlays.MarkerOptions;
+			import com.google.maps.styles.FillStyle;
+			import com.google.maps.styles.StrokeStyle;
+			
+			import gadget.control.GridColumnRenderFactory;
+			import gadget.dao.Database;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.service.PicklistService;
+			import gadget.util.DateUtils;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			import gadget.window.WindowManager;
+			
+			import ilog.core.ilog_internal;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Form;
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			import mx.controls.HTML;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.http.HTTPService;
+			private var timeFormatString:String;
+			public var list:List;
+			[Embed(source="/assets/sync.png")] [Bindable] public static var refresh:Class;
+
+			private static const API_KEY:Object = {
+				//key: "ABQIAAAAiO1dtdpNPgdon_xaew6tzRT-y38ddP0OAp0wGY0-KVK-F9BaeBRMjT17OBIemS1u9mT4oWQFaqWZ7w",
+				key: "ABQIAAAADLVFWzMFYMu28dkOxNfgART-y38ddP0OAp0wGY0-KVK-F9BaeBTlJb_TNeDzXn7pdnOV1YkAG5Qthw",
+				url: "http://desktop.crm-gadget.com"
+			};
+			
+
+			[Bindable]  public var greaterDays:int  = 60;
+			[Bindable] public var lowerDays:int = 30;
+			private var map:Map = null;
+			private function init():void{
+				
+				createMap();
+				
+				timeFormatString = DateUtils.getCurrentUserDatePattern().timeFormat;
+			
+				
+				var picklist:ArrayCollection = PicklistService.getPicklist("Activity","Type",false,true,true);
+				var col:ArrayCollection = new ArrayCollection();
+				col.addItem({element_name:"PrimaryBillToCity"});
+				col.addItem({element_name:"PrimaryBillToCountry"});
+				var listLocation:ArrayCollection = Database.accountDao.findAll(col,null,null,10,"PrimaryBillToCountry",true,"PrimaryBillToCity,PrimaryBillToCountry");
+				
+				if(picklist != null && picklist.length){
+					for each(var obj:Object in picklist){
+						var chk:CheckBox = new CheckBox();
+						chk.label = obj.label;
+						chk.data = obj.data;
+						chk.toolTip = obj.data;
+						chk.selected = false;
+						taskGroup.addChild(chk);
+					}
+				}
+				if(listLocation != null && listLocation.length>0){
+					for each(var loc:Object in listLocation){
+						var city:String = loc.PrimaryBillToCity;
+						var country:String =loc.PrimaryBillToCountry;
+						var chkLoc:CheckBox = new CheckBox();
+						var coma:String = "";
+						if(!StringUtils.isEmpty(city) && !StringUtils.isEmpty(country)){
+							coma = " , ";
+						}
+						var address:String = city + coma +  country;
+						if(StringUtils.isEmpty(address)){
+							continue;
+						}
+						chkLoc.label = address;
+						chkLoc.toolTip = address;
+						chkLoc.data =   loc;
+						locationGroup.addChild(chkLoc);
+					}
+				}
+				//total.text = "Total Marks - " + itemsAcount.length;
+		
+				initGridColumns();
+				initForm(null);
+				refreshVisitCusDays(true);
+				
+				reloadData();
+			}
+			private function getCriterai():String{
+				var cri:String = "";
+				var coma:Boolean = false;
+				for each(var chk:CheckBox in taskGroup.getChildren()){
+					if(chk.selected){
+						if(coma){
+							cri = cri + ", '" + chk.data +"'";
+						}else{
+							cri = "'"+ chk.data +"'";
+						}
+						coma = true;
+					}
+				}
+				if(!StringUtils.isEmpty(cri)){
+					cri =" act.Type in ("+ cri +") And ";
+				}
+				var city:String = "";
+				var country:String = "";
+				coma = false;
+				var coma1:Boolean = false;
+				for each(var chkLoc:CheckBox in locationGroup.getChildren()){
+					if(chkLoc.selected){
+						var objLoc:Object = chkLoc.data;
+						var objCity:String = objLoc.PrimaryBillToCity;
+						var objCountry:String = objLoc.PrimaryBillToCountry;
+						if(coma1 && !StringUtils.isEmpty(objCity) ){
+							city = city + ", '" + objCity +"'";
+						}else if(!StringUtils.isEmpty(objCity)){
+							city = "'"+ objCity +"'";
+							coma1 = true;
+						}
+						
+						if(coma && !StringUtils.isEmpty(objCountry)){
+							country = country + ", '" + objCountry +"'";
+						}else if(!StringUtils.isEmpty(objCountry)){
+							country ="'" + objCountry +"'";
+							coma = true;
+						}
+						
+					}
+				}
+				if(!StringUtils.isEmpty(city)){
+					cri = cri + " a.PrimaryBillToCity in ("+ city +") And ";
+				}
+				if(!StringUtils.isEmpty(country)){
+					cri = cri + " a.PrimaryBillToCountry in ("+ country +") And";
+				}
+				return cri;
+			}
+			private function getDateCompare(i:int):Date{
+				var now:Date = new Date();
+				var compareDate:Date = new Date();
+				
+				if(i==1){
+					compareDate.setDate(now.getDate()- lowerDays);
+				}else if(i==2){
+					compareDate.setDate(now.getDate()-greaterDays);
+				}else{
+					compareDate.setDate(now.getDate()-greaterDays);
+				}
+				
+				
+				return compareDate;
+			}
+			private function createMap():void{
+				imap.removeAllChildren();
+				map = new Map();
+				map.addEventListener(MapEvent.MAP_READY, onMapReady);
+				map.percentHeight = 100;
+				map.percentWidth = 100;
+				map.key = API_KEY.key +"";
+				map.sensor ="true";
+				map.url = API_KEY.url +"";
+				
+//				map.addControl(new ZoomControl());
+				imap.addChild(map);
+			}
+			private var listActivities:ArrayCollection = null;
+			private function reloadData():void{
+				
+//				var listContactId:ArrayCollection = new ArrayCollection();
+				var listAccContact:ArrayCollection = new ArrayCollection();
+				var listAccountId:ArrayCollection = new ArrayCollection();
+
+//				var markerLetter:Array = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R","S", "T", "U", "V", "W", "X", "Y", "Z"];
+//				imap.removeAllChildren();
+				//var dataSource:ArrayCollection = Database.activityDao.getCurrentAppointmentList(getStartTimeEndTime(date));
+				var q:String = "";
+				var cri:String = getCriterai() +  getStartTimeEndTime();
+				listActivities = Database.activityDao.getAppointmentAccountList(cri);
+				var relationWithAccount:Object = Relation.getRelation("Activity", "Account");
+				var relationWithContact:Object = Relation.getRelation("Activity", "Contact");
+				var itemsAcount:Array = new Array();
+				var mapExistAccount:Object = new Object();
+				var existAddress:Object = new Object();
+				for each(var activity:Object in listActivities){
+					var actStartDate:Date = DateUtils.guessAndParse(activity.StartTime);
+					var actDueDate:Date = DateUtils.guessAndParse(activity.DueDate);
+					activity['icon'] = ImageUtils.getImageDailyAgenda(activity);
+					activity.stTime = DateUtils.format(actStartDate, timeFormatString);
+					activity.enTime = DateUtils.format(DateUtils.guessAndParse(activity.EndTime), timeFormatString);
+					var contact:Object = null;
+					
+					if(!StringUtils.isEmpty(activity[relationWithContact.keySrc]) && activity[relationWithContact.keySrc] != "No Match Row Id"){
+//						listContactId.addItem(activity[relationWithContact.keySrc]);
+						if(!mapExistAccount[activity[relationWithContact.keySrc]]){
+							contact = Database.contactDao.findByOracleId(activity[relationWithContact.keySrc]);
+							if(contact){
+								contact.PrimaryContact = activity.PrimaryContact;
+								mapExistAccount[activity[relationWithContact.keySrc]] = activity[relationWithContact.keySrc];
+								listAccContact.addItem(contact);
+							}
+						}
+						
+						
+					}
+					if(activity[relationWithAccount.keySrc] && activity[relationWithAccount.keySrc] != "No Match Row Id"){
+						
+						var color:Object = new Object;
+						var date1:Date = getDateCompare(1);
+						var date2:Date = getDateCompare(2);
+						if(actStartDate >=  date1 || actDueDate >= date1 ){
+							color = 0x00CC00;
+						}else if(actStartDate >= date2 || actDueDate >= date2 ){
+							color = 0xF7FE2E;
+						}else{
+							color = 0xFF0000;
+						}
+					//	mapColorAccount[activity[relationWithAccount.keySrc]] = color;
+						//listAccountId.addItem(activity[relationWithAccount.keySrc]);
+						
+						var account:Object = Database.accountDao.findByOracleId(activity[relationWithAccount.keySrc]);
+						if(account){
+						
+							account.address = GUIUtils.getAddress(Database.accountDao.entity,account);//StringUtil.trim((address ? address + ' ' : '') + (code ? code + ' ' : '') + (city ? city : ''));
+							
+							activity.GoogleAddress = account.address;
+							if(!StringUtils.isEmpty(activity.address) &&  StringUtils.isEmpty(existAddress[activity.address]) && contact != null){
+								existAddress[activity.address] = activity.address;
+								contact.GoogleAddress = activity.GoogleAddress;
+								contact.Color = color;
+								
+							}
+							
+							
+							
+							var acc:String = mapExistAccount[activity.AccountName];
+							if(contact == null && StringUtils.isEmpty(acc) && !StringUtils.isEmpty(activity.AccountName)){
+								mapExistAccount[activity.AccountName] = activity.AccountName;
+								activity.Color = color;
+								listAccContact.addItem(activity);
+								
+							}
+						}
+						
+					}
+					
+				}
+				drawingMap(listAccContact);
+				
+				/*
+				var listAccounts:ArrayCollection = Database.accountDao.findByListOracleId(listAccountId);
+				if(listAccounts != null && listAccounts.length>0){
+					for each (var account:Object in listAccounts){
+						var address:String = account.PrimaryShipToStreetAddress;
+						var code:String = account.PrimaryShipToPostalCode;
+						var city:String  = account.PrimaryShipToCity;
+						if(StringUtils.isEmpty(address) && StringUtils.isEmpty(code) && StringUtils.isEmpty(city)) {
+							address = account.PrimaryBillToStreetAddress;
+							code = account.PrimaryBillToPostalCode;
+							city = account.PrimaryBillToCity;
+						}
+						account.Color = mapColorAccount[account.AccountId];
+						account.address = GUIUtils.getAddress(Database.accountDao.entity,account);//StringUtil.trim((address ? address + ' ' : '') + (code ? code + ' ' : '') + (city ? city : ''));
+						activity.address = account.address;
+						itemsAcount.push(account);
+						if(!StringUtils.isEmpty(address) || !StringUtils.isEmpty(code) || !StringUtils.isEmpty(city)){
+							
+							if(markerLetter.length > 0) {
+								activity.mark = markerLetter.shift();
+							}
+						}
+					}
+				}
+				*/
+				/*
+				var childObj:DisplayObject = GUIUtils.getMapTravelComponet("Account", itemsAcount,false);
+				if(childObj){
+					(childObj as HTML).addEventListener(Event.COMPLETE, function(e:Event):void {
+						loadBtn.visible = false;
+						loadBtn.includeInLayout = false;
+					});
+					(childObj as HTML).addEventListener(MapEvent.MAP_READY, function(event:MapEvent):void {
+						var oMap:Object = event;
+					});
+					loadBtn.start();
+					loadBtn.label = i18n._("LOADING@Loading");
+					loadBtn.visible = true;
+					loadBtn.includeInLayout = true;
+					(childObj as HTML).percentWidth = 100;
+					childObj.height = 175;
+					imap.addChild(childObj);
+				}else {
+					if(markerLetter.length == 26) {
+						loadBtn.label = "";
+						loadBtn.visible = false;
+						loadBtn.includeInLayout = false;
+					}
+				}
+				imap.addChild(loadBtn);
+				*/
+				grid.dataProvider = listActivities;
+//				gridCallList.dataProvider = Database.contactDao.findByListOracleId(listContactId);
+				
+				
+			}
+			private var index:int = 1;
+			private var mapAccount:Object = null;
+			private function drawingMap(listObject:ArrayCollection):void {
+				var existAddress:Object = new Object();
+				mapAccount = new Object();
+				index = 1;
+//				removeChildMap();
+				map.visible = false;
+				
+				// first marker
+				getLocationAddress(listObject,0);
+				
+				
+			}
+			private function reloadAndSelectFristContact(listAccContact:ArrayCollection):void{
+				gridCallList.dataProvider = listAccContact;
+				if(listAccContact != null && listAccContact.length>0){
+					gridCallList.selectedIndex = 0;
+					onGridContactClick();
+				}
+				gridCallList.validateNow();
+			}
+			private function getLocationAddress(listObject:ArrayCollection,next:int):void{
+				if(listObject != null && next < listObject.length){
+					var obj:Object = listObject[next];
+					if(StringUtils.isEmpty(obj.GoogleAddress)){
+						getLocationAddress(listObject,next+1);
+					}else{
+						var url:String = "http://maps.googleapis.com/maps/api/geocode/json?address=" + encodeURI(obj.GoogleAddress) + "&sensor=false";
+						var service:HTTPService = new HTTPService();
+						service.url = url;
+						service.addEventListener(ResultEvent.RESULT, function onComplete(event:ResultEvent):void{
+							
+							onGetGeometryComplete(event,obj);
+							getLocationAddress(listObject,next+1);
+							
+						});
+						service.send();
+					}
+					
+				}else{
+					reloadAndSelectFristContact(listObject);
+				}
+				
+			}
+			private function onGetGeometryComplete(event:ResultEvent,obj:Object):void {
+				try {
+					var json:Object = JSON.decode(event.result as String);
+					trace("url request center point status:" + json.status);
+					trace(json.toString());
+					if(json.status == "OK"){
+						var geometry:Object = json.results[0].geometry;
+						var location:Object = geometry.location;
+						var address:String =  json.results[0].formatted_address;
+						var southWest:Object = geometry.viewport.southwest;
+						var ne:Object = geometry.viewport.northeast;
+						var lngSpan:Number = ne.lng - southWest.lng;
+						var latSpan:Number = ne.lat - southWest.lat;
+						var latlng:LatLng = new LatLng(southWest.lat + latSpan * Math.random(),
+							southWest.lng + lngSpan * Math.random());
+						//var latlng:LatLng = new LatLng(location.lat ,location.lng);
+
+						map.addOverlay(createMarker(latlng,address,obj));
+						index = index + 1;
+						map.visible = true;
+						//						var region:String = json.results[0].address_components[0].short_name;
+						//getAddress(new Point(location.lat,location.lng), new Point(sw.lat,sw.lng), new Point(ne.lat,ne.lng));
+					}
+				} catch(ignored:Error) {
+					trace(ignored);
+					
+				}
+			}
+			private function removeChildMap():void{
+			//map.clearOverlays();
+			
+				var listMaker:ArrayCollection = gridCallList.dataProvider as ArrayCollection;
+				if(listMaker != null && listMaker.length>0){
+					for each(var obj:Object in listMaker){
+						if(obj.Marker != null){
+							map.removeOverlay(obj.Marker);
+						}
+					}
+				}
+				
+			}
+			private function createMarker(latlng:LatLng,address:String,obj:Object):Marker {
+			
+				var color:Object = obj.Color;
+				
+				var markerOptions:MarkerOptions = new MarkerOptions({
+//					strokeStyle: new StrokeStyle({color: "#000000"}),
+					fillStyle: new FillStyle({color: color, alpha: 1.0}),
+					radius: 12,
+					hasShadow: false
+				});
+				markerOptions.label = index.toString();
+				
+			
+				var marker:Marker = new Marker(latlng,markerOptions);
+				obj.MarkPoint = index.toString();
+				obj.Marker = marker;
+				obj.ContentMarker = address;
+				if(index ==1){
+					map.setCenter(marker.getLatLng());
+				}
+				
+				marker.addEventListener(MapMouseEvent.CLICK, function(e:MapMouseEvent):void {
+					openContentMarker(marker,address);
+				});
+				return marker;
+			}
+			
+			private function openContentMarker(marker:Marker,content:String):void{
+				if(marker != null){
+					marker.openInfoWindow(new InfoWindowOptions({titleHTML: "", contentHTML: content,hasShadow:false,labelFormat: { size: 12} }));
+				}else{
+					var mak:Object = map.wrapper
+					if(mak !=null) mak.closeInfoWindow();
+				}
+				
+					
+			}
+			private function initGridColumns():void{
+				var columns:ArrayCollection = new ArrayCollection();
+				
+				var fields:ArrayCollection = Database.columnsLayoutDao.getColumnLayout("Activity", "-1");
+				
+				if(fields == null || fields.length < 1){
+					return;
+				}
+				for each (var field:Object in fields ){						
+					var obj:Object = FieldUtils.getField(field.entity, field.element_name);
+					if(obj==null) {
+						obj = FieldUtils.getField(field.entity, field.element_name, false, true); // read custom field
+					}
+					if (obj) {
+						
+						//	var child:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+						//	child.headerText = obj.display_name;
+						//	child.dataField = obj.element_name;
+						columns.addItem(List.createColumn(field,function(item:Object,col:AdvancedDataGridColumn):String{
+							return List.displayDataTime(item,col,list.entity);
+						},function(item:Object,col:AdvancedDataGridColumn):String{
+							return List.displayPicklistValue(item,col,list.entity);
+						}));
+					}
+					
+				}
+				grid.columns = columns.source;
+			}
+			private function getStartTimeEndTime():String{
+				var date:Date = new Date();
+				var starDate:Date = new Date();
+				
+				starDate.setHours(0, 0, 1);
+//				var object:Object = new Object();
+//				object.StartTime = DateUtils.format(date, DateUtils.DATABASE_DATETIME_FORMAT);
+				
+				var endDate:Date = new Date();
+				var isLowerStarDate:Boolean = false;
+				if(chk30.selected){
+					endDate.setDate(date.getDate() - lowerDays);
+					isLowerStarDate = true;
+				} 
+				if(chk60.selected){
+					if(!isLowerStarDate){
+						starDate.setDate( date.getDate() - ( lowerDays + 1 ) );
+						isLowerStarDate = true;
+					}
+					endDate = new Date();
+					endDate.setDate(date.getDate() - greaterDays);
+				}
+					
+				
+				if(chk120.selected){
+					if(isLowerStarDate){
+						endDate = starDate;
+					}else{
+						endDate.setDate(date.getDate() - greaterDays);
+					}
+					
+				}
+				
+				// - m data in the past
+//				endDate.setMonth(date.getMonth() - m);
+				endDate.setHours(23, 59, 59);
+				var str:String = "";
+				if(chk120.selected){
+					// > 120 days
+					str = "((act.StartTime < '" +DateUtils.format(endDate, DateUtils.DATABASE_DATETIME_FORMAT)+ "') Or " + "(act.DueDate < '" +DateUtils.format(endDate, DateUtils.DATABASE_DATETIME_FORMAT)+ "'))";
+				}else{
+					str = "((act.StartTime > '" +DateUtils.format(endDate, DateUtils.DATABASE_DATETIME_FORMAT)+ "' and act.StartTime < '" +DateUtils.format(starDate, DateUtils.DATABASE_DATETIME_FORMAT)+"')";
+					str = str + " Or (act.DueDate > '" +DateUtils.format(endDate, DateUtils.DATABASE_DATETIME_FORMAT)+ "' and act.DueDate < '" +DateUtils.format(starDate, DateUtils.DATABASE_DATETIME_FORMAT)+"'))";
+				}
+				
+				
+//				object.EndTime = DateUtils.format(endDate, DateUtils.DATABASE_DATETIME_FORMAT);
+				 //str = "(act.StartTime >= '" +DateUtils.format(endDate, DateUtils.DATABASE_DATETIME_FORMAT)+ "' and act.StartTime <= '" +DateUtils.format(starDate, DateUtils.DATABASE_DATETIME_FORMAT)+"')";
+				return str;
+			}
+			
+			
+			private function selectAllCheckbox(vbox:VBox,isCheck:Boolean):void{
+				if(vbox != null){
+					for each (var chk:CheckBox in vbox.getChildren()){
+						chk.selected = isCheck;
+					}
+				}
+			}
+			private function onSelectAllLocation():void{
+				selectAllCheckbox(locationGroup,chkSelectAllLocation.selected);
+			}
+			private function onSelectAllTask():void{
+				selectAllCheckbox(taskGroup,chkSelectAllTask.selected);
+			}
+			private function onSelectAllFragment():void{
+				selectAllCheckbox(segmentGroup,chkSelectAllFragment.selected);
+			}
+			private function onGridClick():void{
+				var item:Object = grid.selectedItem;
+				initForm(item);
+			}
+			private function initForm(object:Object):void{
+					var form:Form = new Form();
+					// 
+					var formItem:FormItem = new FormItem();
+					formItem.label = "Subject";
+					var columnValue:Label = new Label();
+					columnValue.setStyle("color", "blue");
+					columnValue.text = object ==null?"": object['Subject'];
+					formItem.addChild(columnValue);
+					form.addChild(formItem);
+				
+					formItem = new FormItem();
+					formItem.label = "Account";
+					columnValue = new Label();
+					columnValue.setStyle("color", "blue");
+					columnValue.text = object ==null?"": object['AccountName'];
+					formItem.addChild(columnValue);
+					form.addChild(formItem);
+					
+					formItem = new FormItem();
+					formItem.label = "Due Date";
+					columnValue = new Label();
+					columnValue.setStyle("color", "blue");
+					columnValue.text =object ==null?"": object['DueDate'];
+					formItem.addChild(columnValue);
+					form.addChild(formItem);
+					
+					formItem = new FormItem();
+					formItem.label = "Contact";
+					columnValue = new Label();
+					columnValue.setStyle("color", "blue");
+					columnValue.text =object ==null?"": object['PrimaryContact'];
+					formItem.addChild(columnValue);
+					form.addChild(formItem);
+					
+					detailPanel.removeAllChildren();
+					detailPanel.addChild(form);
+				
+			}
+			private var selectedItem:Object = new Object();
+			private function onGridContactClick():void{
+				selectedItem = gridCallList.selectedItem;
+				
+				if(selectedItem == null){
+					return;
+				}
+				var listActAccount:ArrayCollection = new ArrayCollection();
+				if(listActivities != null && listActivities.length>0){
+					for each (var obj:Object in listActivities){
+						if(selectedItem != null && (selectedItem.AccountId == obj.AccountId || selectedItem.ContactId == obj.PrimaryContactId)){
+							listActAccount.addItem(obj);
+						}
+					}
+				}
+				//var cri:String = " act.PrimaryContactId ='" + conId+ "' And act.Status !='Completed' And " +  getStartTimeEndTime();
+				grid.dataProvider = listActAccount;
+				initForm(null);
+				openContentMarker(selectedItem.Marker,selectedItem.ContentMarker);
+				
+			
+			}
+			
+			public function onButtonClick(name:String):void{
+				var obj:Object = gridCallList.selectedItem;
+				var item:Object = new Object();
+				item.Activity ="Appointment";
+				item.PrimaryContact = obj.PrimaryContact ;
+				item.AccountName = obj.AccountName ;
+				var type:int = 1;
+				item.gadget_type ="Activity";
+				item.CallType = "General";
+				if('C' == name){
+					item.CallType = "Account Call";
+					item.Type="Call";
+					type = 2;
+				}else if('E' == name){
+					item.Type="Email";
+				}else if('M' == name){
+					item.Type="Meeting";
+				}
+				list.openScreenCreate(item, type,null,null);
+			}
+
+			
+			private function onMapReady(event:MapEvent):void {
+				var myMapOptions:MapOptions = new MapOptions();
+				myMapOptions.zoom = 14;
+				myMapOptions.center = new LatLng(40.736072,-73.992062);
+				myMapOptions.mapType = MapType.NORMAL_MAP_TYPE;
+				//map.addControl(new ZoomControl());
+				
+				map.enableScrollWheelZoom();
+				map.setInitOptions(myMapOptions);
+				
+			}
+			
+			
+			public function saveSetting():void{
+				if(stepperLowerDays.value > stepperGreaterDays.value){
+					Alert.show(i18n._('GLOBAL_MESSAGE_GREEN_MUST_BE_LESS_THAN_RED'), "", Alert.OK, this);
+				}else{
+					
+					Database.preferencesDao.setValue(PreferencesDAO.VISIT_CUSTOMER_LOWER_DAYS,stepperLowerDays.value);
+					Database.preferencesDao.setValue(PreferencesDAO.VISIT_CUSTOMER_GREATER_DAYS,stepperGreaterDays.value);
+					refreshVisitCusDays(false);
+				}
+			}
+			
+			public function refreshVisitCusDays(isInit:Boolean):void{
+				greaterDays = Database.preferencesDao.getIntValue(PreferencesDAO.VISIT_CUSTOMER_GREATER_DAYS);
+				lowerDays =  Database.preferencesDao.getIntValue(PreferencesDAO.VISIT_CUSTOMER_LOWER_DAYS);
+				if(isInit){
+					stepperGreaterDays.value = greaterDays;
+					stepperLowerDays.value = lowerDays;
+				}
+				
+				lblGreen.text = i18n._('GLOBAL_LESS_THAN') + ' ' + lowerDays + ' '+ i18n._('GLOBAL_DAYS');
+				lblYellowDays.text =  ( lowerDays + 1 ) + ' - ' +   greaterDays+ ' '+ i18n._('GLOBAL_DAYS');
+				lblRed.text = i18n._('GLOBAL_GREATER_THAN') + ' ' + greaterDays + ' '+ i18n._('GLOBAL_DAYS');
+				
+			}
+
+			
+			private function onRefreshClick():void{
+				//createMap();
+				map.clearOverlays();
+				reloadData();
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="1010" height="600" right="0" bottom="0">
+		<mx:Canvas top="06" left="8" right="8" bottom="8" horizontalScrollPolicy="off">
+			<mx:HBox width="100%" height="100%">
+				<mx:VBox width="190" height="100%" >
+					<mx:HBox horizontalAlign="center" backgroundColor="#F2F2F2" borderColor="1" width="100%">
+						<mx:Label text="Filters" fontWeight="bold" />
+					</mx:HBox>
+					<mx:Label text="Location Group" fontWeight="bold"/>
+					<mx:CheckBox  paddingLeft="5" id="chkSelectAllLocation" change="onSelectAllLocation()" label="Select All" />
+
+					<mx:VBox id="locationGroup"  horizontalScrollPolicy="off" paddingLeft="5" height="70" width="190">
+
+					
+					</mx:VBox>
+					
+					<mx:Label text="Task Group" fontWeight="bold"/>
+					<mx:CheckBox  paddingLeft="5" id="chkSelectAllTask" change="onSelectAllTask()" label="Select All" />
+
+					<mx:VBox id="taskGroup" paddingLeft="5" height="75" horizontalScrollPolicy="off" width="190">
+
+					</mx:VBox>
+					<mx:Label text="Segment Group" fontWeight="bold" />
+					<mx:CheckBox  paddingLeft="5" id="chkSelectAllFragment" change="onSelectAllFragment()" label="Select All" />
+
+					<mx:VBox id="segmentGroup" paddingLeft="5" horizontalScrollPolicy="off" height="50" width="190">
+
+						<mx:CheckBox label="A" />
+						<mx:CheckBox label="B" />
+					</mx:VBox>
+					<mx:Label text="Setting" fontWeight="bold" />
+					<mx:VBox width="100%" height="100%" horizontalAlign="center">
+						<mx:HBox backgroundColor="#00CC00" width="100%" verticalAlign="middle">
+							<mx:Label text='&lt;' fontSize="10" fontWeight="bold"/>
+							<mx:NumericStepper width="50"  maximum="200" minimum="0" id="stepperLowerDays"/>
+							<mx:Label text='day(s)' fontSize="10" fontWeight="bold"/>
+						</mx:HBox>
+						<mx:HBox backgroundColor="#FF0000" width="100%" verticalAlign="middle">
+							<mx:Label text='&gt;' fontSize="10" fontWeight="bold"/>
+							<mx:NumericStepper width="50"  maximum="200" minimum="0" id="stepperGreaterDays"/>
+							<mx:Label text='day(s)' fontSize="10" fontWeight="bold"/>
+						</mx:HBox>
+						<mx:Button label="Save" click="saveSetting()"/>
+					</mx:VBox>
+				</mx:VBox>	
+
+					<mx:VBox width="100%" height="100%" bottom="8">
+						
+						<mx:Canvas width="100%" height="180">
+							<control:CustomLinkButton id="loadBtn" icon="{ImageUtils.synOkIcon}" label="{i18n._('LOADING@Loading')}" 
+													  visible="false" includeInLayout="false" />
+								<mx:Canvas id="imap" width="100%" height="180">
+									<!--<maps:Map width="100%" height="100%" mapevent_mapready="onMapReady(event)" maintainProjectionCenter="true"  key="ABQIAAAADLVFWzMFYMu28dkOxNfgART-y38ddP0OAp0wGY0-KVK-F9BaeBTlJb_TNeDzXn7pdnOV1YkAG5Qthw" id="map" sensor="true"/>
+									-->
+								</mx:Canvas>
+						</mx:Canvas>
+						<mx:HBox width="100%">
+							
+							<mx:HBox horizontalAlign="center"  verticalAlign="middle" backgroundColor="#00CC00"  height="20" width="120" >
+								<mx:CheckBox selected="true" id="chk30" enabled="true" />
+								<mx:Label id="lblGreen" text="{i18n._('GLOBAL_LESS_THAN') + ' ' + lowerDays + ' '+ i18n._('GLOBAL_DAYS')}"  fontWeight="bold"  />
+							</mx:HBox>
+							<mx:HBox horizontalAlign="center" verticalAlign="middle" backgroundColor="#F7FE2E"  height="20" width="120" paddingBottom="0" top="65">
+								<mx:CheckBox id="chk60" selected="false" enabled="true" />
+								<mx:Label  id="lblYellowDays" text="{ lowerDays + ' - ' + greaterDays + ' '+ i18n._('GLOBAL_DAYS')}" fontWeight="bold"/>
+							</mx:HBox>
+							<mx:HBox horizontalAlign="center" verticalAlign="middle" backgroundColor="#FF0000"  height="20" width="120" paddingBottom="0" top="65">
+								<mx:CheckBox id="chk120" selected="false" enabled="true" />
+								<mx:Label id="lblRed" text="{i18n._('GLOBAL_GREATER_THAN') + ' ' + greaterDays + ' '+ i18n._('GLOBAL_DAYS')}" fontWeight="bold" />
+							</mx:HBox>
+							<mx:HBox verticalAlign="middle" >
+								<mx:LinkButton icon="{refresh}" toolTip="Refresh Data" click="onRefreshClick()"  />
+							</mx:HBox>
+							
+
+						</mx:HBox>
+						<mx:HBox width="100%" height="100%">
+							<mx:VBox height="100%" width="100%">
+								<mx:Label text="Call List" fontWeight="bold"/>
+								<mx:HBox width="100%" height="100%">
+									<mx:DataGrid id="gridCallList" click="onGridContactClick()" width="100%" height="100%">
+										<mx:columns>
+											<mx:DataGridColumn dataField="MarkPoint" headerText="Mark Point"/>
+											<mx:DataGridColumn dataField="AccountName" headerText="Account Name"/>
+											<mx:DataGridColumn dataField="ContactFirstName" headerText="First Name"/>
+											<mx:DataGridColumn dataField="ContactLastName" headerText="Last Name"/>
+											<mx:DataGridColumn dataField="ContactEmail" headerText="Email"/>
+											<mx:DataGridColumn dataField="CellularPhone" headerText="Phone"/>
+											<mx:DataGridColumn headerText="Action" textAlign="center" >
+												<mx:itemRenderer>
+													<mx:Component>
+														<mx:HBox horizontalAlign="center" width="130" horizontalScrollPolicy="off">
+															<mx:Button label="C" width="35" click="{outerDocument.onButtonClick('C')}" />
+															<mx:Button label="E" width="35" click="{outerDocument.onButtonClick('E')}" />
+															<mx:Button label="M" width="35" click="{outerDocument.onButtonClick('M')}" />
+														</mx:HBox>	
+													</mx:Component>
+												</mx:itemRenderer>
+											</mx:DataGridColumn>
+										</mx:columns>
+									</mx:DataGrid>
+									</mx:HBox>
+									<mx:HBox width="100%" height="100%">
+										<mx:AdvancedDataGrid click="onGridClick()" id="grid" width="60%" height="100%">
+											
+										</mx:AdvancedDataGrid>
+										
+										<mx:Panel id="detailPanel" label="Details" width="40%" height="100%">
+										</mx:Panel>
+									</mx:HBox>
+							</mx:VBox>
+							
+						</mx:HBox>
+					</mx:VBox>
+				
+					
+				
+			</mx:HBox>
+		</mx:Canvas>	
+	</mx:Canvas>
+</mx:Canvas>

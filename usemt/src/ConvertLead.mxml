@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window  xmlns:mx="http://www.adobe.com/2006/mxml"
+			xmlns:control="gadget.control.*"
+			resizable="false" height="570"
+			width="750" 
+			title="{i18n._('GLOBAL_CONVERTED_LEAD')}"
+			showFlexChrome="false" systemChrome="none" xmlns:form="gadget.form.*"
+			creationComplete="init()" xmlns:s="library://ns.adobe.com/flex/spark" xmlns:local="*">
+	
+
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.service.UserService;
+			import gadget.util.DateUtils;
+			import gadget.util.FieldUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.Relation;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			import mx.controls.DateField;
+			import mx.validators.Validator;
+			public var itemLead:Object;
+			public var itemAcc:Object = new Object();
+			public var itemCon:Object = new Object();
+			public var itemOpp:Object= new Object();
+			//public var finderClick:Function;
+			private var item:Object =new Object();
+			private var contact:String ;
+			private var account:String ;
+			private var opportunity:String;
+			private var validators:Array = [];
+			private var fields:Array=['AccountName','ContactFirstName','ContactLastName','OpportunityName','Revenue'];
+			private var entitys:Array=['Account','Contact','Contact','Opportunity','Opportunity'];
+			private var childObjs:Array = new Array();
+			private function init():void{
+				
+				account = Database.accountDao.entity;
+				contact = Database.contactDao.entity;
+				opportunity = Database.opportunityDao.entity;
+				item = itemLead;
+				txtAcc.addChild(bindItemFinder('Lead','Company','AccountName',item));
+				txtCon.addChild(bindItemFinder('Lead','ContactFullName','ContactFullName',item));
+				txtFirstName.text = item.LeadFirstName;
+				txtLastName.text = item.LeadLastName;
+				txtCloseDate.addChild(GUIUtils.getDateControl('CloseDate',itemOpp,false,false));
+				if(itemLead.Source != null){
+					switch(itemLead.Source){
+						case "Company":
+							txtAccName.text = itemLead.IndexedPick0 + " - " +itemLead.IndexedPick1;
+							txtOpp.text = itemLead.IndexedPick2+"("+ itemLead.LeadFirstName +" "+itemLead.LeadLastName+")";
+							break;
+						case "Contact Person":
+							txtAccName.text = itemLead.CustomPickList0 + " - " +itemLead.CustomPickList1;
+							txtOpp.text = itemLead.CustomPickList2+"("+ itemLead.ContactFirstName +" "+itemLead.LeadLastName+")";
+							break;
+						case "Opportunity":
+							txtAccName.text = itemLead.IndexedPick3 + " - " +itemLead.IndexedPick4;
+							txtOpp.text = itemLead.IndexedPick5+" ("+ itemLead.LeadFirstName +" "+itemLead.LeadLastName+")";
+							
+							break;
+					}
+				}
+				optCreateOpp.selected = true;
+				if(item.AccountId != null){
+					optExistingAcc.selected = true;
+				}else{
+					optAutoCreateAcc.selected = true;
+				}
+				if(item.ContactId){
+					optExistingCon.selected = true;
+				}else{
+					optCreateCon.selected = true;
+				}
+				txtDesc.text = itemLead.Description;
+				
+		        //childObjs.push(((txtAcc.getChildAt(0) as HBox).getChildAt(0) as Canvas).getChildAt(0) as TextInput);
+				childObjs.push(txtAccName);
+			
+			    //	childObjs.push(txtCon.getChildAt(0) as ImageTextInput);
+				childObjs.push(txtFirstName);
+				childObjs.push(txtLastName);
+				childObjs.push(txtOpp);
+				childObjs.push(txtRevenue);
+				
+					
+			}
+			private function validationFields():void{
+				
+				for(var i:int = 0 ;i<fields.length;i++){
+					var fieldInfo:Object = FieldUtils.getField(entitys[i], fields[i]);
+					if(childObjs[i].id == "txtAccName" && optAutoCreateAcc.selected){
+						validators = validators.concat(FieldUtils.getValidators(fieldInfo, childObjs[i]));
+					}else if((childObjs[i].id == "txtFirstName" ||  childObjs[i].id == "txtLastName") && optCreateCon.selected){
+						validators = validators.concat(FieldUtils.getValidators(fieldInfo, childObjs[i]));
+					}else if(childObjs[i].id == "txtRevenue"){
+						validators = validators.concat(FieldUtils.getValidators(fieldInfo, childObjs[i]));
+					}
+					
+					
+				}
+			}
+			private function commit():void{
+				var oidName:String 
+				validators = new Array();
+				validationFields();
+				var validatorErrorArray:Array = Validator.validateAll(validators);
+				if (validatorErrorArray.length != 0) {
+					var errorMessageArray:Array = [];
+					for each (var err:Object in validatorErrorArray) {
+						var errField:String = ''; 
+						if (err.currentTarget) {
+							var parent:DisplayObject = err.currentTarget.source.parent; 
+							if(parent is FormItem){
+								errField = (parent as FormItem).label + " : ";
+							}else if(parent.parent is FormItem){
+								errField = (parent.parent as FormItem).label + " : ";
+							} 
+						}
+						if(err.currentTarget.source.id == "txtAccName" && optAutoCreateAcc.selected){
+							errorMessageArray.push(errField + Utils.getTranslatedValidation(err.message));
+						}else if((err.currentTarget.source.id == "txtFirstName" ||  err.currentTarget.source.id == "txtLastName") && optCreateCon.selected){
+							errorMessageArray.push(errField + Utils.getTranslatedValidation(err.message));
+						}else if(err.currentTarget.source.id == "txtRevenue"){
+							errorMessageArray.push(errField + Utils.getTranslatedValidation(err.message));	
+						}
+						
+					}
+					
+					Alert.show(errorMessageArray.join("\n"), i18n._('GLOBAL_INVALID_FORM'), Alert.OK, this);
+					return ;
+				}
+				
+				if(!optNotConvertAcc.selected){
+					if(!optExistingAcc.selected && !optExistingCon.selected){
+						//insert account
+						oidName = DAOUtils.getOracleId(account);
+						itemAcc.AccountName = txtAccName.text;
+						Database.accountDao.insert(itemAcc);
+						itemAcc = Database.getDao(account).selectLastRecord()[0];
+						itemAcc[oidName] = "#" + itemAcc.gadget_id;
+						Database.getDao(account).update(itemAcc);
+						
+						//insert contact
+						oidName = DAOUtils.getOracleId(contact);
+						itemCon.ContactFirstName = txtFirstName.text;
+						itemCon.ContactLastName = txtLastName.text;
+						itemCon.ContactFullName =  txtFirstName.text + " "+ txtLastName.text ;
+						Database.contactDao.insert(itemCon);
+						itemCon = Database.getDao("Contact").selectLastRecord()[0];
+						oidName = DAOUtils.getOracleId(contact);
+						
+						itemCon[oidName] = "#" + itemCon.gadget_id;
+						Database.getDao(contact).update(itemCon);
+						
+						joinObject(itemAcc,itemCon,account,'PrimaryContactFullName');
+						joinObject(itemCon,itemAcc,contact,'AccountName');
+						
+						Database.getDao(account).update(itemAcc);	
+						Database.getDao("Contact").update(itemCon);
+					}else if(optExistingAcc.selected && !optExistingCon.selected){
+						itemAcc = Database.accountDao.getAccountById(item.AccountId);
+						//insert contact
+						oidName = DAOUtils.getOracleId(contact);
+						itemCon.ContactFirstName = txtFirstName.text;
+						itemCon.ContactLastName = txtFirstName.text;
+						itemCon.ContactFullName =  txtFirstName.text + " "+ txtLastName.text ;
+						Database.contactDao.insert(itemCon);
+						itemCon = Database.getDao(contact).selectLastRecord()[0];
+						itemCon[oidName] = "#" + itemCon.gadget_id;
+						Database.getDao(contact).update(itemCon);
+						
+						
+						joinObject(itemCon,itemAcc,contact,'AccountName');
+						joinObject(itemAcc,itemCon,account,'PrimaryContactFullName');
+						
+						Database.getDao(account).update(itemAcc);	
+						Database.getDao(contact).update(itemCon);
+						
+					}else if(!optExistingAcc.selected && optExistingCon.selected){
+						itemCon = Database.contactDao.getContactById(item.ContactId);
+						//insert account
+						oidName = DAOUtils.getOracleId(account);
+						itemAcc.AccountName = txtAccName.text;
+						Database.accountDao.insert(itemAcc);
+						itemAcc = Database.getDao(account).selectLastRecord()[0];
+						itemAcc[oidName] = "#" + itemAcc.gadget_id;
+						Database.getDao(account).update(itemAcc);
+						
+						joinObject(itemCon,itemAcc,contact,'AccountName');
+						joinObject(itemAcc,itemCon,account,'PrimaryContactFullName');
+						
+						Database.getDao(account).update(itemAcc);	
+						Database.getDao(contact).update(itemCon);
+						
+					}
+					if(!optNotConvertOpp.selected){
+						//insert opportunity
+						if(!optNotConvertAcc.selected){
+							itemOpp.AccountName = itemAcc.AccountName;
+							itemOpp.AccountId = itemAcc.AccountId;
+						}
+						oidName = DAOUtils.getOracleId(opportunity);
+						itemOpp.KeyContactId = itemCon.ContactId;
+						itemOpp.KeyContactLastName = itemCon.ContactLastName;
+						itemOpp.OpportunityName = txtOpp.text;
+						itemOpp.CloseDate = getDateValue(txtCloseDate);
+						itemOpp.NextStep = txtNextStep.text;
+						itemOpp.Description = txtDesc.text;
+						if(UserService.SIEMEN==UserService.getCustomerId()){
+							itemOpp.SalesStage = '0 Lead Management';
+						}else if(UserService.DIVERSEY==UserService.getCustomerId()){
+							itemOpp.SalesStage = '1 - Identify';
+						}else if(UserService.VETOQUINOL==UserService.getCustomerId()){
+							itemOpp.SalesStage = 'Qualified Lead';
+						}
+						Database.opportunityDao.insert(itemOpp);
+						itemOpp = Database.getDao(opportunity).selectLastRecord()[0];
+						itemOpp[oidName] = "#" + itemOpp.gadget_id;
+						Database.getDao(opportunity).update(itemOpp);
+							
+					}
+				}
+				this.close();
+			}
+			private function joinObject(source:Object,dest:Object,entity:String,id:String):void {
+				var relation:Object =  Relation.getFieldRelation(entity, id);
+				var other:Object = Database.getDao(relation.entityDest).findByGadgetId(dest.gadget_id);
+				source[relation.keySrc] = other[relation.keyDest];
+				for(var i:int=0; i<relation.labelDest.length; i++){
+					source[relation.labelSrc[i]] = other[relation.labelDest[i]];
+				}
+							
+			}
+			private function getDateValue(component:HBox):String{
+				var dateControl:DateField = (component.getChildAt(0) as HBox).getChildAt(0) as DateField;
+				var value:String=null;
+				if (dateControl.text != '') {
+					var selectedDate:Date = dateControl.selectedDate;
+					value = DateUtils.format(selectedDate, DateUtils.DATABASE_DATE_FORMAT);
+				}
+				return value;
+			}
+			private function bindItemFinder(entity:String,element_name:String,id:String,item:Object):DisplayObject{
+				return GUIUtils.getItemFinderControl(referenceClick,entity,element_name,id,false,item);
+			}
+			private function referenceClick(event:MouseEvent):void {
+				
+				var itemFinder:ItemFinder = new ItemFinder();
+				itemFinder.relation = (event.currentTarget as TextInput).data;
+				itemFinder.textInput = (event.currentTarget as TextInput);
+				itemFinder.item = item;
+				//itemFinder.reload = setModifiedAndReload;
+				WindowManager.openModal(itemFinder);
+			}
+			private function closeForm():void{
+				this.close();
+			}
+		]]>
+	</mx:Script>
+	<mx:Canvas width="100%" height="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off" styleName="main" left="0" top="0"  right="0" bottom="0">
+		<control:TitleBar id="titlebar" title="Converted Lead" y="2" x="25"/>
+		<mx:Canvas width="100%" height="100%" horizontalScrollPolicy="off"  left="20" top="50"  right="20" bottom="60" borderStyle="solid">
+			<mx:VBox id="mainForm" width="100%" height="100%" left="20" right="20" top="20" bottom="40">
+				<mx:VBox width="100%"  >
+					<mx:Label text="{i18n._('GLOBAL_COMPANY_ACCOUNT')}" textAlign="left"  fontSize="12" fontWeight="bold"/>
+					<mx:HRule width="100%"/>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label text="{i18n._('GLOBAL_DO_NOT_CONVERT_TO_COMPANY_ACCOUNT')}" textAlign="right" width="50%" />
+						<mx:RadioButton id="optNotConvertAcc" width="50%"  groupName="account"/>
+					</mx:HBox>	
+					
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label text="{i18n._('GLOBAL_USE_EXISTING_COMPANY_ACCOUNT')}" width="50%" textAlign="right"/>
+						<mx:RadioButton id="optExistingAcc" width="50%" groupName="account"/>
+					</mx:HBox>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label text="{i18n._('GLOBAL_ASSOCIATED_COMPANY_ACCOUNT')}" width="50%" textAlign="right"/>
+						<mx:HBox id="txtAcc" width="50%"/>
+					</mx:HBox>
+					
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label text="{i18n._('GLOBAL_AUTO_CREATE_NEW_COMPANY_ACCOUNT')}" width="50%" textAlign="right"/>
+						<mx:RadioButton id="optAutoCreateAcc" width="50%" groupName="account"/>
+					</mx:HBox>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label text="{i18n._('GLOBAL_COMPANY_ACCOUNT_NAME')}" width="50%" textAlign="right"/>
+						<mx:TextInput id="txtAccName" width="200"/>
+					</mx:HBox>
+				</mx:VBox>
+				<mx:VBox width="100%">
+					<mx:Label text="{i18n._('GLOBAL_CONTACT_PERSON')}" textAlign="left"  fontSize="12" fontWeight="bold"/>
+					<mx:HRule width="100%"/>
+						
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label text="{i18n._('GLOBAL_USE_EXISTING_CONTACT_PERSON')}" width="50%" textAlign="right"/>
+						<mx:RadioButton id="optExistingCon" width="50%" groupName="contact"/>
+					</mx:HBox>	
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label id="lblCon" text="{i18n._('GLOBAL_ASSOCIATED_CONTACT_PERSON')}" width="50%" textAlign="right"/>
+						<mx:HBox id="txtCon" width="50%"/>
+					</mx:HBox>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label text="{i18n._('GLOBAL_AUTO_CREATE_NEW_CONTACT_PERSON')}" width="50%" textAlign="right"/>
+						<mx:RadioButton id="optCreateCon" width="50%" groupName="contact"/>
+					</mx:HBox>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label id= "lblFirstName" text="{i18n._('GLOBAL_CONTACT_PERSON_FIRST_NAME')}" width="50%" textAlign="right"/>
+						<mx:TextInput id="txtFirstName" width="200"/>
+					</mx:HBox>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label id="lblLastName" text="{i18n._('GLOBAL_CONTACT_PERSON_LAST_NAME')}" width="50%" textAlign="right"/>
+						<mx:TextInput id="txtLastName" width="200"/>
+					</mx:HBox>
+				</mx:VBox>
+				<mx:VBox width="100%">
+					<mx:Label text="Opportunity" textAlign="left"  fontSize="12" fontWeight="bold"/>
+					<mx:HRule width="100%"/>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label text="{i18n._('GLOBAL_DO_NOT_CONVERT_TO_OPPORTUNITY')}" width="50%" textAlign="right"/>
+						<mx:RadioButton id="optNotConvertOpp" width="50%" groupName="opportunity"/>
+					</mx:HBox>	
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label text="{i18n._('GLOBAL_AUTO_CREATE_NEW_OPPORTUNITY')}" width="50%" textAlign="right"/>
+						<mx:RadioButton id="optCreateOpp" width="50%" groupName="opportunity"/>
+					</mx:HBox>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label id="lblOppName" text="{i18n._('GLOBAL_OPPORTUNITY_NAME')}" width="50%" textAlign="right"/>
+						<mx:TextInput id="txtOpp" width="50%"/>
+					</mx:HBox>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label id="lblRevenue" text="{i18n._('GLOBAL_REVENUE')}" width="50%" textAlign="right"/>
+						<mx:TextInput id="txtRevenue" width="200"/>
+					</mx:HBox>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label id="lblCloseDate" text="{i18n._('GLOBAL_CLOSE_DATE')}" width="50%" textAlign="right"/>
+						<mx:HBox id="txtCloseDate" width="200"/>
+					</mx:HBox>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label id="lblNextStep" text="{i18n._('GLOBAL_NEXT_STEP')}" width="50%" textAlign="right"/>
+						<mx:TextArea id="txtNextStep" height="50" width="300"/>
+					</mx:HBox>
+					<mx:HBox  width="100%" horizontalAlign="right">	
+						<mx:Label id="lblDesc" text="{i18n._('GLOBAL_DESCRIPTION')}" textAlign="right" width="50%"/>
+						<mx:TextArea id="txtDesc" height="50" width="300"/>
+					</mx:HBox>
+					<mx:HBox/>
+				</mx:VBox>
+			</mx:VBox>
+		
+			
+		</mx:Canvas>
+		<mx:HBox  width="100%" horizontalAlign="right" top="530" right="20">	
+			<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CANCEL')}" click="closeForm()" right="0" icon="{ImageUtils.cancelIcon}"/>
+			<mx:Button id="createNewBtn" label="{i18n._('GLOBAL_CREATE')}" click="commit()" right="0" icon="{ImageUtils.acceptIcon}"/>
+		</mx:HBox>	
+	</mx:Canvas>
+</mx:Window>

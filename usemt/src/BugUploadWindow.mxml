@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Window xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" width="600" height="450" xmlns:flexlib="http://code.google.com/p/flexlib/" skinClass="spark.skins.spark.SparkChromeWindowedApplicationSkin">
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import gadget.i18n.i18n;
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Platzieren Sie nichtvisuelle Elemente (z. B. Dienste, Wertobjekte) hier -->
+	</fx:Declarations>
+	<s:Button x="450" y="10" label="{i18n._('GLOBAL_SEND_BUG_REPORT')}" width="140" fontWeight="bold" chromeColor="#E69145" id="Send" click="Send_clickHandler(event)"/>
+	<s:Label x="10" y="10" height="21" width="432" verticalAlign="middle" text="{i18n._('GLOBAL_MESSAGE_TO_CRMGADGET2GO_SUPPORT')}:"/>
+	<s:HGroup x="154" y="174" width="289" height="21" verticalAlign="bottom" gap="8" paddingLeft="10">
+		<s:Label text="Log:" height="13" y="8"/>
+		<s:RadioButton label="{i18n._('GLOBAL_EXTENDED')}" selected="true" value="2"/>
+		<s:RadioButton label="{i18n._('GLOBAL_NORMAL')}" value="1"/>
+		<s:RadioButton label="{i18n._('GLOBAL_NONE')}" value="0"/>
+	</s:HGroup>
+	<s:Button x="10" y="174" label="{i18n._('GLOBAL_ATTACH_FILE')}" width="140" fontWeight="normal" enabled="false"/>
+	<s:ToggleButton x="451" y="174" label="{i18n._('GLOBAL_MORE_INFORMATION')}" width="139" selected="false" id="More" enabled="false"/>
+	<s:ToggleButton x="450" y="210" label="{i18n._('GLOBAL_DELETE')}" width="139" selected="false" enabled="false"/>
+	<flexlib:PromptingTextArea x="10" y="39" width="580" height="127" id="MessageText"/>
+	<s:TextArea x="10" y="239" height="151" width="580" editable="false" id="AttachmentPreview"/>
+	<s:Label x="10" y="210" text="{i18n._('GLOBAL_ATTACHMENT')}:" height="21" width="136" verticalAlign="middle"/>
+	<s:DropDownList x="154" y="211" width="289" id="AttachmentList"></s:DropDownList>
+	<mx:HRule x="10" y="398" width="580" id="Expanded" chromeColor="#FFFFFF"/>
+	<mx:ProgressBar x="10" y="199" labelPlacement="center" width="580" height="7" id="ProgressBar"/>
+</s:Window>

@@ -1,0 +1,1430 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	resizable="false"
+	width="880" height="500"
+	title="{i18n._('CALCULATEDFIELD_FORMULA_AND_EXPRESSION')}"
+	showFlexChrome="false" transparent="true" systemChrome="none" xmlns:form="gadget.form.*"
+	initialize="init()"
+	creationComplete="window1_creationCompleteHandler(event)"
+	
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.crmgadget.eval.Evaluator;
+			
+			import gadget.dao.BaseDAO;
+			import gadget.dao.BusinessPlanDAO;
+			import gadget.dao.CustomFieldDAO;
+			import gadget.dao.DAOUtils;
+			import gadget.dao.Database;
+			import gadget.dao.SupportDAO;
+			import gadget.i18n.i18n;
+			import gadget.service.LocaleService;
+			import gadget.service.PicklistService;
+			import gadget.util.CacheUtils;
+			import gadget.util.ImageUtils;
+			import gadget.util.ReadCSVPicklist;
+			import gadget.util.Relation;
+			import gadget.util.StringUtils;
+			import gadget.util.TreeUtil;
+			import gadget.util.Utils;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.FormItem;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.controls.TextArea;
+			import mx.controls.dataGridClasses.DataGridItemRenderer;
+			import mx.core.SpriteAsset;
+			import mx.events.CloseEvent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.MenuEvent;
+			import mx.utils.StringUtil;
+			import mx.validators.StringValidator;
+			import mx.validators.Validator;
+			
+			[Bindable] public static var imagesCombo:ArrayCollection = new ArrayCollection(
+				[ {icon:ImageUtils.green,label:" ",data:"'/assets/green.gif'"},
+					{icon:ImageUtils.blue,label:" ",data:"'/assets/blue.gif'"},
+					{icon:ImageUtils.red,label:" ",data:"'/assets/red.gif'"},
+					{icon:ImageUtils.yellow,label:" ",data:"'/assets/yellow.gif'"},
+					{icon:ImageUtils.orange,label:" ",data:"'/assets/orange.gif'"},
+					{icon:ImageUtils.purple,label:" ",data:"'/assets/purple.gif'"},
+					{icon:ImageUtils.gray,label:" ",data:"'/assets/gray.gif'"},
+					{icon:ImageUtils.black,label:" ",data:"'/assets/black.gif'"},
+					{icon:ImageUtils.white,label:" ",data:"'/assets/white.gif'"}
+					//			  	{icon:ImageUtils.thumb,label:" ",data:"'assets/thumb.gif'"},
+					//				{icon:ImageUtils.tick,label:" ",data:"'assets/tick.gif'"},
+					//				{icon:ImageUtils.question,label:" ",data:"'assets/question.gif'"},
+					//				{icon:ImageUtils.warning,label:" ",data:"'assets/warning.gif'"}
+				]);
+			
+			
+			
+			// select DISTINCT data_type from field order by data_type
+			private var fieldTyps:ArrayCollection = new ArrayCollection(
+				[ {label:" ", data:" "},
+					{label:"Formula", data:"Formula"},					
+					{label:"Picklist", data:"Picklist"},
+					{label:"Multi-Select Picklist", data:"Multi-Select Picklist"},
+					{label:"Related Picklist", data:"Related Picklist"},
+					{label:"Checkbox", data:"Checkbox"},
+					{label:"Currency", data:"Currency"},
+					{label:"Date", data:"Date"},
+					{label:"Date/Time", data:"Date/Time"},
+					{label:"Email", data:"Email"},
+					{label:"ID", data:"ID"},
+					{label:"Integer", data:"Integer"},
+					{label:"Number", data:"Number"},
+					{label:"Percent", data:"Percent"},
+					{label:"Phone", data:"Phone"},
+					{label:"Text (Long)", data:"Text (Long)"},
+					{label:"Text (Short)", data:"Text (Short)"},
+					{label:"Time", data:"Time"},
+					{label:"URL", data:"URL"},
+					{label:"Tree", data:"Tree"},
+					{label:"Sum", data:"Sum"}
+				]);
+			
+			[Bindable] public static var operatorData:ArrayCollection = new ArrayCollection(
+				[ {label:" ", data:" "},
+					{label:"+", data:"+"},{label:"-", data:"-"},{label:"&", data:"&"},{label:"/", data:"/"},
+					{label:"=", data:"="},
+					{label:"<", data:"<"},
+					{label:">", data:">"},
+					{label:"<=", data:"<="},
+					{label:">=", data:">="},
+					{label:"<>", data:"<>"},{label:"LIKE", data:"LIKE"},
+					{label:"OR", data:"OR"},{label:"AND", data:"AND"},{label:"NOT", data:"NOT"}
+				]);
+			
+			
+			[Bindable] public static var functionsData:ArrayCollection = new ArrayCollection(
+				[ {label:"", data:""},
+					// STRING_FUNCTION
+					{label:"Left", data:"Left( text, integer )",desc:"Returns the leftmost n characters in the text string or field. For example, Left ('Adams', 2) returns 'Ad.'"}, // 
+					{label:"Len", data:"Len( text )",desc:"Returns the length of a string or string variable. The number of characters is specified between parentheses."}, //
+					{label:"Mid", data:"Mid(text, start_num, num_chars )",desc:"Returns character from the middle of a text string, given a starting position and length"},
+					{label:"Right", data:"Right( text, integer )",desc:"Returns the rightmost n characters in the text string or field. For example, Right ('Adams', 2) returns 'ms'."},  // 
+					{label:"Preference", data:"Preference ( 'pref_name' )",desc:"Returns the value for preference name specified."}, // 
+					{label:"ToChar", data:"ToChar( [field_name], 'format' )",desc:"Converts a specified date or numeric expression to a formatted string. /n Ex: ToChar (10.2345, '##.##') returns 10.23"}, // 
+					
+					//
+					{label:"FieldValue", data:"FieldValue( 'text' )",desc:"Returns the value of a field as a string."},
+					{label:"UserValue", data:"UserValue( 'text' )",desc:"Access user specific values like language or login id"},  // 
+					{label:"Concat", data:"CONCAT( text1,text2 )",desc:""},
+					{label:"IIf", data:"IIf ( testExpr, expr1, expr2 )",desc:"If testExpr is TRUE, returns the value of expr1; otherwise returns the value of expr2. It should be possible to combine IF-Statements."}, //  
+					{label:"IfNull", data:"IfNull ( expr1, expr2 ) ",desc:"Returns the value of expr1 unless expr1 is NULL, in which case the value of expr2 is returned."}, //
+					{label:"LookupValue", data:"LookupValue (type, lang_ind_code)",desc:"Returns a specified picklist value that is translated into the currently active language."},
+					{label:"LookupName", data:"LookupName(type, lang_ind_code)",desc:"Finds a row in the List of Values table. \n returns the untranslated value (the language independent code) of the display value in the specified List of Values."},
+					{label:"Timestamp", data:"Timestamp()",desc:"Returns the server date and time converted to the current user's time zone setting. For example, if the current user's time zone setting is set to Eastern Daylight Time (EDT) -0400 UTC, the Timestamp function converts the server time to EDT. The TimeStamp function performs UTC (universal time code) conversion."},
+					{label:"Today", data:"Today()",desc:"Returns today's date based on the current user's time zone setting."},  // 
+					{label:"OrganisationName", data:"OrganisationName()",desc:"Returns the organization name of the signed-in user."},
+					{label:"Locale", data:"Locale()",desc:"Returns the locale code that is associated user."}, // 
+					{label:"JoinFieldValue", data:"JoinFieldValue (ref_record_type, foreign_key, field_name)",desc:"Returns the value of a joined field when the referenced record type and the related foreign key fields are specified in the function."},
+					{label:"FindOneOf", data:"FindOneOf(string1, string2)",desc:"Returns the position of the first instance in the first argument (string1) of a character in the second argument (string2)."},
+					{label:"FindNoneOf", data:"FindNoneOf(string1, string2)",desc:"Returns the position of the first instance in the first argument (string1) that does not match any character in the second argument (string2)."},
+					{label:"SQLListCount", data:"SQLListCount()",desc:"Count record in sql list result."},
+					{label:"Image", data:"Image()",desc:"display image."}
+					// IIf(UserValue<Language>=“DE“, Description1, IIf(UserValue<Language>=“UK“, Description2, „not translated“))
+					
+					
+				]);
+			
+			[Embed(source='/assets/delete.png')] [Bindable] public var deleteIcon:Class;
+			[Embed(source='/assets/add.png')] [Bindable] public var addIcon:Class;
+			
+			[Bindable] private var pickListDescription:String = i18n._("CALCULATEDFIELD_PLEASE_ENTER_THE_LIST_OF_VALUES");
+			[Bindable] private var pickListDescription1:String = i18n._("CALCULATEDFIELD_DRAG_AND_DROP_ONE");
+			
+			[Bindable] private var entityFeildList:ArrayCollection = new ArrayCollection();
+			[Bindable] public var tempHeaderVal:String;
+			[Bindable] public var refreshGridEntity:Function;
+			[Bindable] public var dataField:Object;
+			[Bindable] public var isCustomField:Boolean = false;
+			[Bindable] public var isCreate:Boolean = true;
+			private var isPicklist:Boolean = false;
+			private var isBindPicklist:Boolean = false;
+			private var isTree:Boolean = false;
+			private var isUpdateTree:Boolean = false;
+			private var rootTree:String = null;
+			private var validate:Array = new Array();
+			private var objectEntity:Object = new Object;
+			private var xmlText:String = null;
+			private var headerFieldMap:Object = new Object;
+			public var postSave:Function;
+			
+			[Bindable] private var customPicklistList:ArrayCollection = new ArrayCollection();
+			[Bindable] private var entityPicklistList:ArrayCollection = new ArrayCollection();
+			[Bindable] private var parentPicklistList:ArrayCollection = new ArrayCollection();
+			[Bindable] private var fieldList:ArrayCollection = new ArrayCollection();
+			
+			private static var _cache_customField:CacheUtils = new CacheUtils("customField");
+			// private static var _cache_picklist_field:CacheUtils = new CacheUtils("picklist");
+			private static const mapType:Object ={Number:"Number",Currency:"Currency",Integer:"Integer"} 
+			
+			private function bindSumField(obj:Object):void{
+				var table:String = DAOUtils.getTable(cboEntitySum.selectedItem.data);
+				obj["entity"] = txtEntity.text;
+				obj["fieldName"] = txtFieldName.text;
+				obj["displayName"] = txtDisplayName.text;
+				obj["fieldType"] = cboFieldTypes.text;
+				obj["value"] = "Select SUM("+ cboEntityFieldsSum.selectedItem.data+") as sumFields from "+ table + " Where " + cboEntitySum.selectedItem.relationId + "= :" + cboEntitySum.selectedItem.relationId ;
+				obj["sum_field_name"] = cboEntityFieldsSum.selectedItem.data;
+				obj["sum_entity_name"] = cboEntitySum.selectedItem.entity;
+				obj["field_copy"] = cboCopyField.selectedItem.data;
+				obj["relation_id"] = cboEntitySum.selectedItem.relationId;
+				
+			}
+			private function getFields():void{
+				if((cboEntitySum.dataProvider as ArrayCollection).length >0 ){
+					cboEntityFieldsSum.dataProvider =  getComboSumDataList(Utils.getColumns(cboEntitySum.selectedItem.entity,true,false));
+				}else{
+					cboEntityFieldsSum.dataProvider= new ArrayCollection();
+				}
+			}
+			public static function getComboSumDataList(list:ArrayCollection):ArrayCollection {	
+				if(list==null) return new ArrayCollection();
+				for(var i:int=1 ;i<list.length;i++){
+					if(mapType[list[i].type] == null ){
+						list.removeItemAt(i);
+						i--;
+					}
+				}
+				return list;
+			}
+			private function getEntitySum():ArrayCollection{
+				var lst:ArrayCollection = new ArrayCollection();
+				var relations:ArrayCollection = Relation.getReferencers(txtEntity.text);
+				for each(var obj:Object in FieldManagmentWindow.entityNameList){
+					for each(var relation:Object in relations){
+						if( relation.supportTable == null && relation.entitySrc == obj.entity){
+							obj["relationId"] = relation.keySrc;
+							obj["Id"] = relation.keyDest;
+							lst.addItem(obj);
+							//replace the temporay label
+							obj.label = Database.customLayoutDao.getDisplayName(obj.entity);
+						}
+					}
+				}
+				if(lst.length >0 && txtEntity.text == "Account"){
+					lst.removeItemAt(1);
+				}
+				return lst;
+			}
+			private function init():void {
+				
+				cboFieldTypes.dataProvider = new ArrayCollection(fieldTyps.source);
+				var customField:Object = dataField.customField;
+				if(!customField) customField = CustomFieldDAO.newCustomField();
+				txtEntity.text = dataField.entity;
+				txtLanguageCode.text = dataField.languageCode;
+				txtDisplayName.text = customField.displayName;
+				txtFieldName.text = customField.fieldName;				
+				txtArFormula.text = customField.value;
+				parentPicklistField = customField.parentPicklist;
+				entityFeildList = getComboDataList(Utils.getColumns(txtEntity.text),objectEntity);
+				entityPicklistList = getEntityPicklistFields(entityFeildList);
+				cboFieldTypes.selectedIndex = getComboSelectedIndex(cboFieldTypes,customField.fieldType);
+				if(isCustomField) changeFieldTypeAction();
+				// validate fields
+				var stringValidator:StringValidator = new StringValidator();
+				stringValidator.property = "text";
+				stringValidator.source = txtDisplayName;
+				validate.push(stringValidator);
+				chkDefaultValue.selected = Utils.checkNullValue(customField.defaultValue)=="1"?true:false;
+				
+				cboEntitySum.dataProvider =  getEntitySum();
+				cboCopyField.dataProvider = getComboSumDataList(Utils.getColumns(txtEntity.text,true,false));
+				cboEntitySum.selectedIndex = getSumComboSelected(cboEntitySum,customField.sum_entity_name);
+				getFields();
+				cboEntityFieldsSum.selectedIndex = getComboSelectedIndex(cboEntityFieldsSum,customField.sum_field_name);
+				cboCopyField.selectedIndex = getComboSelectedIndex(cboCopyField,customField.field_copy);
+				
+				if(isCustomField){
+					if(isCreate) titlebar.title = i18n._("CALCULATEDFIELD_CREATE_CUSTOM_FIELD");
+					else titlebar.title = i18n._("GLOBAL_EDIT") + " " + txtFieldName.text;
+					
+					stringValidator = new StringValidator();
+					stringValidator.property = "text";
+					stringValidator.source = cboFieldTypes;
+					validate.push(stringValidator);
+					if(isCreate){
+						stringValidator = new StringValidator();
+						stringValidator.property = "text";
+						stringValidator.source = txtFieldName;
+						validate.push(stringValidator);
+					}else if(isPicklist || isBindPicklist){
+						if(isPicklist){
+							cboFieldList.enabled = false;
+							cboFieldList.selectedIndex = getComboSelectedIndex(cboFieldList,customField.fieldName);
+						}
+						cboFieldTypes.enabled = false;						
+						cboFieldPicklists.enabled = false;
+						cboFieldPicklists.selectedIndex = getComboSelectedIndex(cboFieldPicklists,customField.bindField);
+						changeFieldPicklistAction();
+					}	
+					
+					gridCustomPicklist.addEventListener(DragEvent.DRAG_COMPLETE,function(event:DragEvent):void {dragComplete(event);});
+					gridFieldPicklist.addEventListener(DragEvent.DRAG_DROP,function(event:DragEvent):void {dragDrop(event);});
+					
+					treeColumn.addEventListener(DragEvent.DRAG_COMPLETE,function(event:DragEvent):void {dragTreeComplete(event);});
+					oodColumn.addEventListener(DragEvent.DRAG_DROP,function(event:DragEvent):void {dragDropTree(event);});
+					if(txtLanguageCode.text==CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+						getContextMenuItem(this,gridCustomPicklist,gridPicklistHandler);
+						getContextMenuItem(this,gridBindPicklist,gridPicklistHandler,true);
+						
+						getContextMenuItem(this,treeColumn,gridPicklistHandler);
+						getContextMenuItem(this,mapTreeAndOODField,gridPicklistHandler,true);
+					}
+					
+				}else{
+					lblFieldName.visible = false;
+					txtFieldName.visible = false;
+					switchLayout(true);
+					if(Utils.checkNullValue(dataField.column_name).indexOf("#")>-1){
+						cbolanguageCodes.selectedIndex = getComboSelectedIndex(cbolanguageCodes,CustomFieldDAO.DEFAULT_LANGUAGE_CODE);
+						titlebar.title = i18n._("CALCULATEDFIELD_CREATE_HEADER_FEILD");
+						height = 200;
+						detailCanvas.width = width = 500; 
+						detailCanvas.height = 170; 
+						frmHeaderInput.height = 80;
+						buttonLayout.width = 450;
+						frmCustomField.width = frmCustomField.height = 0;
+						loadHeaderFieldMap(customField.value);
+						txtHeaderValue.text = headerFieldMap[currentLanguage];
+						stringValidator.source = txtHeaderValue;
+						
+					}
+				}
+				
+				// can change field type and text formula only when languagecode='ENU' 
+				if(!isCreate && txtLanguageCode.text!=CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+					switchLayout(false, true);
+					gridCustomPicklist.dragEnabled = false;
+					chkDefaultValue.enabled = false;
+				}
+				
+				if(!isCreate){
+					cboFieldTypes.enabled = false;
+					checkPicklistValueToView(customField);
+				}
+				
+				// init ood field
+				oodField = Utils.getColumns(dataField.entity, false, false);
+				
+				this.systemManager.stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDown);
+				
+				
+			}
+			private function keyDown(evt:KeyboardEvent):void {
+				if (evt.charCode == Keyboard.ESCAPE) {
+					this.close();
+				}
+			}
+			// =================================================================================
+			private function loadHeaderFieldMap(headerValue:String):void{
+				if(StringUtils.isEmpty(headerValue)){
+					headerFieldMap[currentLanguage] = dataField.custom; 
+				}else{
+					var headerFields:Array = headerValue.split(";");
+					for each(var headerField:String in headerFields){
+						var header:Array = headerField.split(":");
+						if(header.length>0){
+							headerFieldMap[header[0]] = header[1]; 
+						}
+					}
+				}
+			}
+			private function checkHeaderFieldValue():Boolean{
+				var list:ArrayCollection = cbolanguageCodes.dataProvider as ArrayCollection;
+				for each(var objLanguage:Object in list){
+					var headerValue:String = headerFieldMap[objLanguage.data];
+					if(!StringUtils.isEmpty(headerValue)){
+						if(checkInvalidHeaderText(headerValue)){
+							cbolanguageCodes.selectedIndex = getComboSelectedIndex(cbolanguageCodes,objLanguage.data);
+							changeLanguageCode();
+							return true;
+						} 
+					} 
+				}
+				return false;
+			}
+			private function getHeaderFieldValue():String{
+				var languageCode:String = getComboDataField(cbolanguageCodes);
+				headerFieldMap[currentLanguage] = txtHeaderValue.text;
+				if(StringUtils.isEmpty(StringUtil.trim(headerFieldMap[CustomFieldDAO.DEFAULT_LANGUAGE_CODE]))){
+					headerFieldMap[CustomFieldDAO.DEFAULT_LANGUAGE_CODE] = tempHeaderVal;
+				}
+				var headerFieldValue:String = "";
+				var list:ArrayCollection = cbolanguageCodes.dataProvider as ArrayCollection;
+				for each(var objLanguage:Object in list){
+					if(!StringUtils.isEmpty(headerFieldMap[objLanguage.data])){
+						if(!StringUtils.isEmpty(headerFieldValue)) headerFieldValue += ";";
+						headerFieldValue += objLanguage.data + ":" + headerFieldMap[objLanguage.data];
+					} 
+				}
+				return headerFieldValue;
+			}
+			// =================================================================================
+			
+			public static function getComboDataList(list:ArrayCollection,objectEntity_:Object):ArrayCollection {	
+				if(list==null) return new ArrayCollection();
+				for each(var object:Object in list){
+					object['data'] = object['column'];
+					objectEntity_[object.data] = "abc"; 
+				}
+				return list;
+			}
+			
+			public static function getEntityPicklistFields(entityFeildLists:ArrayCollection):ArrayCollection {
+				var listPicklistFields:ArrayCollection = new ArrayCollection();
+				listPicklistFields.addItem({data:'',label:''});
+				for each(var objF:Object in entityFeildLists){
+					if(checkPicklistType(objF.type)){
+						listPicklistFields.addItem(objF);
+					}
+				}
+				return listPicklistFields;
+			}
+			
+			public static function getComboDataField(cbo:ComboBox,key:String='data'):String {	
+				if(cbo==null || cbo.dataProvider==null || cbo.selectedItem==null) return "";
+				var label:String = cbo.selectedItem.data;
+				var list:ArrayCollection = cbo.dataProvider as ArrayCollection;
+				for each(var object:Object in list){
+					if(object['data']==label){
+						return object[key];
+					}
+				}
+				return "";
+			}
+			public static function getSumComboSelected(cbo:ComboBox,key:String):int {	
+				if(cbo==null || cbo.dataProvider==null) return 0;
+				var list:ArrayCollection = cbo.dataProvider as ArrayCollection;
+				for (var i:int=0;i<list.length;i++){
+					var object:Object = list[i];
+					if(object["entity"]==key) return i;
+				}
+				return 0;
+			}
+			
+			public static function getComboSelectedIndex(cbo:ComboBox,key:String):int {	
+				if(cbo==null || cbo.dataProvider==null) return 0;
+				var list:ArrayCollection = cbo.dataProvider as ArrayCollection;
+				for (var i:int=0;i<list.length;i++){
+					var object:Object = list[i];
+					if(object["data"]==key) return i;
+				}
+				return 0;
+			}
+			
+			// ===============================================================
+			private function checkInvalidFieldName(fieldName:String):Boolean{
+				var charas:Array = [":",";"," ",".","#","/","\\",";",",","%","-","+"];
+				for each(var str:String in charas){
+					if(fieldName.indexOf(str)>-1){
+						Alert.show(i18n._("CALCULATEDFIELD_INVALID_FIELD_NAME_WITH_CHARACTOR") +  " '" + str + "'",this.title, Alert.OK, this);
+						return true;
+					}
+				}
+				return false;
+			}
+			
+			private function checkInvalidHeaderText(value:String):Boolean{
+				var charas:Array = [":",";"];
+				for each(var str:String in charas){
+					if(value.indexOf(str)>-1){
+						Alert.show(i18n._("CALCULATEDFIELD_INVALID_HEADER_TEXT_WITH_CHARACTOR") + " '" + str + "'",this.title, Alert.OK, this);
+						return true;
+					}
+				}
+				return false;
+			}
+			
+			public static function replaceString(textArea:TextArea,value:String):void {
+				if(!textArea) return; 
+				var idx:int = textArea.selectionBeginIndex;
+				textArea.text = deleteSelectedString(textArea.text,textArea.selectionBeginIndex,textArea.selectionEndIndex);
+				textArea.text = addString(textArea.text,value,textArea.selectionBeginIndex);
+				textArea.selectionBeginIndex = textArea.selectionEndIndex = idx + value.length;
+				textArea.setFocus();
+			}
+			
+			public static function addString(oldString:String,addString:String,addIdex:int):String {
+				return oldString.substr(0,addIdex) + addString + oldString.substr(addIdex,oldString.length);
+			}
+			
+			public static function deleteSelectedString(str:String,beginIdx:int,endIdex:int):String {
+				return str.substr(0,beginIdx) + str.substr(endIdex,str.length);
+			}
+			
+			public static function checkPicklistType(type:String):Boolean{
+				return (type=="Picklist" || type=="Multi-Select Picklist");
+			}
+			
+			public static function getPicklistValue(value:String,p:*="\r",repl:*=","):String{
+				if(!value) return "";
+				while(value.indexOf(p)>-1)
+					value = value.replace(p,repl);
+				return value;
+			}
+			
+			private function checkSyntax_clickHanler(event:MouseEvent):void {
+				if(checkSyntax()){
+					Alert.show(i18n._("GLOBAL_SYNTAX_IS_VALID"),this.title,Alert.OK,this);
+				}
+			}
+			
+			private function checkSyntax():Boolean {
+				
+				var result:String, message:String = "";
+				
+				if(cboFieldTypes.text == "Tree") {
+					try {
+						message = "XML file format is invalid";
+						result = new XML(xmlText).toXMLString();
+					}catch(e:Error) {
+						result = "", xmlText = "";
+					}
+				}else {
+					message = i18n._("GLOBAL_SYNTAX_IS_INVALID");
+					var ownerUser:Object = Database.allUsersDao.ownerUser();
+					//Bug fixing 593 CRO
+					result =Utils.doEvaluate(txtArFormula.text,ownerUser,txtEntity.text, txtFieldName.text, objectEntity,null);
+				}
+				//
+				/*if(StringUtils.isEmpty(result) && (cboFieldTypes.text=="Formula" || cboFieldTypes.text=="Tree")){
+				Alert.show(message, this.title, Alert.OK, this);
+				return false;
+				}*/
+				return true;
+			}
+			
+			// ===============================================================
+			private function checkPicklistValueToSave():void{
+				if(parentPicklistList.length==0){
+					bindPicklistMap["noParent"] = bindGridPicklistToValue(bindPicklistValue,bindCols);
+					parentPicklistList.addItem(Utils.createNewObject(["data","label"],["noParent",""]));
+				}else{
+					bindPicklistMap[currentParentValue] = bindGridPicklistToValue(bindPicklistValue,bindCols);
+				}	
+				
+				for each(var objParent:Object in parentPicklistList){
+					var bindList:ArrayCollection = bindValueToGridPicklist(bindPicklistMap[objParent.data],bindCols);
+					for each(var objBind:Object in bindList){
+						if(txtLanguageCode.text != CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+							objBind.crmData = objBind.crmLabel;
+						}
+					}
+					bindPicklistMap[objParent.data] = bindGridPicklistToValue(bindList,bindCols);
+				}
+				for each(var obj:Object in customPicklistValue){
+					obj.data = obj.label;
+				}	
+			}
+			
+			public static function refreshFormulaField(customField:Object,useTransaction:Boolean=true):void{
+				var list:ArrayCollection = Database.getDao(customField.entity).queryAll();
+				var ownerUser:Object = Database.allUsersDao.ownerUser();
+				if(useTransaction){
+					Database.begin();
+				}
+				for each(var objEntity:Object in list){
+					var result:String = Utils.doEvaluate(customField.value,ownerUser, customField.entity, customField.fieldName, objEntity,null);
+					objEntity[customField.fieldName] = result;
+					// Database.getDao(customField.entity).update(objEntity);
+					Database.getDao(customField.entity).updateByGadgetId(customField.fieldName,objEntity.gadget_id,result);
+				}
+				if(useTransaction){
+					Database.commit();
+				}				
+			}
+			
+			private function update_clickHanler(event:MouseEvent):void {
+				var error:String = "";
+				for each(var objError:Object in Validator.validateAll(validate)){
+					if(objError.type=="invalid"){
+						error += objError.message;
+						break;
+					}
+				}
+				if(checkInvalidFieldName(txtFieldName.text)) return;
+				if(StringUtils.isEmpty(error)){
+					if(checkSyntax()==true){		
+						checkPicklistValueToSave();
+						
+						var customField:Object = new Object();
+						if(cboFieldTypes.text == "Sum"){
+							if(cboEntityFieldsSum.selectedItem.label == ""){
+								Alert.show(i18n._("GLOBAL_PLEASE_CHOOSE_ONE_AGGREGATION"),this.title, Alert.OK, this);
+								return ;
+							}else{
+								bindSumField(customField);	
+							}
+							
+						}else{
+							customField["entity"] = txtEntity.text;
+							customField["fieldName"] = txtFieldName.text;
+							customField["displayName"] = txtDisplayName.text;
+							customField["fieldType"] = cboFieldTypes.text;
+							customField["value"] = isPicklist?bindGridPicklistToValue(customPicklistValue,["data"]):(isTree?xmlText:txtArFormula.text);
+							customField["bindField"] = isBindPicklist?getComboDataField(cboFieldPicklists):"";
+							customField["bindValue"] = isBindPicklist?getRelatedPicklistValue():(isTree?"noParent:"+bindGridPicklistToValue(bindPicklistValue, bindCols):"");
+							customField["defaultValue"] = chkDefaultValue.selected?1:0;
+							customField["parentPicklist"] = parentPicklistField;
+						}
+						if(isCustomField){
+							if(isCreate){
+								customField["subtype"] = 10;
+								if(Database.customFieldDao.checkExistingFieldName(txtEntity.text,txtFieldName.text,isBindPicklist)){
+									Alert.show(i18n._('GLOBAL_FIELD_NAME') + " " + txtFieldName.text + " " + i18n._('CALCULATEDFIELD_ALREADY_EXIST'),this.title, Alert.OK, this);
+									txtFieldName.setFocus();
+									return;
+								}else{
+									var colName:String = isBindPicklist?CustomLayout.BINDPICKLIST_CODE:CustomLayout.CUSTOMFIELD_CODE;
+									var count:int = Database.customFieldDao.countColumnName(colName);
+									if(txtEntity.text == Database.businessPlanDao.entity){
+										customField["column_name"] = txtFieldName.text;
+									}else{
+										customField["column_name"] = "{" + colName + count + "}";
+									}
+									Database.customFieldDao.insert(customField);
+									if(isTree) {
+										saveTreeData(customField);
+									}
+									if(!isBindPicklist){
+										// create new column on table entity
+										Database.customFieldDao.addTableColumn(customField.entity,customField.fieldName,"TEXT");
+									}
+									
+								}
+							}else{		
+								if(txtEntity.text == Database.businessPlanDao.entity){
+									customField["column_name"] = dataField.customField.fieldName;
+								}else{
+									customField["column_name"] = dataField.customField.column_name;
+								}
+								customField["subtype"] = dataField.customField.subtype;
+								if(isUpdateTree) {
+									saveTreeData(customField);
+								}
+								if(txtLanguageCode.text==CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+									Database.customFieldDao.updateField(customField);
+								}
+							}
+							customField["languageCode"] = isCreate?CustomFieldDAO.DEFAULT_LANGUAGE_CODE:txtLanguageCode.text;
+							Database.customFieldTranslatorDao.updateField(customField);
+							refreshGridEntity();
+							
+							if(isBindPicklist){
+								// _cache_picklist_field.del(txtEntity.text + "/" + txtFieldName.text) as ArrayCollection;
+								PicklistService.getPicklist(txtEntity.text,txtFieldName.text,true,true,true);
+								PicklistService.getBindPicklist(txtEntity.text,txtFieldName.text,true,true);
+								
+								var cache:CacheUtils = new CacheUtils("cascading_crm");
+								cache.del(txtEntity.text);
+							}
+							if(customField.fieldType=='Formula') refreshFormulaField(customField);
+						}else{		
+							// create header field.
+							if(Utils.checkNullValue(dataField.column_name).indexOf("#")>-1){
+								customField["column_name"] = dataField.column_name;
+								customField["fieldType"] = "HeaderText";
+								customField["value"] = getHeaderFieldValue();
+								if(checkHeaderFieldValue()) return;
+								var languageCode:String = LocaleService.getLanguageInfo().LanguageCode;								
+								if(Utils.checkNullValue(headerFieldMap[languageCode])!=""){
+									dataField["custom"] = headerFieldMap[languageCode];
+								}else{
+									dataField["custom"] = headerFieldMap[CustomFieldDAO.DEFAULT_LANGUAGE_CODE];
+								}
+								if(postSave!=null){
+									postSave(dataField["custom"]);
+								}
+							}else{ // create calculate field.
+								customField["column_name"] = dataField["column_name"];
+								customField["fieldType"] = dataField["custom"] = "Formula";
+								if(postSave!=null){
+									postSave(txtArFormula.text);
+								}
+							}
+							if(txtEntity.text == Database.businessPlanDao.entity){
+								customField["column_name"] = txtFieldName.text;
+							}
+							dataField["customField"] = customField;		
+							
+						}
+						_cache_customField.del(txtEntity.text);
+						close();
+					}
+				}else{
+					Alert.show(error, title, Alert.OK, this);
+					txtDisplayName.setFocus();
+				}
+				
+			}
+			
+			private function saveTreeData(customField:Object):void {
+				switch(rootTree) {
+					case "territory":
+						saveTerritoryTree(customField);
+						break;
+					case "depthstructure":
+						saveDepthStructureTree(customField);
+						break;
+					default:
+						break;
+				}
+			}
+			
+			private function saveDepthStructureTree(customField:Object):void {
+				var j:int=1;
+				Database.begin();
+				Database.depthStructureTreeDAO._delete(customField);
+				for each(var v:Object in TreeUtil.getDepthStructureTree(new XML(xmlText))) {
+					v.num = j;
+					v.entity = customField.entity;
+					v.column_name = customField.column_name;
+					Database.depthStructureTreeDAO.insert(v);
+					j++;
+				}
+				Database.commit();
+			}
+			
+			private function saveTerritoryTree(customField:Object):void {
+				var i:int=1;
+				Database.begin();
+				Database.territoryTreeDAO._delete(customField);
+				for each(var x:Object in TreeUtil.getTerritoryTree(new XML(xmlText))) {
+					x.num = i;
+					x.entity = customField.entity;
+					x.column_name = customField.column_name;
+					Database.territoryTreeDAO.insert(x);
+					i++;
+				}
+				Database.commit();
+			}
+			
+			private function insert_clickHanler(event:MouseEvent):void {
+				var field:String = getComboDataField(cboEntityFields);
+				if(gadget.util.StringUtils.isEmpty(field)){
+					Alert.show(i18n._('GLOBAL_PLEASE_SELECT_FIELD_FIRST'),this.title, Alert.OK, this);
+				}else{
+					replaceString(txtArFormula," [<" + field + ">] ");
+				}
+			}
+			
+			private function insertFunction_clickHanler(event:MouseEvent):void {
+				var strFunction:String = getComboDataField(cboFunctions);
+				if(gadget.util.StringUtils.isEmpty(strFunction)){
+					Alert.show(i18n._('GLOBAL_PLEASE_SELECT_FUNCTION_FIRST'), this.title, Alert.OK, this);
+				}else{
+					replaceString(txtArFormula,strFunction);
+				}
+			}
+			private function changeImageAction(event:Event):void{
+				replaceString(txtArFormula,getComboDataField(cboImage));
+				cboOperators.selectedIndex = 0;
+			}
+			// ===================================================================================
+			private function changeOperatorAction(event:Event):void{
+				replaceString(txtArFormula,getComboDataField(cboOperators));
+				cboOperators.selectedIndex = 0;
+			}
+			private function changeFunctionAction(event:Event):void{
+				txtArFunctionDesc.text = getComboDataField(cboFunctions,"desc");
+			}
+			
+			
+			//			private var bindTreeCols:Array = ["treeData","oodData","oodLabel"];
+			private var bindCols:Array = ["crmData","oodData","oodLabel"];
+			private function getRelatedPicklistValue():String{
+				var relatedValue:String = "";
+				for (var i:int;i<parentPicklistList.length;i++){
+					var obj:Object = parentPicklistList[i];
+					var key:String =  obj.data; // obj.label; // obj.data;
+					if(!StringUtils.isEmpty(key)){
+						relatedValue += key + ":" + Utils.checkNullValue(bindPicklistMap[key]);
+						if(i<parentPicklistList.length-1) relatedValue += "##";
+					}
+				}		
+				return relatedValue;
+			}
+			
+			
+			
+			private var bindPicklistMap:Object = new Object();
+			private var currentParentValue:String = "";
+			private var parentPicklistField:String = "";
+			[Bindable] private var bindGridName:String = i18n._("CALCULATEDFIELD_OOD_VALUES");
+			private function changeParentPicklistAction():void{
+				bindPicklistMap[currentParentValue] = bindGridPicklistToValue(bindPicklistValue,bindCols);
+				currentParentValue = getComboDataField(cboParentPicklists); //cboParentPicklists.text; // getComboDataField(cboParentPicklists);	
+				// bindPicklistValue = new ArrayCollection();
+				bindPicklistValue = bindValueToGridPicklist(Utils.checkNullValue(bindPicklistMap[currentParentValue]),bindCols);
+				
+				var objParent:Object = cboParentPicklists.selectedItem;
+				fieldPicklistValue = new ArrayCollection();
+				for each(var objCascading:Object in listAllCascading){
+					if(objParent.data==objCascading.parent_code){
+						var objChild:Object = Utils.createNewObject(["data","label"],[objCascading.child_code,objCascading.child_value]);
+						fieldPicklistValue.addItem(objChild);
+					}
+				}				
+				bindGridName = cboParentPicklists.text;
+			}
+			
+			private var listAllCascading:ArrayCollection = new ArrayCollection();
+			private function changeFieldPicklistAction():void{
+				if(isBindPicklist){			
+					bindGridName = cboFieldPicklists.text;				
+					txtFieldName.text = getComboDataField(cboFieldPicklists);
+					currentParentValue = getComboDataField(cboParentPicklists); //cboParentPicklists.text; // getComboDataField(cboParentPicklists);
+					lblParentPicklists.text = i18n._("CALCULATEDFIELD_PARENT_PICKLIST");
+					fieldPicklistValue = PicklistService.getPicklist(txtEntity.text,txtFieldName.text,false,false,true);
+					if(isCreate){
+						txtDisplayName.text = cboFieldPicklists.text;
+						bindPicklistValue = new ArrayCollection();
+						bindPicklistMap = new Object();
+						parentPicklistField = "";
+					}
+					gridCustomPicklist.dragEnabled = (fieldPicklistValue.length>0);
+					
+					listAllCascading = Database.cascadingPicklistDAO.selectParent(txtEntity.text,txtFieldName.text,true);
+					parentPicklistList = new ArrayCollection();
+					if(listAllCascading.length>0){
+						//checkPicklistCode(txtEntity.text,"parent_picklist","parent_code","parent_value",listAllCascading);
+						//checkPicklistCode(txtEntity.text,"child_picklist","child_code","child_value",listAllCascading);
+						
+						var listCheck:ArrayCollection = new ArrayCollection();						
+						for each(var objCascading:Object in listAllCascading){
+							var objParent:Object = Utils.createNewObject(["data","label"],[objCascading.parent_code,objCascading.parent_value]);
+							if(!listCheck.contains(objParent.data)){
+								listCheck.addItem(objParent.data);
+								parentPicklistList.addItem(objParent);
+								parentPicklistField = objCascading.parent_picklist;								
+							}
+						}						
+						var objField:Object = Database.fieldDao.findFieldByPrimaryKey(txtEntity.text,parentPicklistField);
+						if(objField){
+							lblParentPicklists.text = objField.display_name;
+						}
+						changeParentPicklistAction();
+					}				
+					PicklistService.getPicklist(txtEntity.text,txtFieldName.text,true,true,true);
+				}			
+			}
+			
+			/* private function checkPicklistCode(entity:String,kehField:String,keyCode:String,keyValue:String,listCascading:ArrayCollection):void{
+			var field:String = listCascading.getItemAt(0)[kehField];
+			var allPiclistValues:ArrayCollection = PicklistService.getPicklist(entity,field);
+			for each(var obj1:Object in listCascading){
+			obj1[keyCode] = obj1[keyValue];						
+			for(var i:int=0;i<allPiclistValues.length;i++){						
+			var obj2:Object = allPiclistValues.getItemAt(i);
+			if(obj1[keyValue] == obj2.label){
+			i = allPiclistValues.length;
+			obj1[keyCode] = obj2.data;		
+			obj1[keyValue] = obj2.label;
+			}
+			}					
+			}
+			} */
+			
+			
+			
+			private function changeFieldTypeAction():void{
+				isPicklist = checkPicklistType(getComboDataField(cboFieldTypes));
+				isBindPicklist = getComboDataField(cboFieldTypes)=="Related Picklist"?true:false;
+				isTree = getComboDataField(cboFieldTypes)=="Tree"?true:false;
+				var visibleField:Boolean = false;
+				picklistDesc.text = isBindPicklist?pickListDescription1:pickListDescription;
+				if(bindPicklistValue.length<=0) gridCustomPicklist.dragEnabled = false;
+				
+				if(isPicklist || isBindPicklist){
+					// isPicklist = false;
+					expressionITem.height = 0;
+					inputExpressionITem.height = 0;
+					piclistValueITem.height = 285;				
+				}else{
+					inputExpressionITem.height = 30;
+					expressionITem.height = 255;
+					piclistValueITem.height = 0;
+				}
+				if(cboFieldTypes.text=="Picklist"){	
+					var baseDAO:BaseDAO = (Database.getDao(txtEntity.text) as BaseDAO);
+					if(baseDAO is SupportDAO || baseDAO is BusinessPlanDAO){
+						visibleField = true;
+						getMappingField(baseDAO);	
+					}
+				}				
+				if(cboFieldTypes.text=="Formula"){
+					switchLayout(true);
+				}else if(cboFieldTypes.text=="Tree") {
+					switchLayout(false);
+				}else if(cboFieldTypes.text=="Sum"){
+					switchLayout(false,false,true);
+				}else{
+					txtArFormula.text = "";
+					switchLayout(false, true);
+				}
+				
+				gridFieldPicklist.visible = isBindPicklist;
+				gridBindPicklist.visible = isBindPicklist;
+				lblFieldPicklists.visible = isBindPicklist;
+				cboFieldPicklists.visible = isBindPicklist;
+				lblParentPicklists.visible = isBindPicklist;
+				cboParentPicklists.visible = isBindPicklist;
+				lblFieldList.visible = visibleField;
+				cboFieldList.visible =  visibleField;
+				btnImportPicklist.visible = visibleField;
+				hBoxFielList.includeInLayout = true;
+				
+				chkDefaultValue.visible = !isBindPicklist;
+				
+				if(isCreate){
+					txtDisplayName.editable = !isBindPicklist;
+					txtFieldName.editable = !isBindPicklist;
+				}
+				
+			}
+			private function getMappingField(baseDAO:BaseDAO):void{
+				fieldList.removeAll();
+				var listLayout:Array = null;
+				// hard code for business plan picklist Period
+				if(baseDAO.entity == Database.businessPlanDao.entity){
+					listLayout = (baseDAO as BusinessPlanDAO).getLayoutFields();
+				}else{
+					listLayout = (baseDAO as SupportDAO).getLayoutFields();
+				}
+				
+				fieldList.addItem({label:"",data:""});
+				for each(var field:Object in listLayout){
+					if(field.data_type =="Picklist" && field.isCustom){
+						var obj:Object = {label:field.display_name,data:field.element_name}
+						fieldList.addItem(obj);
+					}
+				}				
+			}
+			private function changeFieldListAction():void{
+				if(cboFieldList.selectedIndex != -1){
+					var objFld:Object = cboFieldList.selectedItem
+					txtDisplayName.text = objFld.label;
+					txtFieldName.text = objFld.data;
+				}
+				
+			}
+			
+			// ===================================================================================================
+			[Bindable] private var customPicklistValue:ArrayCollection = new ArrayCollection;
+			[Bindable] private var fieldPicklistValue:ArrayCollection = new ArrayCollection;
+			[Bindable] private var bindPicklistValue:ArrayCollection = new ArrayCollection;
+			private var dropComplete:Boolean = false;
+			private function dragDrop(event:DragEvent):void {
+				var obj1:Object = gridCustomPicklist.selectedItem;
+				var index:int = gridFieldPicklist.calculateDropIndex(event);
+				var obj2:Object = index>=1?fieldPicklistValue.getItemAt(index-1):null;			
+				if(obj1 && obj2){
+					if(!StringUtils.isEmpty(obj1.label) && !checkExistingValue(obj1.label,bindPicklistValue,["crmLabel"])){
+						var objBind:Object = new Object();
+						objBind["crmData"] = obj1.label;
+						objBind["oodData"] = obj2.data;
+						objBind["crmLabel"] = obj1.label;
+						objBind["oodLabel"] = obj2.label;
+						bindPicklistValue.addItem(objBind);
+					}
+					dropComplete = true;
+				}
+			}
+			
+			private function dragComplete(event:DragEvent):void {
+				var index:int = gridFieldPicklist.calculateDropIndex(event);
+				if(index==0) fieldPicklistValue.removeItemAt(index);
+				if(dropComplete && index<fieldPicklistValue.length){
+					fieldPicklistValue.removeItemAt(index);
+					dropComplete = false;
+				}	
+			}
+			
+			// Tree
+			[Bindable] private var treeField:ArrayCollection = new ArrayCollection;
+			[Bindable] private var oodField:ArrayCollection = new ArrayCollection;
+			//			[Bindable] private var bindTreeAndOODField:ArrayCollection = new ArrayCollection;
+			private function dragDropTree(event:DragEvent):void {
+				var obj1:Object = treeColumn.selectedItem;
+				var index:int = oodColumn.calculateDropIndex(event);
+				var obj2:Object = index >= 1 ? oodField.getItemAt(index-1) : null;			
+				if(obj1 && obj2){
+					if(!StringUtils.isEmpty(obj1.label) && !checkExistingValue(obj1.label, bindPicklistValue, ["crmLabel"])) {
+						bindPicklistValue.addItem({crmLabel: obj1.label, crmData: obj1.data, oodLabel: obj2.label, oodData: obj2.column});
+					}
+					dropComplete = true;
+				}
+				refreshGridTree();
+			}
+			
+			private function dragTreeComplete(event:DragEvent):void {
+				var index:int = oodColumn.calculateDropIndex(event);
+				if(index==0) oodField.removeItemAt(index);
+				if(dropComplete && index<oodField.length){
+					oodField.removeItemAt(index);
+					dropComplete = false;
+				}	
+				refreshGridTree();
+			}
+			
+			private function refreshGridTree():void {
+				(treeColumn.dataProvider as ArrayCollection).refresh();
+				treeColumn.validateNow();
+				(oodColumn.dataProvider as ArrayCollection).refresh();
+				oodColumn.validateNow();
+				(mapTreeAndOODField.dataProvider as ArrayCollection).refresh();
+				mapTreeAndOODField.validateNow();
+			}
+			
+			private function checkExistingValue(value:String,list:ArrayCollection,columns:Array):Boolean {
+				for each(var obj:Object in list){
+					for each(var col:String in columns){
+						if(obj[col]==value) return true;
+					}
+				}
+				return false;
+			}
+			
+			private function gridChangeData_hanler():void {
+				var obj1:Object = gridCustomPicklist.selectedItem;
+				if(obj1 && isCreate){
+					obj1.data = obj1.label;
+				}else if(obj1){
+					for each(var obj2:Object in bindPicklistValue){
+						if(obj2.crmData == obj1.data){
+							obj2.crmLabel = obj1.label;
+						}
+					}
+				}
+			}
+			
+			private function gridDoubleClick_hanler():void {
+				if(txtLanguageCode.text==CustomFieldDAO.DEFAULT_LANGUAGE_CODE){
+					customPicklistValue.addItem(Utils.createNewObject(["data","label"],["",""]));
+				}
+			}
+			
+			public static function getContextMenuItem(layout:CalculatedField, grid:DataGrid, handler:Function,hideAdd:Boolean=false,hideDelete:Boolean=false):void{
+				var rootMenu:XML = <root />;
+				var addMenu:XML = new XML('<menuitem label="'+i18n._('GLOBAL_ADD')+'" icon="addIcon" />');
+				var deleteMenu:XML = new XML('<menuitem label="'+i18n._('GLOBAL_DELETE')+'" icon="deleteIcon" />');
+				if(!hideAdd) rootMenu.appendChild(addMenu);
+				if(!hideDelete) rootMenu.appendChild(deleteMenu);
+				var myMenu:Menu = Menu.createMenu(layout, rootMenu, false);
+				myMenu.iconField="@icon";
+				myMenu.labelField="@label";
+				var selectedItem:Object = null;	
+				var selectedIndex:int = 0;	
+				myMenu.addEventListener(MenuEvent.ITEM_CLICK, function handleMenuItem(e:MenuEvent):void {
+					handler(layout,grid, e.label, selectedItem);
+				});
+				grid.addEventListener(MouseEvent.RIGHT_CLICK, 
+					function showMenu(e:MouseEvent):void{
+						selectedItem = null;
+						if (e.target is SpriteAsset) {
+							return;
+						}
+						myMenu.hide();
+						myMenu.show(e.stageX, e.stageY);
+						if(e.target is DataGridItemRenderer){	
+							selectedItem = e.target.data;
+						}
+					}
+				);
+			}
+			
+			private static function gridPicklistHandler(layout:CalculatedField, grid:DataGrid, status:String, selectedItem:Object = null):void{
+				var list:ArrayCollection = grid.dataProvider as ArrayCollection;
+				if(status==i18n._('GLOBAL_ADD')){
+					var newObj:Object = new Object();
+					for each(var column:DataGridColumn in grid.columns){
+						newObj[column.dataField] = "";
+					}
+					list.addItem(newObj);
+				}else if(status==i18n._('GLOBAL_DELETE')){		
+					var selectedIdex:int = list.getItemIndex(selectedItem);
+					if(selectedIdex>-1 && selectedIdex<list.length){
+						(grid.dataProvider as ArrayCollection).removeItemAt(selectedIdex);
+					}
+				}					
+			}	
+			
+			public static function bindGridPicklistToValue(list:ArrayCollection,cols:Array):String{
+				var value:String = "";
+				for(var i:int=0;i<list.length;i++){
+					var obj:Object = list.getItemAt(i);
+					var strValue:String = ""; 
+					for (var j:int=0;j<cols.length;j++){
+						strValue += obj[cols[j]];
+						if(j<cols.length-1) strValue += "=";
+					}
+					value += strValue;
+					if(i<list.length-1) value += ";";
+				}
+				return value;
+			}
+			
+			public function bindValueToGridPicklist(value:String,cols:Array):ArrayCollection{
+				var bindList:ArrayCollection = new ArrayCollection();
+				var tree:Boolean = getComboDataField(cboFieldTypes)=="Tree"?true:false;
+				if(!StringUtils.isEmpty(value)){
+					var arrValue:Array = value.split(";");
+					for each(var str:String in arrValue){
+						var obj:Object = new Object();
+						var strArr:Array = str.split("=");
+						for (var i:int=0;i<cols.length;i++){
+							obj[cols[i]] = i<=strArr.length?strArr[i]:"";
+						}
+						if(tree) obj.crmLabel = obj.crmData;
+						bindList.addItem(obj);
+					}
+				}
+				refreshGridBindPicklist(bindList);		
+				return bindList;
+			}
+			
+			private function refreshGridBindPicklist(bindList:ArrayCollection):void{
+				for each(var objCusttom:Object in customPicklistValue){
+					for each(var objBind:Object in bindList){
+						if(objCusttom.data == objBind.crmData){
+							if(!StringUtils.isEmpty(objCusttom.label)){
+								objBind.crmLabel = objCusttom.label;
+							}
+						}
+					}
+				}
+			}
+			
+			private function checkPicklistValueToView(customFeild:Object):void {
+				customPicklistValue = Database.customFieldDao.getPicklistValue(txtEntity.text,customFeild.column_name,txtLanguageCode.text);
+				if(customPicklistValue.length>0)
+					customPicklistValue.removeItemAt(0);
+				var objBind:Object = Database.customFieldDao.selectCustomField(txtEntity.text,customFeild.column_name);
+				if(isTree)loadTreeField(objBind.value);
+				xmlText = objBind.value;
+				loadRelatedPicklistValue(objBind.bindValue);
+			}
+			
+			private function loadRelatedPicklistValue(relatedValue:String):void{
+				if(!StringUtils.isEmpty(relatedValue)){
+					var arr:Array = relatedValue.split("##");
+					for each(var str:String in arr){
+						var arr2:Array = str.split(":");
+						if(!StringUtils.isEmpty(arr2[0]))
+							bindPicklistMap[arr2[0]] = Utils.checkNullValue(arr2[1]);
+					}
+				}
+				
+				if(StringUtils.isEmpty(currentParentValue)){
+					currentParentValue = "noParent";
+				}
+				
+				bindPicklistValue = bindValueToGridPicklist(bindPicklistMap[currentParentValue], bindCols);
+				
+			}
+			
+			private var currentLanguage:String = CustomFieldDAO.DEFAULT_LANGUAGE_CODE;
+			private function changeLanguageCode():void{
+				var languageCode:String = getComboDataField(cbolanguageCodes);
+				headerFieldMap[currentLanguage] = txtHeaderValue.text;
+				txtHeaderValue.text = headerFieldMap[languageCode];
+				currentLanguage = languageCode;
+			}
+			
+			private function uploadXMLFile():void {
+				try {
+					var file:File = new File();
+					file.addEventListener(Event.SELECT, uploadXMLFileHandler);
+					file.browseForOpen("Browse xml file", [new FileFilter("XML File", "*.xml")]);
+				} catch (e:Error) {
+					Alert.show("Upload xml file error", e.message);
+					trace("Failed: ", e.message);
+				}
+			}
+			
+			private function uploadXMLFileHandler(e:Event):void {
+				var file:File = (e.currentTarget as File);
+				xmlText = Utils.readUTFBytes(file);
+				if(checkSyntax()) {
+					loadTreeField(xmlText);
+					isUpdateTree = isTree && !isCreate;
+				}
+			}
+			
+			
+			private function loadTreeField(sXML:String):void {
+				try{
+					var x:XML = new XML(sXML);
+					switch(x.localName()) {
+						case "territory":
+							treeField = TreeUtil.territoryField;
+							rootTree = "territory";
+							break;
+						case "depthstructure":
+							treeField = TreeUtil.depthStructureField;
+							rootTree = "depthstructure";
+							break;
+						default:
+							treeField = null;
+							break;
+					}
+				}catch(e:Error){
+					trace(e.getStackTrace());
+				}
+			}
+			
+			private function switchLayout(isFormula:Boolean, isInvisibleFormular:Boolean=false,isSum:Boolean=false):void {
+				if(isSum){
+					formula.visible = false;
+					formula.includeInLayout = false;
+					tree.visible = false;
+					tree.includeInLayout = false;
+					sumPanel.visible =true;
+					sumPanel.includeInLayout = true;
+					
+				}else{
+					formula.enabled = isFormula;
+					formula.visible = isInvisibleFormular ? isInvisibleFormular : isFormula;
+					formula.includeInLayout = isInvisibleFormular ? isInvisibleFormular : isFormula;
+					tree.enabled = isInvisibleFormular ? !isInvisibleFormular : !isFormula;
+					tree.visible = isInvisibleFormular ? !isInvisibleFormular : !isFormula;
+					tree.includeInLayout = isInvisibleFormular ? !isInvisibleFormular : !isFormula;
+					sumPanel.visible = false;
+					sumPanel.includeInLayout = false;
+				}
+			}
+			
+			private function browseAndUpload():void {
+				var readCSVFile:ReadCSVPicklist = new ReadCSVPicklist();
+				readCSVFile.browseFile(this, createImportCustomPicklist, refreshListDataGrid);
+				
+				//var readExcelFile:ReadExcelFile = new ReadExcelFile();
+				//readExcelFile..browseAndUpload(this,createImportCustomField,refreshListDataGrid);
+			}
+			
+			private function createImportCustomPicklist(picklistValues:ArrayCollection):void {
+				customPicklistValue.removeAll();
+				for each(var picklistValue:String in picklistValues){
+					customPicklistValue.addItem(Utils.createNewObject(["data","label"],[picklistValue, picklistValue]));
+					var customValue:Object = new Object();
+					
+					/*customValue["crmData"] = picklistValue;
+					customValue["oodData"] = picklistValue;
+					customPicklistValue.addItem(customValue);*/
+				}
+				
+				//customPicklistValue.refresh();
+				//gridCustomPicklist.dataProvider = customPicklistValue;
+			}
+			
+			private function refreshListDataGrid():void{
+				//btnImportExcel.enabled = (CalculatedField.getComboDataField(txtEntity.text)=="Service Request");
+				//var listAll:ArrayCollection = Database.customFieldDao.selectAll(CalculatedField.getComboDataField(cboEntitys),CalculatedField.getComboDataField(cbolanguageCodes));
+				//				var listAll:ArrayCollection = new ArrayCollection();
+				//				var listCustomFields:ArrayCollection = new ArrayCollection();
+				//				for each(var tmp:Object in listAll){
+				//					if(tmp.fieldType!='HeaderText'){
+				//						listCustomFields.addItem(tmp);
+				//					}
+				//					tmp["display_value"] = StringUtils.reduceTextLength(tmp.value, 30);	
+				//				}
+				//fieldsGrid.dataProvider = listCustomFields;
+			}
+			
+
+			protected function window1_creationCompleteHandler(event:FlexEvent):void
+			{
+				cboFieldTypes.setFocus();
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas id="detailCanvas" horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="880" height="480" right="0" bottom="0">
+		<control:TitleBar title="{i18n._('CALCULATEDFIELD_FORMULA_AND_EXPRESSION')}" icon="@Embed(source='/assets/customize.png')" id="titlebar" y="2" x="25"/>
+		<mx:VBox top="30" left="0" right="0" bottom="0">
+			<mx:VBox id='frmHeaderInput' width="500" height="0" paddingTop="10" paddingBottom="20">	
+				<mx:HBox>
+					<mx:Label text="{i18n._('GLOBAL_LANGUAGE')}" textAlign="right" width="100" fontWeight="bold" />
+					<mx:ComboBox id="cbolanguageCodes" dataProvider="{FieldManagmentWindow.languageCodes}" change="changeLanguageCode()" width="160" />
+				</mx:HBox>
+				<mx:HBox>
+					<mx:Label text="{i18n._('GLOBAL_HEADER_VALUE')}" textAlign="right" width="100" fontWeight="bold" />
+					<mx:TextInput id="txtHeaderValue" width="300" />
+				</mx:HBox>
+			</mx:VBox>	
+			<mx:Form id='frmCustomField' width="100%">	
+				<mx:HBox paddingTop="0">
+					<mx:Label text="{i18n._('GLOBAL_ENTITY')}" textAlign="right" width="100" fontWeight="bold" />
+					<mx:TextInput id="txtEntity" editable="false" width="160"/>
+					<mx:Label text="{i18n._('GLOBAL_DISPLAY_NAME')}" textAlign="right" fontWeight="bold" maxWidth="100"/>
+					<mx:TextInput id="txtDisplayName" width="160"  />
+					<mx:Label id="lblFieldName" text="{i18n._('GLOBAL_FIELD_NAME')}" textAlign="right" fontWeight="bold" maxWidth="120"/>
+					<mx:TextInput id="txtFieldName" width="160" editable="{isCreate}"/>
+					<mx:TextInput id="txtLanguageCode" width="5" editable="false" visible="false" />
+				</mx:HBox>
+				<mx:FormItem id="fieldTypeItem" visible="{isCustomField}">
+					<mx:HBox>
+						<mx:Label text="{i18n._('GLOBAL_FIELD_TYPE')}" textAlign="right" width="100" fontWeight="bold" />
+						<mx:ComboBox id="cboFieldTypes" change="changeFieldTypeAction()" width="160" />
+					</mx:HBox>						
+				</mx:FormItem>	
+				
+				<mx:FormItem paddingTop="0" id="piclistValueITem" height="0">
+					<mx:VBox width="100%">
+						<mx:HBox id="hBoxFielList">
+							<mx:Label id="lblFieldList" text="{i18n._('CALCULATEDFIELD_FIELD_LIST')}" textAlign="right" fontWeight="bold" width="100"/>
+							<mx:ComboBox id="cboFieldList"  dataProvider="{fieldList}" change="changeFieldListAction();" maxWidth="250"  />
+							<mx:Button id="btnImportPicklist" label="{i18n._('GLOBAL_IMPORT_CSV')}" click="browseAndUpload()" enabled="true"/>		
+						</mx:HBox>
+						<mx:VBox width="100%">
+							<mx:HBox>												
+								<mx:Label id="lblFieldPicklists" text="{i18n._('CALCULATEDFIELD_OOD_PICKLIST')}" width="100" textAlign="right" fontWeight="bold" maxWidth="100"/>
+								<mx:ComboBox id="cboFieldPicklists" dataProvider="{entityPicklistList}" change="changeFieldPicklistAction()" maxWidth="250"/>
+								<mx:Label id="lblParentPicklists" text="{i18n._('CALCULATEDFIELD_PARENT_PICKLIST')}" textAlign="right" fontWeight="bold" maxWidth="150"/>
+								<mx:ComboBox id="cboParentPicklists" dataProvider="{parentPicklistList}" change="changeParentPicklistAction()" maxWidth="250"/>																															
+							</mx:HBox>
+						</mx:VBox>
+						<mx:HBox paddingTop="0">								
+							<mx:Label id="picklistDesc" paddingLeft="120" text="" height="20" width="740"/>
+						</mx:HBox>	
+						<mx:HBox paddingTop="0">
+							<mx:Label textAlign="right" text="{i18n._('CALCULATEDFIELD_PICKLIST_VALUE')}" height="20" width="100" fontWeight="bold"/>
+							<!-- mx:TextArea id="txtArPicklistValue" height="225" width="200" / -->
+							<mx:DataGrid sortableColumns="false" dragEnabled="true" id="gridCustomPicklist" width="200" dataProvider="{customPicklistValue}" doubleClickEnabled="true" height="205" editable="true"  doubleClick="gridDoubleClick_hanler()">
+								<mx:columns>
+									<mx:DataGridColumn dataField="data" headerText="" visible="false" />
+									<mx:DataGridColumn dataField="label" headerText="{i18n._('CALCULATEDFIELD_LOCAL_VALUES')}" />
+								</mx:columns>
+							</mx:DataGrid>
+							<mx:DataGrid sortableColumns="false" dropEnabled="true" id="gridFieldPicklist" width="200" dataProvider="{fieldPicklistValue}" height="205">
+								<mx:columns>
+									<mx:DataGridColumn dataField="data" headerText="" visible="false" />
+									<mx:DataGridColumn dataField="label" headerText="{bindGridName}" />
+								</mx:columns>
+							</mx:DataGrid>
+							<!-- mx:TextArea id="txtArBindPicklist" height="225" width="0" editable="false"/ -->
+							<mx:DataGrid sortableColumns="false" id="gridBindPicklist" dragMoveEnabled="true" draggableColumns="false" width="300" dataProvider="{bindPicklistValue}" doubleClickEnabled="true" height="205">
+								<mx:columns>	
+									<mx:DataGridColumn dataField="crmData" headerText="" visible="false" />
+									<mx:DataGridColumn dataField="oodData" headerText="" visible="false" />
+									<mx:DataGridColumn dataField="crmLabel" headerText="{i18n._('CALCULATEDFIELD_LOCAL_VALUE')}" />
+									<mx:DataGridColumn dataField="oodLabel" headerText="{bindGridName}" />
+								</mx:columns>
+							</mx:DataGrid>
+						</mx:HBox>	
+						<mx:HBox paddingTop="0" paddingLeft="120">
+							<mx:CheckBox id="chkDefaultValue" label="{i18n._('CALCULATEDFIELD_USE_FIRST_VALUE_AS_DEFAULT_VALUE')}" height="20" fontWeight="bold"/>
+						</mx:HBox>
+					</mx:VBox>	
+				</mx:FormItem>
+				
+				<mx:VBox id="tree">
+					<mx:FormItem paddingTop="0" >
+						<mx:VBox paddingLeft="80" width="100%">
+							<mx:Button label="Upload" click="uploadXMLFile()" />
+							<mx:Label text="Drag and Drop one 'Tree Field' to 'OOD Field' to link them" width="100%"/>
+						</mx:VBox>	
+						<mx:HBox paddingTop="0">
+							<mx:Label textAlign="right" height="20" width="100" fontWeight="bold"/>
+							<mx:DataGrid id="treeColumn" dataProvider="{treeField}" sortableColumns="false" dragEnabled="true" width="200" height="205">
+								<mx:columns>
+									<mx:DataGridColumn dataField="data" headerText="" visible="false" />
+									<mx:DataGridColumn dataField="label" headerText="Tree Field" />
+								</mx:columns>
+							</mx:DataGrid>
+							<mx:DataGrid id="oodColumn" dataProvider="{oodField}" sortableColumns="false" dropEnabled="true" width="200" height="205">
+								<mx:columns>
+									<mx:DataGridColumn dataField="column" headerText="" visible="false" />
+									<mx:DataGridColumn dataField="label" headerText="OOD Fields" />
+								</mx:columns>
+							</mx:DataGrid>
+							<mx:DataGrid id="mapTreeAndOODField" dataProvider="{bindPicklistValue}" sortableColumns="false" dragMoveEnabled="true" draggableColumns="false" width="300" doubleClickEnabled="true" height="205">
+								<mx:columns>	
+									<mx:DataGridColumn dataField="crmData" headerText="" visible="false" />
+									<mx:DataGridColumn dataField="oodData" headerText="" visible="false" />
+									<mx:DataGridColumn dataField="crmLabel" headerText="Tree Field" />
+									<mx:DataGridColumn dataField="oodLabel" headerText="OOD Field" />
+								</mx:columns>
+							</mx:DataGrid>
+						</mx:HBox>
+					</mx:FormItem>
+				</mx:VBox>	
+				
+				<mx:VBox id="formula">
+					<mx:FormItem paddingTop="5" id="inputExpressionITem" >
+						<mx:HBox>
+							<mx:Label text="{i18n._('GLOBAL_FIELDS')}" textAlign="right" width="100" fontWeight="bold" />
+							<mx:ComboBox id="cboEntityFields" dataProvider="{entityFeildList}" width="160" />
+							<mx:Button id="btnInsert" width="70" label="{i18n._('GLOBAL_INSERT')}" click="insert_clickHanler(event)" right="0"/>
+							<mx:Label text="{i18n._('GLOBAL_OPERATORS')}" textAlign="right" fontWeight="bold" />
+							<mx:ComboBox id="cboOperators" width="60" dataProvider="{operatorData}" change="changeOperatorAction(event)" />
+							<mx:Label text="{i18n._('Image')}" textAlign="right" fontWeight="bold" />
+							<mx:ComboBox id="cboImage" width="60" dataProvider="{imagesCombo}" change="changeImageAction(event)" />
+							<mx:Label text="{i18n._('GLOBAL_FUNCTIONS')}" fontWeight="bold" />
+							<mx:ComboBox id="cboFunctions" dataProvider="{functionsData}" width="140" change="changeFunctionAction(event)" right="0"/>
+						</mx:HBox>
+					</mx:FormItem>
+					<mx:FormItem width="100%" id="expressionITem">
+						<mx:VBox>
+							<mx:HBox paddingTop="0">
+								<mx:Label textAlign="right" text="{i18n._('GLOBAL_EXPRESSION')}" height="20" width="100" fontWeight="bold"/>
+								<mx:TextArea id="txtArFormula" height="225" width="520" />
+								<mx:VBox>
+									<mx:Button id="btnInsertfunction" label="{i18n._('GLOBAL_INSERT_SELECTED_FUNCTION')}" maxWidth="185" click="insertFunction_clickHanler(event)" right="0"/>
+									<mx:TextArea id="txtArFunctionDesc" height="195" width="185" editable="false"/>
+								</mx:VBox>
+							</mx:HBox>
+							<mx:HBox paddingTop="0" paddingLeft="120">
+								<mx:Button id="btnCheckSynTax" label="{i18n._('GLOBAL_CHECK_SYNTAX')}" click="checkSyntax_clickHanler(event)" right="0"/>
+							</mx:HBox>	
+						</mx:VBox>
+					</mx:FormItem>	
+				</mx:VBox>
+				
+			</mx:Form>
+			<mx:VBox id="sumPanel" visible="false" includeInLayout="false" height="250" paddingLeft="30">
+				<mx:HBox height="40">
+					<mx:VBox>
+						<mx:Label text="{i18n._('GLOBAL_CHILDREN')}" textAlign="right" width="100" fontWeight="bold" />
+					</mx:VBox>
+					<mx:VBox>
+						<mx:ComboBox id="cboEntitySum"  width="159" change="getFields()" />
+					</mx:VBox>
+					<mx:VBox>
+						<mx:Label text="{i18n._('GLOBAL_AGGREGATION')}" textAlign="right" width="90" fontWeight="bold" />
+					</mx:VBox>
+					<mx:VBox>
+						<mx:ComboBox id="cboEntityFieldsSum" dataProvider="{entityFeildList}" width="159" />
+					</mx:VBox>
+				</mx:HBox>
+				<mx:HBox >
+					<mx:VBox>
+						<mx:Label text="{i18n._('GLOBAL_COPY_RESULT_INTO')}" textAlign="right" width="100" fontWeight="bold" />
+					</mx:VBox>
+					<mx:VBox>
+						<mx:ComboBox id="cboCopyField"  width="159" />
+					</mx:VBox>
+				</mx:HBox>
+			</mx:VBox>
+			
+			<mx:HBox id='buttonLayout' width="95%" horizontalAlign="right" right="20">
+				<mx:Button id="closeBtn" label="{i18n._('GLOBAL_CLOSE')}" click="close()" icon="{ImageUtils.cancelIcon}"/>
+				<mx:Button id="createBtn" label="{i18n._('GLOBAL_SAVE')}" click="update_clickHanler(event)" icon="{ImageUtils.acceptIcon}"/>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

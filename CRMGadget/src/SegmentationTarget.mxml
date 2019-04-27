@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	width="100%" height="100%"
+	xmlns:form="gadget.form.*"
+	initialize="init()"
+	>
+	<mx:Script>
+		<![CDATA[
+			import flash.net.navigateToURL;
+			
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.sync.incoming.GetContentCustomTab;
+			[Bindable] public var list:List;
+			private function onError(htmlText:String,error:Object=null):void{
+				if(htmlText != null && htmlText.indexOf("#2032")!=-1){
+					myHtml.htmlText = i18n._("GLOBAL_NO_INTERNET_CONNECTION@No internet connection");
+				}else{
+					myHtml.htmlText = htmlText;
+				}				
+			}
+			private function callback(urlReq:URLRequest):void{
+				
+				myHtml.addEventListener(IOErrorEvent.IO_ERROR, function(e:IOErrorEvent):void {
+					onError(e.text,e);
+				});
+				myHtml.addEventListener(Event.COMPLETE,function onBack(e:Event):void{
+					var document:Object = myHtml.htmlLoader.window.document;
+					var body:Object = document.getElementsByTagName("body");
+					var bottonLayout:Object = document.getElementsByClassName("PoweredByMsg");
+					if(bottonLayout != null && bottonLayout[0] != null){
+						bottonLayout[0].setAttribute("style","visibility: hidden");
+					}
+					body[0].onmousedown = function(o:Object):void
+					{
+						var parentNode:Object = o.target.parentNode;
+						
+						if(parentNode != null){
+							var href:String = parentNode.href;
+							if(href != null && href != "" && parentNode.href.indexOf("javascript:void") != 0){
+								openBrowser(parentNode.href);
+							}
+							
+						}
+						
+					}
+				});
+				myHtml.htmlLoader.load(urlReq);
+			}
+			private function init():void {
+				var getCustomTab:GetContentCustomTab = new GetContentCustomTab(callback,onError);
+				getCustomTab.doRequest();
+			}
+			private function openBrowser(url:String):void {
+				//var u:URLRequest = new URLRequest("javascript:window.location.href='"+url+"'");
+				navigateToURL(new URLRequest(url), "_self");
+			}
+		]]>
+	</mx:Script>
+	<mx:VBox width="100%" height="100%">
+		<mx:HTML  id="myHtml" width="100%" height="100%">
+		
+		</mx:HTML>
+		<!--
+		<mx:VBox borderColor="#BECEE5" borderStyle="solid" height="60" width="100%">
+			<mx:Canvas backgroundColor="#BECEE5" width="100%" height="30">
+				<mx:Label fontSize="14" fontWeight="bold" text="{i18n._('SEGMENTATION_TARGET')}"/>
+			</mx:Canvas>
+		</mx:VBox>
+		
+		<mx:VBox borderColor="#BECEE5" borderStyle="solid" width="100%">
+			<mx:Label paddingTop="10"/>
+			<mx:LinkButton  color="#2c79b8" label="{i18n._('ST_PERSON')}" click="openBrowser('http://www.google.com')"/>
+			<mx:LinkButton color="#2c79b8" label="{i18n._('ST_DASHBOARD_TERRITORY')}" click="openBrowser('http://www.ideaondemand.com')"/>
+			<mx:LinkButton color="#2c79b8" label="{i18n._('ST_DASHBOARD_FOR_COMPANY')}" click="openBrowser('http://www.fabebook.com')"/>
+			<mx:LinkButton color="#2c79b8" label="{i18n._('ST_DASHBOARD_SALES_MNAGER')}" click="openBrowser('http://www.adobe.com/')"/>
+		</mx:VBox>
+		<mx:VBox borderColor="#BECEE5" borderStyle="solid" width="100%">
+			<mx:Label paddingTop="10"/>
+			<mx:LinkButton  color="#2c79b8" label="{i18n._('ST_CALLPLAN')}" click="openBrowser('http://www.google.com')"/>
+			<mx:LinkButton color="#2c79b8" label="{i18n._('ST_COMPIANCE_ACCOUNT_TARGET')}" click="openBrowser('http://www.google.com')"/>
+			<mx:LinkButton color="#2c79b8" label="{i18n._('ST_COMPLIANCE_TERRITORY_CUSTOMER')}" click="openBrowser('http://www.google.com')"/>
+		</mx:VBox>
+		-->
+	</mx:VBox>
+	
+</mx:Canvas>

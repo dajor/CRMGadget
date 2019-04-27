@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	xmlns:control="gadget.control.*"
+	width="500" height="480"
+	title="{i18n._(ADD_FOLLOWING)}" 
+	showFlexChrome="false" transparent="true" systemChrome="none" 
+	creationComplete="txtSearch.setFocus()">
+	
+	<mx:Script>
+		<![CDATA[
+			import gadget.chatclient.CRMXAMPPConnection;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.ListEvent;
+	
+			public var chatClientControl:ChatClientControl;
+			
+			private static const ADD_FOLLOWING:String = 'Add Following';
+			private static const LABEL_SEARCH:String = 'Search';
+			private static const LABEL_RESULTS:String = 'Results';
+			private static const STR_FOLLOW:String = 'Follow';
+			
+			[Bindable] private var allUsers:ArrayCollection = new ArrayCollection();
+			
+			private var currentUser:Object = Database.currentUserDAO.getCurrentUser();
+			
+			private function doSearch():void {
+				var columns:ArrayCollection = new ArrayCollection([
+					{'element_name': 'Id'},
+					{'element_name': 'MrMrs'},
+					{'element_name': 'FirstName'},
+					{'element_name': 'LastName'},
+					{'element_name': 'Alias'},
+					{'element_name': 'JobTitle'},
+					{'element_name': 'EMailAddr'},
+					{'element_name': 'PhoneNumber'},
+					{'element_name': 'Department'}
+				]);
+				
+				if(txtSearch.text == ""){
+					allUsers = new ArrayCollection();
+					return;
+				}
+
+				var filter:String = "uppername like '" + txtSearch.text.toUpperCase() + "%' AND Id !='" + currentUser.id + "'";
+				allUsers = Database.allUsersDao.filter(columns, filter);
+			}
+			
+			protected function btnFollow_clickHandler(event:MouseEvent):void
+			{
+				var selectedIndex:int = resultList.selectedIndex;
+				if(selectedItem==-1 || resultList.dataProvider == null){
+					Alert.show("Please select an user to follow.","",4,this);
+					return;
+				} 
+				var selectedItem:Object = (resultList.dataProvider as ArrayCollection).getItemAt(selectedIndex);
+//				CRMXAMPPConnection.getInstance().addFollowing(selectedItem.Id);
+//				Database.feedUserDAO.replace(selectedItem);
+				CRMXAMPPConnection.getInstance().addFollowing(selectedItem);
+				chatClientControl.reloadData();
+				this.close();
+			}
+
+			protected function resultList_itemDoubleClickHandler(event:ListEvent):void
+			{
+				btnFollow_clickHandler(null);
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	
+	<mx:Canvas styleName="main" left="0" top="0" width="500" height="480" right="0" bottom="0">
+		<control:TitleBar icon="@Embed(source='/assets/search.png')" title="{i18n._(ADD_FOLLOWING)}"/>
+		<mx:VBox top="32" left="16" right="16">
+			<mx:Form width="100%" paddingBottom="8">
+				<mx:Label id="info" left="0"/>
+				<mx:FormItem label="{i18n._(LABEL_SEARCH)}">
+					<mx:TextInput id="txtSearch" change="doSearch()"/>
+				</mx:FormItem>
+				<mx:FormItem label="{i18n._(LABEL_RESULTS)}" width="100%">
+					<mx:List id="resultList" width="100%" height="300" dataProvider="{allUsers}" labelField="Alias" itemDoubleClick="resultList_itemDoubleClickHandler(event)"/>
+					<!--
+					<mx:List id="resultList" width="100%" dataProvider="{allUsers}" rowCount="5">
+						<mx:itemRenderer>
+							<mx:Component>
+								<mx:HBox horizontalScrollPolicy="off" horizontalAlign="left" horizontalGap="0">
+									<mx:Script>
+										<![CDATA[
+											import gadget.util.ImageUtils;
+										]]>
+									</mx:Script>
+									<mx:Image id="followingImage" width="50" height="50" source="@Embed(source='assets/d_silhouette.gif')"/>
+									<mx:Label text="{data.Alias}" width="100%"/>
+								</mx:HBox>								
+							</mx:Component>
+						</mx:itemRenderer>
+					</mx:List>
+					-->
+				</mx:FormItem>
+			</mx:Form>
+			<mx:Canvas width="100%">
+				<mx:HBox horizontalAlign="right" width="100%">
+					<mx:Button id="btnClose" label="{i18n._('GLOBAL_CLOSE')}" click="this.close()" right="0"/>
+					<mx:Button id="btnFollow" label="{i18n._(STR_FOLLOW)}" click="btnFollow_clickHandler(event)" right="0"/>
+				</mx:HBox>					
+			</mx:Canvas>			
+		</mx:VBox>
+	</mx:Canvas>
+</mx:Window>

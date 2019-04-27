@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXAdvancedDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								  xmlns:s="library://ns.adobe.com/flex/spark" 
+								  xmlns:mx="library://ns.adobe.com/flex/mx" 
+								  focusEnabled="true" height="100%" width="100%"								  
+								  >
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridListData;
+			import mx.controls.listClasses.BaseListData;
+			
+			import spark.components.CheckBox;
+			public var column:AdvancedDataGridColumn;
+			private var grid:AdvancedDataGrid;
+			private var list:ArrayCollection ;
+						
+			private function clickFunction(e:Event):void{
+				 if(column!=null){
+					 data[column.dataField] = chkBox.selected ? '1' :'0';
+				 }
+			 }	
+
+			 override public function set data(value:Object):void{		
+				super.data = value;
+				if(column!=null && value){					
+					var val:Object = value[column.dataField];
+					chkBox.selected=(val==true || val=="true" || val==1 || val=="1");
+				}
+			 }
+						
+			override public function set listData(value:BaseListData):void{
+				super.listData = value;
+				if(value!=null){
+					grid= value.owner as AdvancedDataGrid;
+					var list:AdvancedDataGridListData = value as AdvancedDataGridListData;
+					if(list!=null){					
+						column = grid.columns[list.columnIndex];						
+					}
+					
+				}
+			}
+			
+		]]>
+		
+	</fx:Script>
+	<mx:HBox verticalAlign="middle" width="100%" height="30" paddingBottom="3" horizontalAlign="center">
+		<s:CheckBox id="chkBox" click="clickFunction(event)" />
+	</mx:HBox>
+</s:MXAdvancedDataGridItemRenderer>

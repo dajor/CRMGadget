@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"
+	showFlexChrome="false" transparent="true" systemChrome="none"
+	width="980" height="640"
+	xmlns:form="gadget.form.*" 
+	initialize="initial()"
+	>
+	
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.rtc.sharedManagers.descriptors.FileDescriptor;
+			import com.adobe.utils.DateUtil;
+			import com.google.analytics.utils.Environment;
+			import com.google.analytics.utils.Variables;
+			
+			import flex.lang.reflect.Field;
+			
+			import gadget.control.LinkButtonColRenderer;
+			import gadget.control.LinkButtonRevenueColRenderer;
+			import gadget.dao.Database;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.util.DashboardUtils;
+			import gadget.util.DateUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Form;
+			import mx.containers.FormItem;
+			import mx.containers.HBox;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.controls.VRule;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.events.IndexChangedEvent;
+			import mx.events.ItemClickEvent;
+			import mx.managers.DragManager;
+			import mx.managers.SystemManager;
+			import mx.utils.StringUtil;
+			
+			import org.igniterealtime.xiff.data.whiteboard.Path;
+			[Embed(source='/assets/upload_config.png')] [Bindable] public static var importIcon:Class;
+			private static const GLOBAL_EDIT:String = 'PREFERENCES_LINKBUTTON_TOOLTIP_IMPORT_CONFIGURATION';
+			
+			private var numOfPage:int = 3;
+			private var fields:ArrayCollection;
+			[Bindable] private var innerCanvasL:Array = new Array();
+			[Bindable] private var leftFormL:Array = new Array();
+			[Bindable] private var vRuleL:Array = new Array();
+			[Bindable] private var rightFormL:Array = new Array();
+			[Bindable] private var heightLeftL:Array = new Array();
+			[Bindable] private var heightRightL:Array = new Array();
+			
+			private var grid1:AdvancedDataGrid = null;
+			private var grid2:AdvancedDataGrid = null;
+			
+			[Bindable] public var accId:String;
+			
+			
+			
+			private function initial():void {
+				initTab();
+				//initForm();
+			}
+			
+			
+			
+			private function initTab():void {
+				
+				
+				for(var p:int = 0; p < numOfPage; p++){
+					var innerCanvas:Canvas = new Canvas();
+					innerCanvas.horizontalScrollPolicy = "off";
+					innerCanvas.percentWidth = 100;
+					innerCanvas.percentHeight = 100;
+					
+					var hBox:HBox = new HBox();
+					hBox.setStyle('horizontalGap', 0);
+					hBox.percentWidth = 100;
+					hBox.percentHeight = 100;
+					
+					
+					//leftForm.setStyle('verticalGap', 2);
+					
+					//var vRule:VRule = new VRule();
+					//vRule.percentHeight = 100;
+					
+					innerCanvas.label = i18n._('GLOBAL_PAGE') + " " + p;
+					//rightForm.setStyle('verticalGap', 0);
+					if(p==0){
+						innerCanvas.label = "Account";
+						var f:Form = createFormAccountLayout();
+						hBox.addChild(f);
+					}else if(p==1){
+						grid1 = DashboardRevenue.getGridTab1();
+						hBox.addChild(grid1);
+					}else if(p==2){
+						grid2 = DashboardRevenue.getGridTab2();
+						hBox.addChild(grid2);
+					}
+					
+					///hBox.addChild(vRule);
+					
+					innerCanvas.addChild(hBox);
+					
+					
+					viewstack.addChild(innerCanvas);
+					
+					
+					
+				}
+				
+				
+				reload();
+			}
+			
+			private function createFormAccountLayout():Form{
+				var form:Form = new Form();
+				var formItem:FormItem = new FormItem();
+				var lb:Label = new Label();
+				lb.text = accId;
+				
+				formItem.label = "Account";
+				formItem.addChild(lb);
+				form.addChild(formItem);
+				return form;
+			}
+		
+		
+			public function reload():void {
+				/*viewstack.removeAllChildren();
+				initTab();
+				
+				if(viewstack.getChildren().length <= currentSelected){
+					currentSelected = 0;
+				}				
+				viewstack.selectedIndex = currentSelected;
+				*/
+				
+				var ls:ArrayCollection = new ArrayCollection(Database.revenueDao.fetch({ShipToPrimary:accId}));
+				grid1.dataProvider = ls;
+				grid2.dataProvider = ls;
+				lblCount.text ="Count ("+ls.length +")";
+				
+			}
+			
+			
+		
+			
+			
+			private var fMax:Boolean = false;
+			private function viewRestoreMaxWindow():void {
+				if (fMax) {
+					fMax = false;
+					//restore();
+				} else { 
+					fMax = true; 
+					//maximize();
+				}
+			}
+			
+			
+		
+			private function loadDataByMonth(month:String):void{
+				var data:ArrayCollection = new ArrayCollection(Database.revenueDao.fetch({Month: month}));
+				grid1.dataProvider = data;
+				grid2.dataProvider = data;
+				lblCount.text ="Count ("+data.length +")";
+			}
+			
+			
+		]]>
+	</mx:Script>
+	
+	
+	<mx:Style source="styles.css"/>
+	<mx:Canvas horizontalScrollPolicy="off" styleName="main" left="0" top="0" width="980" height="640" right="0" bottom="0">
+		<control:TitleBar id="titlebar" y="2" x="25"/>		
+		<mx:VBox width="100%" height="100%" paddingTop="35" paddingLeft="10" paddingRight="10" paddingBottom="50">			
+			<mx:TabNavigator id="viewstack" width="100%" height="100%" tabHeight="24" creationPolicy="all" />
+			<mx:HBox horizontalAlign="right" width="100%" paddingRight="50">
+				<mx:Label fontWeight="bold" id="lblCount" />
+			</mx:HBox>
+		</mx:VBox>
+	</mx:Canvas>
+	
+</mx:Window>

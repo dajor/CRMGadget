@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Window
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:control="gadget.control.*"  
+	resizable="false"
+	showFlexChrome="true" transparent="false" systemChrome="none"
+	width="600" height="436"
+	title="OOPS"
+	autoLayout="false"
+	creationComplete="window1_creationCompleteHandler(event)"
+	close="window1_closeHandler(event)" paddingLeft="5" paddingRight="5" paddingBottom="5" paddingTop="5" showStatusBar="false">
+	<mx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			//VAHI shoot me, but I really do not get
+			// how to show an simple alert()-box in AIR.
+			// So I had to invent this here ..
+
+			private static var myEvent:EventDispatcher;
+			private static var iAmOpen:OOPSwindow;
+			private static var OOPSes:Array = [];
+			private static var lastSelected:Boolean = true;
+			
+			public static function OOPS(s:String):void {
+				if (OOPSes!=null) {
+					if (s.substr(0,1)!='=')
+						s="=OOPS"+s;
+					OOPSes.push(s);
+					if (myEvent!=null) {
+						myEvent.dispatchEvent(new Event("OOPS",true,false));
+					}
+				}
+			}
+
+			public static function init():void {
+				myEvent = new EventDispatcher();
+				myEvent.addEventListener("OOPS",open_me);
+				if (OOPSes==null)
+					OOPSes = [];
+				open_me(null);
+			}
+			
+			public static function bye():void {
+				myEvent = null;
+				OOPSes = null;
+				if (iAmOpen)
+					iAmOpen.close();
+			}
+			
+			private function update():void {
+				OOPSes.unshift(info.text);
+				info.text = OOPSes.join("\n\n");
+				OOPSes = [];
+				if (!mini.selected) {
+					iAmOpen.activate();
+				}
+			}
+
+			private static function open_me(e:Event):void {
+				if (!OOPSes.length)
+					return;
+				if (!iAmOpen) {
+					iAmOpen = new OOPSwindow();
+					iAmOpen.open(false);
+					// next comes window1_creationCompleteHandler
+				} else {
+					iAmOpen.update();
+				}
+			}
+
+			protected function window1_creationCompleteHandler(event:FlexEvent):void
+			{
+				mini.selected = lastSelected;
+				update();
+				if (lastSelected)
+					this.minimize();
+			}
+
+			protected function window1_closeHandler(event:Event):void
+			{
+				iAmOpen = null;
+			}
+
+			protected function checkbox1_clickHandler(event:MouseEvent):void
+			{
+				lastSelected = mini.selected;
+				if (mini.selected)
+					this.minimize();
+			}
+
+
+			protected function info_valueCommitHandler(event:FlexEvent):void
+			{
+				info.verticalScrollPosition = info.maxVerticalScrollPosition;
+			}
+
+		]]>
+	</mx:Script>
+	<mx:CheckBox label="Minimized" click="checkbox1_clickHandler(event)" id="mini"/>
+	<mx:TextArea width="570" height="358" id="info" editable="false" valueCommit="info_valueCommitHandler(event)"/>
+</mx:Window>

@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+		   creationComplete="addContextMenuList();">
+	<mx:Script>
+		<![CDATA[
+			import gadget.dao.CriteriaDAO;
+			import gadget.dao.CustomLayoutDAO;
+			import gadget.dao.Database;
+			import gadget.dao.FilterDAO;
+			import gadget.dao.PreferencesDAO;
+			import gadget.i18n.i18n;
+			import gadget.lists.List;
+			import gadget.sync.WSProps;
+			import gadget.util.DashboardUtils;
+			import gadget.util.GUIUtils;
+			import gadget.util.MenuUtils;
+			import gadget.util.StringUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.LinkButton;
+			import mx.core.Window;
+			import mx.events.CloseEvent;
+			import mx.events.ItemClickEvent;
+			
+			[Bindable] private var filterList:ArrayCollection;
+			[Bindable] public var list:List;
+			
+			private var objectTransaction:Object;
+			private var filterSelectedIndices:Object = new Object();
+			
+			public function listFilters():void {
+				filterList = Utils.getAllFilters(list.entity);
+
+				filterGrid.dataProvider = filterList;
+				
+				if( filterSelectedIndices[list.entity] != null ){
+					filterGrid.selectedIndex = filterSelectedIndices[list.entity];
+				}
+			}	
+			
+			public function getTransactionObject():Object{
+				//Bug #6516 CRO
+				//if(list!=null && objectTransaction==null){
+				
+				if(list!=null){
+					objectTransaction = Database.transactionDao.find(list.entity);
+				}
+				return objectTransaction;
+			}
+			
+			private function handleFilterBar(event:ItemClickEvent):void {
+				//CRO 05.01.2011
+				if (event.label == i18n._('GLOBAL_BOOKMARK')) {
+					bookmarkFilter();
+				}
+				if (event.label == 'New' || event.index==0) {
+					newFilter();
+				}
+				if (event.label == i18n._('GLOBAL_EDIT') || event.index==1) {
+					editFilter();
+				}
+				if (event.label == i18n._('GLOBAL_DELETE') || event.label == 'Del' || event.index==2) {
+					deleteFilter();
+				}
+			}
+			
+			private function newFilter():void {
+				var filterCreate:FilterCreate = new FilterCreate(); 
+				filterCreate.filter = new Object();
+				filterCreate.filter.entity = list.entity;
+				filterCreate.criteria1 = new Object();
+				filterCreate.criteria2 = new Object();
+				filterCreate.criteria3 = new Object();
+				filterCreate.criteria4 = new Object();
+				filterCreate.criteria5 = new Object();
+				filterCreate.filterList = this;
+				WindowManager.openModal(filterCreate);			
+			}
+			
+			private function bookmarkFilter(obj:Object=null):void {
+				if (obj == null) obj = filterGrid.selectedItem;
+				if (obj == null) Alert.show(i18n._('FILTERLIST_ALERT_PLEASE_SELECT_AN_ITME_TO_BOOKMARK'), "", Alert.OK, this);
+				if (obj != null) {
+					(parentApplication as MainWindow).addBookmark(obj);
+				}
+			}
+			
+			private function editFilter(obj:Object=null):void {
+				var objTarget:Object = obj;
+				if (objTarget == null) objTarget = filterGrid.selectedItem;
+				if (objTarget == null) {
+					Alert.show(i18n._('FILTERLIST_ALERT_PLEASE_SELECT_THE_FILTER_TO_EDIT'), "", Alert.OK, this);
+					return;
+				}   
+				if (objTarget.type <= 0 ){
+					var predefinedDetail:FilterPredefinedDetail = new FilterPredefinedDetail();
+					predefinedDetail.filter = objTarget;
+					predefinedDetail.list = list;
+					WindowManager.openModal(predefinedDetail);
+					//Alert.show("Predefined filters cannot be edited.", "", Alert.OK, this);
+					return;	
+				}
+				if ( objTarget != null && objTarget.type > 0 ){				
+					var filterDetail:FilterDetail = new FilterDetail();
+					filterDetail.filterName = objTarget.name;
+					filterDetail.filter = objTarget;
+					filterDetail.criteria1 = Database.criteriaDao.find(filterDetail.filter.id, "1");
+					filterDetail.criteria2 = Database.criteriaDao.find(filterDetail.filter.id, "2");
+					filterDetail.criteria3 = Database.criteriaDao.find(filterDetail.filter.id, "3");
+					filterDetail.criteria4 = Database.criteriaDao.find(filterDetail.filter.id, "4");
+					filterDetail.criteria5 = Database.criteriaDao.find(filterDetail.filter.id, "5");
+					filterDetail.filterList = this;
+					filterDetail.list = list;
+					WindowManager.openModal(filterDetail);
+				}
+			}		
+			
+			private function deleteFilter(obj:Object=null):void {
+				var objTarget:Object = obj;
+				if (objTarget == null) objTarget = filterGrid.selectedItem;
+				if (objTarget == null) {
+					Alert.show(i18n._('FILTERLIST_ALERT_PLEASE_SELECT_THE_FILTER_TO_DELETE'), "", Alert.OK, this);
+					return;
+				}
+				if (objTarget.type <= 0) {
+					Alert.show(i18n._('FILTERLIST_ALERT_PREDEFINED_FILTERS_CANNOT_BE_DELETED'), "", Alert.OK, this);
+					return;
+				}
+				// don't allow to delete this filter if it was used in dashboard layout.
+				var cols:String = DashboardUtils.getColumnNameUsedInLayout(objTarget.id);
+				if(!StringUtils.isEmpty(cols)) {
+					Alert.show("Please delete this dashboard layout [ " + cols + " ] before delete this filter", "", Alert.OK, this);
+					return;
+				}
+				//CRO 05.01.2011
+				Alert.show(i18n._('GLOBAL_ARE_YOU_SURE_YOU_WANT_TO_DELETE'), i18n._('GLOBAL_DELETE_FILTER'), Alert.YES|Alert.NO, this, function(event:CloseEvent):void{
+					if (event.detail==Alert.YES){
+						Database.filterDao.delete_(objTarget);
+						Database.criteriaDao.delete_(objTarget);
+						//CRO #1345
+						Database.customFilterTranslatorDao.deleteByFilterId(objTarget.entity,objTarget.name);
+						listFilters();
+						(parentApplication as MainWindow).loadBookmarks();
+					}
+				});
+			}
+			
+			private function makeDefaultFilter(obj:Object=null):void{
+				var objTarget:Object = obj;
+				if (objTarget == null) objTarget = filterGrid.selectedItem;
+				if (objTarget == null) {
+					Alert.show(i18n._('FILTERLIST_ALERT_PLEASE_SELECT_THE_FILTER_TO_MAKE_DEFAULT'), "", Alert.OK, this);
+					return;
+				}
+				Database.transactionDao.makeDefaultFilter(objTarget.type, objTarget.entity);
+				// Bug #78
+				filterSelectedIndices[obj.entity] = (filterGrid.dataProvider as ArrayCollection).source.indexOf(obj);
+				list.doFilter(obj);
+				listFilters();
+			}
+						
+			private function addContextMenuList():void {
+				filterGrid.contextMenu = MenuUtils.getContextMenuFilter(bookmarkFilter, editFilter, deleteFilter, makeDefaultFilter);
+			}
+			
+			public static function getHeaderText(lst:List):String{
+				
+				if(lst.entity==Database.activityDao.entity){
+					var languageCode:String =  Database.allUsersDao.ownerUser().LanguageCode;
+					if(languageCode=='CHS'){//bug#8074
+						return "活动 筛选";
+					}
+				}
+				
+				return GUIUtils.getListName(lst.displayName ,' ' + i18n._('FILTERLIST_DATAGRID_COLUMN_HEADER_TEXT_FILTERS'));
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:VBox width="100%" height="100%" verticalGap="0">
+		<mx:DataGrid sortableColumns="false" dragEnabled="true" id="filterGrid" width="100%" height="100%"
+					 click="list.filter = filterGrid.selectedItem; list.initGridColumns(); list.doFilter(filterGrid.selectedItem); filterSelectedIndices[list.entity] = filterGrid.selectedIndex; list.computeColumnList();"
+					 doubleClickEnabled="true" doubleClick="editFilter()" >
+			<mx:columns><!-- GUIUtils.getListName method use to add change PTG translation-->
+				<mx:DataGridColumn headerText="{getHeaderText(list)}">
+					<mx:itemRenderer>
+						<mx:Component>
+							<mx:HBox width="100%" horizontalScrollPolicy="off">
+								<mx:Script>
+									<![CDATA[
+										import gadget.dao.Database;
+										import gadget.i18n.i18n;
+										import gadget.util.StringUtils;
+										
+										private function setToBold(data:Object):String {
+											if (data == null) return "normal";
+											return data.type <= 0 ? 'bold' : 'normal';
+										}
+										
+										private function getText(data:Object):String{
+											//var obj:Object = outerDocument.getTransactionObject();
+											if(data.isDefault){
+												return " "+i18n._('FILTERLIST_TEXT_DEFAULT');
+											}
+											return "";
+										}
+									]]>
+								</mx:Script>
+								<mx:Label width="100%" text="{data.displayName} {getText(data)}" fontWeight="{setToBold(data)}"/>
+							</mx:HBox>
+						</mx:Component>
+					</mx:itemRenderer>
+				</mx:DataGridColumn>
+			</mx:columns>		
+		</mx:DataGrid>	
+		<mx:ButtonBar itemClick="handleFilterBar(event)" width="100%">
+			<mx:dataProvider>
+				<mx:Object icon="@Embed('/assets/add.png')" toolTip="{i18n._('FILTERLIST_BUTTON_BAR_TOOL_TIP_NEW_FILTER')}" />
+				<mx:Object icon="@Embed('/assets/edit.png')" toolTip="{i18n._('FILTERLIST_BUTTON_BAR_TOOL_TIP_EDIT_FILTER')}" />
+				<!--CRO 05.01.2011-->
+				<mx:Object icon="@Embed('/assets/delete.png')" toolTip="{i18n._('GLOBAL_DELETE_FILTER')}" />
+			</mx:dataProvider>
+		</mx:ButtonBar>	
+	</mx:VBox>
+</mx:Canvas>

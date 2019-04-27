@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox 
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:flexlib="flexlib.scheduling.*" 
+	xmlns:control="gadget.control.*"
+	xmlns:form="gadget.form.*"
+	creationComplete="init()">
+	
+	<mx:Script>
+		<![CDATA[		
+			import flash.utils.getTimer;
+			
+			import flexlib.scheduling.util.DateUtil;
+			
+			import gadget.dao.Database;
+			import gadget.util.CalendarUtils;
+			import gadget.util.DateUtils;
+			import gadget.util.MenuUtils;
+			import gadget.util.Utils;
+			import gadget.window.WindowManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.ArrayList;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.formatters.DateFormatter;
+			
+			private const HOURS_PER_DAY:int = 24;
+			
+			private var selectBy:int = CalendarUtils.SELECTED_WEEK;
+			
+			private var day:ArrayList = new ArrayList(['sun','mon','tue','wed','thu','fri','sat','sun']);	
+			
+			public var refreshFunction:Function;  
+			
+			private function addActivity(item:Object , subtype:int = 0):void {
+				var screenCreate:Detail = new Detail();
+				screenCreate.calendar = this;
+				setTime(item,subtype);
+				screenCreate.item = item;
+				screenCreate.entity = "Activity";
+				screenCreate.subtype = subtype;
+				screenCreate.mainWindow = parentApplication as MainWindow;
+				screenCreate.refreshFunction = refreshFunction;
+				screenCreate.create = true;
+				WindowManager.openModal(screenCreate);
+			}
+			
+			private function setTime(item:Object, subtype:int):void{
+				var rowTime:int = item.row;
+				var colDate:int = item.col - 1;
+				var monday:Date = CalendarUtils.getMondayOfWeek(CalendarUtils.getSelectedDate(dateChooser));
+				trace('monday: ' + monday);
+				var selectedDate:Date = new Date(monday.getTime() + DateUtil.DAY_IN_MILLISECONDS * colDate);
+				trace('selected date: ' + selectedDate);
+				if(subtype == 0){
+					item["DueDate"] = DateUtils.format(selectedDate, DateUtils.DATABASE_DATE_FORMAT);
+				}else{
+					var startTime:Date = new Date(selectedDate.getTime() + DateUtil.HOUR_IN_MILLISECONDS * int(rowTime));
+					trace('start time: ' + startTime);
+					item["StartTime"] = DateUtils.format(startTime, DateUtils.DATABASE_DATETIME_FORMAT);
+					var endTime:Date = new Date(selectedDate.getTime() + DateUtil.HOUR_IN_MILLISECONDS * (int(rowTime) + 1));
+					trace('end time: ' + endTime);
+					item["EndTime"] = DateUtils.format(endTime, DateUtils.DATABASE_DATETIME_FORMAT);
+				}
+			}
+			
+			public function init():void {
+				MenuUtils.getContextMenuCalendar(tilelist, addActivity, openDetail, deleteItem);
+				loadData();
+			}  
+			
+			private function getTileListColumnHeader():ArrayCollection {
+				var monday:Date = CalendarUtils.getMondayOfWeek(CalendarUtils.getSelectedDate(dateChooser));
+				var tuesday:Date = new Date(monday.getTime() + DateUtil.DAY_IN_MILLISECONDS);
+				var wednesday:Date = new Date(tuesday.getTime() + DateUtil.DAY_IN_MILLISECONDS);
+				var thursday:Date = new Date(wednesday.getTime() + DateUtil.DAY_IN_MILLISECONDS);
+				var friday:Date = new Date(thursday.getTime() + DateUtil.DAY_IN_MILLISECONDS);
+				var saturday:Date = new Date(friday.getTime() + DateUtil.DAY_IN_MILLISECONDS);
+				var sunday:Date = new Date(saturday.getTime() + DateUtil.DAY_IN_MILLISECONDS);
+				switch(selectBy){
+					case CalendarUtils.SELECTED_WEEK: return new ArrayCollection(['Time', 
+						'Mon ' + monday.getDate(), 'Tue ' + tuesday.getDate(),
+						'Wed ' + wednesday.getDate(), 'Thu ' + thursday.getDate(),
+						'Fri ' + friday.getDate(), 'Sat ' + saturday.getDate(), 'Sun ' + sunday.getDate()]);
+					case CalendarUtils.SELECTED_5DAYS:  return new ArrayCollection(['Time', 
+						'Mon ' + monday.getDate(), 'Tue ' + tuesday.getDate(),
+						'Wed ' + wednesday.getDate(), 'Thu ' + thursday.getDate(),
+						'Fri ' + friday.getDate()]);
+					default:
+						var selectedDate:Date = dateChooser.selectedDate;
+						if( selectedDate == null) selectedDate = CalendarUtils.getSelectedDate(dateChooser);  
+						switch(selectedDate.getDay()){
+							case 0: return new ArrayCollection(['Time', 'Sun ' + sunday.getDate()]); 
+							case 1: return new ArrayCollection(['Time', 'Mon ' + monday.getDate()]);
+							case 2: return new ArrayCollection(['Time', 'Tue ' + tuesday.getDate()]);
+							case 3: return new ArrayCollection(['Time', 'Wed ' + wednesday.getDate()]);
+							case 4: return new ArrayCollection(['Time', 'Thu ' + thursday.getDate()]);
+							case 5: return new ArrayCollection(['Time', 'Fri ' + friday.getDate()]);
+							default: return new ArrayCollection(['Time', 'Sat ' + saturday.getDate()]);
+						}
+				}
+			}
+			
+			private function getTileListColumnCount():int {
+				switch(selectBy){
+					case CalendarUtils.SELECTED_WEEK: return 8;
+					case CalendarUtils.SELECTED_5DAYS: return 6;
+					default: return 2;
+				}			
+			}
+			
+			
+			private function changeTilelists():void {
+				/* change properties of the TilelistHeader and Tilelist */
+				tilelistheader.columnCount = getTileListColumnCount();
+				tilelistheader.dataProvider = getTileListColumnHeader();
+				tilelistheader.validateProperties();
+				tilelistheader.validateNow();
+				
+				tilelist.columnCount = getTileListColumnCount();
+				tilelist.validateProperties();
+				tilelist.validateNow();		
+			}
+			
+			
+			public function loadData():void {
+				tilelistheader.dataProvider = getTileListColumnHeader();
+				/* set the timeline for the Tilelist */
+				var data:ArrayCollection = new ArrayCollection();
+				var columnTileList:int = getTileListColumnCount();
+				for (var j:int = 0; j < HOURS_PER_DAY; j++){
+					for (var i:int = 0; i < columnTileList; i++){
+						if (i==0) {
+							data.addItem({label:"" + j + ":00", color: 0xEBEBEB, row: j, col: i});
+						} else {
+							data.addItem({label:"", color: 0xF2F2F2, row: j, col: i});
+						}
+					}	
+				}
+				
+				/* show the activities for the Tilelist */
+				var activityTaskRowIndex:Array = [-1, -1, -1, -1, -1, -1, -1, -1];
+				for each(var activity:Object in CalendarUtils.getActivities(dateChooser,selectBy)){
+					var index:int = 0;
+					var startDate:Date = null;
+					var endDate:Date = null;
+					var startDay:int = 0;
+					if( activity.Activity == 'Appointment'){
+						
+						startDate = DateUtils.guessAndParse(activity.StartTime);
+						endDate =DateUtils.guessAndParse(activity.EndTime);
+						
+						var startTime:int = startDate.getTime();
+						var endTime:int = endDate.getTime();
+						
+						var startHour:int = startDate.getHours();
+						var endHour:int = endDate.getHours();
+						
+						if(endTime - startTime < 3600000){
+							endHour ++;
+						}
+						
+						for(startHour; startHour < endHour; startHour++){
+							var label:String = (startHour == startDate.getHours() ? activity.Subject : '');
+							index = columnTileList * startHour + (startDate.getDay() == 0 ? 7 : startDate.getDay());
+							if(selectBy == CalendarUtils.SELECTED_DAY) index = columnTileList * startHour + 1;
+							markerDate(label, data.getItemAt(index), CalendarUtils.ACTIVITY_APPOINTMENT_COLOR, activity);
+						}
+					}else{
+						startDate = DateUtils.guessAndParse(activity.DueDate);
+						
+						startDay = startDate.getDay() == 0 ? 7 : startDate.getDay();
+						if (activityTaskRowIndex[startDay] < 23) {
+							activityTaskRowIndex[startDay]++;
+							
+							index = columnTileList * activityTaskRowIndex[startDay] + startDay;
+							if(selectBy == CalendarUtils.SELECTED_DAY) index = columnTileList * activityTaskRowIndex[startDay] + 1;
+						}
+						markerDate(activity.Subject, data.getItemAt(index), CalendarUtils.ACTIVITY_TASK_COLOR, activity);
+					}
+				}
+				
+				Utils.suppressWarning(data);
+				tilelist.dataProvider = data;
+				(tilelist.dataProvider as ArrayCollection).refresh();
+				tilelist.scrollToIndex( 8 * columnTileList );
+				CalendarUtils.setSpecialDays(dateChooser);
+			}
+			
+			private function markerDate(label:String, cell:Object, color:Object, activity:Object):void{
+				cell['label'] = label;
+				cell['color'] = color;
+				cell['data'] = activity;
+			}
+			
+			
+			private function showDetail(event:ListEvent):void{
+				var item:Object = event.currentTarget.selectedItem.data;			
+				var listDetail:ListDetail = (parentDocument as List).detail;
+				listDetail.item = item;
+				listDetail.loadData();
+				listDetail.validateNow();
+			}
+			
+			private function openDetailTileList(event:ListEvent):void {
+				showDetail(event);
+				var data:Object = event.currentTarget.selectedItem.data;
+				openDetail(data)
+			}
+			
+			private function openDetail(data:Object):void {
+				if(data == null) return;
+				(parentApplication as MainWindow).getSelectedList().editScreenDetail(data);
+			}  
+			
+			private function deleteItem(data:Object):void {
+				if(data == null) return;
+				(parentApplication as MainWindow).getSelectedList().deleteItem(data);
+			}    
+			
+//			private function setSpecialDays(): void {
+//				var specialDayData:Array = [];
+//				for each(var activity:Object in CalendarUtils.getSpecialDays(dateChooser.displayedYear, dateChooser.displayedMonth)){		
+//					var startDate:Date = null;
+//					var endDate:Date = null;
+//					
+//					var cDateObject:Object = null;
+//					if (activity.Activity == 'Task') { 
+//						startDate = DateUtils.guessAndParse(activity.DueDate);
+//						cDateObject = {rangeStart:startDate, rangeEnd:startDate};
+//					} else {
+//						startDate = DateUtils.guessAndParse(activity.StartTime);
+//						endDate = DateUtils.guessAndParse(activity.EndTime);
+//						if(startDate && endDate && startDate.getHours() < endDate.getHours()){
+//							cDateObject = {rangeStart:startDate, rangeEnd:endDate};
+//						}
+//					}
+//					if (cDateObject != null && !itemExist(specialDayData, cDateObject)) {
+//						specialDayData.push(cDateObject);
+//					}
+//				}
+//				//   			dateChooser.specialDates = specialDayData;
+//				dateChooser.selectedRanges = specialDayData;
+//				
+//				
+//			}
+			
+//			private function itemExist(specialDayData:Array, item:Object):Boolean {
+//				for each(var object:Object in specialDayData){
+//					var startDate:Date = object.rangeStart;
+//					var endDate:Date = object.rangeEnd;
+//					
+//					if(startDate.getTime() == item.rangeStart.getTime() && endDate.getTime() == item.rangeEnd.getTime()) return true;
+//				}
+//				return false;
+//			}	  
+			
+			private function selectByHandler(event:ItemClickEvent):void{
+				switch(event.index){
+					case 0: selectBy = CalendarUtils.SELECTED_WEEK; break;
+					case 1: selectBy = CalendarUtils.SELECTED_5DAYS; break;
+					case 2: selectBy = CalendarUtils.SELECTED_DAY; break;
+				}
+				changeTilelists();
+				loadData();
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:Style source="styles.css"/>
+	<!-- specialDatesColor="0xFF8040" -->
+	<mx:VBox>   		
+		<mx:DateChooser id="dateChooser" scroll="CalendarUtils.setSpecialDays(dateChooser);" change="loadData();"
+						selectionIndicatorSkin="mx.skins.halo.DateChooserIndicator"
+						selectionColor = "0xFF8040"
+						allowDisjointSelection="true" 
+						allowMultipleSelection="true" 
+						firstDayOfWeek="1"
+						/>
+		<mx:ToggleButtonBar color="0x323232" horizontalGap="0" itemClick="selectByHandler(event);" >
+			<mx:dataProvider>
+				<mx:Array>
+					<mx:String>Week</mx:String>
+					<mx:String>5 Days</mx:String>
+					<mx:String>Day</mx:String>
+				</mx:Array>
+			</mx:dataProvider>
+		</mx:ToggleButtonBar>	
+	</mx:VBox>	
+	<mx:VBox width="100%" height="100%" verticalGap="0">
+		<mx:Canvas width="100%" height="24">
+			<mx:TileList id="tilelistheader" left="0" top="0" right="16" bottom="0" columnCount="{getTileListColumnCount()}"  
+						 selectable="false" dataProvider="{getTileListColumnHeader()}"/>
+		</mx:Canvas> 
+		<mx:Canvas width="100%" height="100%">
+			<mx:TileList doubleClickEnabled="true" itemDoubleClick="openDetailTileList(event)" itemClick="showDetail(event)" id="tilelist" 
+						 columnCount="{getTileListColumnCount()}" rowCount="24" rowHeight="30" width="100%" height="100%" borderStyle="solid" maxVerticalScrollPosition="17">
+				<mx:itemRenderer>
+					<mx:Component>
+						<mx:HBox borderSkin="{HBoxSkinAlpha}" width="100%" backgroundColor="{data.color}" backgroundAlpha="0.5" horizontalScrollPolicy="off">
+							<mx:Script>
+								<![CDATA[
+									import gadget.control.HBoxSkinAlpha;
+								]]>
+							</mx:Script>
+							<mx:Label width="100%" text="{data.label}"/>
+						</mx:HBox>
+					</mx:Component>
+				</mx:itemRenderer>
+			</mx:TileList>
+		</mx:Canvas>
+	</mx:VBox>
+</mx:HBox>
